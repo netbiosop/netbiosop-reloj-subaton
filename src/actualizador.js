@@ -39,12 +39,16 @@ async function pedir(url, ms = 8000) {
   return r;
 }
 
-// ¿Hay versión nueva? → { version, tag, notas, url } o null
+// ¿Hay versión nueva? Mira el último cambio de la rama principal y su package.json → { version, tag, notas, url } o null
+const RAMA = process.env.UPDATE_BRANCH || 'main';
 async function buscar() {
-  const j = await (await pedir(`${API}/repos/${REPO}/releases/latest`)).json();
-  const version = String(j.tag_name || '').replace(/^v/, '');
+  const c = await (await pedir(`${API}/repos/${REPO}/commits/${RAMA}`)).json();
+  if (!c.sha) return null;
+  const pk = JSON.parse(Buffer.from(await (await pedir(`${RAW}/${REPO}/${c.sha}/package.json`)).arrayBuffer()).toString('utf8'));
+  const version = String(pk.version || '').replace(/^v/, '');
   if (!version) return null;
-  return { version, tag: j.tag_name, notas: String(j.body || '').slice(0, 2000), url: j.html_url, nueva: masNueva(version, versionLocal()) };
+  const notas = String(c.commit?.message || '').split('\n').filter((l) => !/^(Co-Authored-By|Claude-Session):/i.test(l)).join('\n').trim().slice(0, 2000);
+  return { version, tag: c.sha, notas, url: c.html_url, nueva: masNueva(version, versionLocal()) };
 }
 
 // Instala una versión: baja todo, verifica y reemplaza solo los archivos del programa
