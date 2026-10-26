@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Código de creador · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#e3121b;--good:#3ddc97;--warn:#ffb547;--bad:#ff5d73;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  header .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:16px;padding:16px 20px 40px;max-width:1400px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  h2 .r{margin-left:auto}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  input,select,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input{width:100%}
+  input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.15)}
+  input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  button,.btn{cursor:pointer;background:var(--card2);color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  .prim{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .fila{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+  .fila>*{flex:1;min-width:90px}
+  .fila>button,.fila>.btn{flex:0 0 auto}
+  .check{display:flex;align-items:center;gap:8px;margin:10px 0 2px;color:var(--text);font-size:13px;cursor:pointer}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .nota.ok{color:var(--good)} .nota.mal{color:var(--bad)}
+  .estado{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;background:var(--card2);color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0}
+  .estado.activa{color:var(--good)}
+  /* lista de plataformas */
+  .plats{display:flex;flex-direction:column;gap:8px}
+  .plat{display:grid;grid-template-columns:28px 1.1fr 1fr 1fr 2fr auto;gap:8px;align-items:center;background:var(--card2);border-radius:11px;padding:8px 10px}
+  .plat.off{opacity:.5}
+  .plat .acc{display:flex;gap:4px}
+  .cols{display:grid;grid-template-columns:28px 1.1fr 1fr 1fr 2fr auto;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:0 10px}
+  .msgs{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+  .msg{display:flex;gap:6px}
+  .prev{background:repeating-conic-gradient(#1b1a20 0 25%,#141318 0 50%) 0 0/22px 22px;border-radius:11px;overflow:hidden;border:1px solid var(--line);position:relative}
+  .prev iframe{border:0;display:block;transform-origin:top left;background:transparent}
+  .urls{display:flex;flex-direction:column;gap:8px}
+  .url{display:flex;gap:8px;align-items:center;background:var(--card2);border-radius:10px;padding:8px 10px}
+  .url code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffb3b6}
+  .url .tam{color:var(--muted);font-size:12px}
+  @media(max-width:760px){ .plat,.cols{grid-template-columns:28px 1fr 1fr} .cols{display:none} .plat .av{grid-column:1/-1} .plat .acc{grid-column:1/-1;justify-content:flex-end} main{grid-template-columns:1fr;padding:12px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>⭐ Código de creador</h1>
+  <span class="sp"></span>
+  <span class="nota" id="notaG" style="margin:0"></span>
+  <button class="prim" id="guardar">💾 Guardar cambios</button>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card ancho">
+    <h2>🎮 Plataformas donde se usa tu código <span class="r"><button class="sm" id="addPlat">＋ Agregar plataforma</button></span></h2>
+    <div class="cols"><span>On</span><span>Juego</span><span>Dónde (tienda)</span><span>Código</span><span>Aviso chico (abajo de la tarjeta)</span><span></span></div>
+    <div class="plats" id="plats"></div>
+    <div class="nota">La tarjeta y la cinta van rotando entre las plataformas activas, en este orden. Si el código es el mismo en todas, igual se muestra en cada una. Epic pide aclarar que recibes una comisión: déjalo en el aviso.</div>
+  </section>
+
+  <section class="card">
+    <h2>🃏 Tarjeta "Apoya a un creador" <span class="estado" id="estTarjeta"></span></h2>
+    <label class="check"><input type="checkbox" id="tOn"> Que aparezca sola</label>
+    <div class="fila">
+      <div><label>Cada (minutos)</label><input type="number" id="tCada" min="0" max="240"></div>
+      <div><label>Queda en pantalla (segundos)</label><input type="number" id="tDur" min="8" max="120"></div>
+    </div>
+    <div class="fila">
+      <div><label>Título (la última palabra sale en rojo)</label><input id="tTitulo" maxlength="40"></div>
+      <div><label>Texto al apretar Aceptar</label><input id="tGracias" maxlength="40"></div>
+    </div>
+    <div class="fila" style="margin-top:12px"><button id="tAhora">▶ Mostrar ahora</button></div>
+    <div class="nota" id="notaT"></div>
+  </section>
+
+  <section class="card">
+    <h2>📰 Cinta de noticias (abajo) <span class="estado" id="estCinta"></span></h2>
+    <label class="check"><input type="checkbox" id="cOn"> Que aparezca sola</label>
+    <div class="fila">
+      <div><label>Cada (minutos)</label><input type="number" id="cCada" min="0" max="240"></div>
+      <div><label>Queda en pantalla (segundos)</label><input type="number" id="cDur" min="10" max="600"></div>
+      <div><label>Velocidad (menos = más lento)</label><input type="number" id="cVel" min="30" max="300" title="píxeles por segundo · 55 se lee cómodo"></div>
+      <div><label>Etiqueta (Urgente, News…)</label><input id="cEtiq" maxlength="16" placeholder="Urgente"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="cPlats"> Incluir las plataformas con su código</label>
+    <label class="check"><input type="checkbox" id="cReyes"> Esconder "Reyes del mes pasado" mientras pasa la cinta</label>
+    <label>Mensajes (lo que va entre *asteriscos* sale resaltado en rojo)</label>
+    <div class="msgs" id="msgs"></div>
+    <div class="fila" style="margin-top:8px"><button class="sm" id="addMsg">＋ Agregar mensaje</button><span></span><button id="cAhora">▶ Mostrar ahora</button></div>
+    <div class="nota" id="notaC"></div>
+  </section>
+
+  <section class="card ancho">
+    <h2>👀 Vista previa <span class="r"><button class="sm" id="recargar">↻ Repetir</button></span></h2>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div class="prev" style="width:416px;height:184px"><iframe id="pvT" style="width:520px;height:230px;transform:scale(.8)"></iframe></div>
+      <div style="flex:1;min-width:280px">
+        <div class="prev" id="pvCbox" style="height:60px"><iframe id="pvC" style="width:1920px;height:60px"></iframe></div>
+        <div class="nota">La vista previa usa lo último guardado.</div>
+        <label class="check"><input type="checkbox" id="soloVivo"> Solo cuando estoy en vivo (y nunca con "Pausar todo")</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="card ancho">
+    <h2>🎥 Fuentes de navegador para OBS</h2>
+    <div class="urls" id="urls"></div>
+    <div class="nota">La tarjeta va donde tenías el cuadro azul de Fortnite. La cinta, pegada abajo de todo (Y = 1020) con todo el ancho. Escala al 100% para que se vea nítida.</div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+function nota(el, txt, cls=''){ el.textContent = txt; el.className = 'nota '+cls; }
+let cfg = null, cambios = false;
+const AVISO_EPIC = 'Código de creador de Epic · recibo una comisión por tus compras';
+
+function pintarPlats(){
+  $('plats').innerHTML = cfg.plataformas.map((p,i)=>`
+    <div class="plat ${p.on===false?'off':''}" data-i="${i}">
+      <input type="checkbox" data-k="on" ${p.on!==false?'checked':''} title="Activa">
+      <input data-k="juego" value="${esc(p.juego)}" placeholder="Juego (ej. Fortnite)" maxlength="30">
+      <input data-k="tienda" value="${esc(p.tienda)}" placeholder="Dónde (ej. Epic Games)" maxlength="30">
+      <input data-k="codigo" value="${esc(p.codigo)}" placeholder="Código" maxlength="30" style="font-weight:700;text-transform:uppercase">
+      <input class="av" data-k="aviso" value="${esc(p.aviso)}" placeholder="Aviso chico (opcional)" maxlength="110">
+      <span class="acc"><button class="sm" data-mv="-1" title="Subir">↑</button><button class="sm" data-mv="1" title="Bajar">↓</button><button class="sm" data-del title="Quitar">✕</button></span>
+    </div>`).join('') || '<div class="nota">No hay plataformas. Agrega una.</div>';
+}
+function pintarMsgs(){
+  $('msgs').innerHTML = cfg.cinta.mensajes.map((m,i)=>`<div class="msg" data-i="${i}"><input value="${esc(m)}" maxlength="140" placeholder="Ej: Usa mi código *BYTEDEMOND* en la tienda"><button class="sm" data-up title="Subir">↑</button><button class="sm" data-del title="Quitar">✕</button></div>`).join('');
+}
+function pintar(){
+  const t = cfg.tarjeta, c = cfg.cinta;
+  $('tOn').checked = t.on; $('tCada').value = t.cadaMin; $('tDur').value = t.duracionSeg; $('tTitulo').value = t.titulo; $('tGracias').value = t.gracias;
+  $('cOn').checked = c.on; $('cCada').value = c.cadaMin; $('cDur').value = c.duracionSeg; $('cVel').value = c.velocidad; $('cEtiq').value = c.etiqueta;
+  $('cPlats').checked = c.conPlataformas; $('cReyes').checked = c.ocultarReyes; $('soloVivo').checked = cfg.soloEnVivo;
+  pintarPlats(); pintarMsgs();
+}
+function leer(){
+  cfg.tarjeta = { on: $('tOn').checked, cadaMin: +$('tCada').value, duracionSeg: +$('tDur').value, titulo: $('tTitulo').value, gracias: $('tGracias').value };
+  cfg.cinta = { ...cfg.cinta, on: $('cOn').checked, cadaMin: +$('cCada').value, duracionSeg: +$('cDur').value, velocidad: +$('cVel').value, etiqueta: $('cEtiq').value,
+    conPlataformas: $('cPlats').checked, ocultarReyes: $('cReyes').checked, mensajes: [...document.querySelectorAll('#msgs input')].map((i)=>i.value) };
+  cfg.soloEnVivo = $('soloVivo').checked;
+  cfg.plataformas = [...document.querySelectorAll('#plats .plat')].map((row)=>{
+    const g = (k)=>row.querySelector(`[data-k="${k}"]`);
+    return { id: cfg.plataformas[row.dataset.i]?.id, juego: g('juego').value, tienda: g('tienda').value, codigo: g('codigo').value.toUpperCase(), aviso: g('aviso').value, on: g('on').checked };
+  });
+  return cfg;
+}
+function marcar(){ cambios = true; nota($('notaG'), 'Hay cambios sin guardar', ''); }
+async function guardar(silencio){
+  const j = await api('/api/codigo/config','POST', leer());
+  cfg = j.result.config; cambios = false; pintar(); vistaPrevia();
+  if(!silencio) nota($('notaG'), '✔ Guardado', 'ok');
+}
+function vistaPrevia(){ $('pvT').src = '/codigo-tarjeta?demo=1&t='+Date.now(); $('pvC').src = '/codigo-cinta?demo=1&t='+Date.now(); escalarCinta(); }
+function escalarCinta(){ const w = $('pvCbox').clientWidth; const s = w/1920; $('pvC').style.transform = `scale(${s})`; $('pvCbox').style.height = (60*s+2)+'px'; }
+window.addEventListener('resize', escalarCinta);
+
+function fmt(seg){ const m = Math.floor(seg/60), s = seg%60; return m+':'+String(s).padStart(2,'0'); }
+function pintarEstado(e){
+  for (const [k,id] of [['tarjeta','estTarjeta'],['cinta','estCinta']]){
+    const p = e.proximas[k], el = $(id);
+    el.className = 'estado '+(p.estado==='activa'?'activa':'');
+    el.textContent = p.estado==='activa' ? 'próxima en '+fmt(p.enSeg) : p.estado;
+  }
+}
+async function estado(){ try { pintarEstado(await api('/api/codigo/estado')); } catch(e){} }
+
+document.addEventListener('input', (e)=>{ if(e.target.closest('main')) marcar(); if(e.target.dataset.k==='on') e.target.closest('.plat').classList.toggle('off', !e.target.checked); });
+$('plats').addEventListener('click', (e)=>{
+  const b = e.target.closest('button'); if(!b) return;
+  leer(); const i = +b.closest('.plat').dataset.i, L = cfg.plataformas;
+  if('del' in b.dataset) L.splice(i,1);
+  if(b.dataset.mv){ const j = i + +b.dataset.mv; if(j>=0 && j<L.length) [L[i],L[j]] = [L[j],L[i]]; }
+  pintarPlats(); marcar();
+});
+$('addPlat').onclick = ()=>{ leer(); cfg.plataformas.push({ juego:'', tienda:'', codigo: cfg.plataformas[0]?.codigo || '', aviso:'', on:true }); pintarPlats(); marcar(); document.querySelector('#plats .plat:last-child [data-k=juego]').focus(); };
+$('msgs').addEventListener('click', (e)=>{
+  const b = e.target.closest('button'); if(!b) return;
+  leer(); const i = +b.closest('.msg').dataset.i, L = cfg.cinta.mensajes;
+  if('del' in b.dataset) L.splice(i,1);
+  if('up' in b.dataset && i>0) [L[i-1],L[i]] = [L[i],L[i-1]];
+  pintarMsgs(); marcar();
+});
+$('addMsg').onclick = ()=>{ leer(); cfg.cinta.mensajes.push(''); pintarMsgs(); marcar(); document.querySelector('#msgs .msg:last-child input').focus(); };
+$('guardar').onclick = ()=> guardar().catch((e)=>nota($('notaG'), e.message, 'mal'));
+for (const [btn, que, n] of [['tAhora','tarjeta','notaT'],['cAhora','cinta','notaC']]) $(btn).onclick = async ()=>{
+  try { if(cambios) await guardar(true); const r = await api('/api/codigo/mostrar','POST',{que}); nota($(n), `▶ En pantalla por ${r.result.dur} s`, 'ok'); estado(); }
+  catch(e){ nota($(n), e.message, 'mal'); }
+};
+$('recargar').onclick = vistaPrevia;
+window.addEventListener('beforeunload', (e)=>{ if(cambios){ e.preventDefault(); e.returnValue=''; } });
+
+(async ()=>{
+  const j = await api('/api/codigo/estado'); cfg = j.config; pintar(); pintarEstado(j); vistaPrevia();
+  const base = location.origin.replace(/\/\/[^:/]+/, '//localhost');
+  $('urls').innerHTML = [['Tarjeta "Apoya a un creador"','/codigo-tarjeta','520 × 230'],['Cinta de noticias','/codigo-cinta','1920 × 60']]
+    .map(([n,u,t])=>`<div class="url"><b>${n}</b><code>${base+u}</code><span class="tam">${t}</span><button class="sm" data-copy="${base+u}">Copiar</button></div>`).join('');
+  $('urls').onclick = (e)=>{ const b = e.target.closest('[data-copy]'); if(b) navigator.clipboard?.writeText(b.dataset.copy).then(()=>{ b.textContent='✔ Copiado'; setTimeout(()=>b.textContent='Copiar',1200); }); };
+  setInterval(estado, 5000);
+})();
+</script>
+</body>
+</html>

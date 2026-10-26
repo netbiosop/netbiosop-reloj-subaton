@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel de mods · Reloj Subatón</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="panel.css">
+<style>
+  .mod-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; padding: 18px 20px 60px; max-width: 1200px; margin: 0 auto; }
+  @media (max-width: 900px) { .mod-grid { grid-template-columns: 1fr; padding: 14px 16px 40px; } }
+  .who { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .who b { color: var(--text); }
+  .badge-mod { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(124, 77, 255, .2); color: var(--accent); }
+  .no-perm { color: var(--muted); font-size: 13px; background: var(--card2); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
+  .total { color: var(--muted); font-size: 13px; text-align: center; margin: -4px 0 10px; }
+  .total b { color: var(--good); }
+  .mod-grid .rates input[type=number] { width: 84px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot"></span> Reloj Subatón</div>
+  <span class="badge-mod">Panel de mods</span>
+  <div class="who">Conectado como <b id="meName"></b><button class="ghost sm" id="btnLogout">Salir</button></div>
+</header>
+
+<main class="mod-grid">
+  <section class="card">
+    <div class="clock-head">
+      <h2>Reloj</h2>
+      <span class="pill" id="runPill">En pausa</span>
+    </div>
+    <div class="big" id="bigTime">--:--:--</div>
+    <div class="total">Tiempo sumado por la comunidad: <b id="totalAdded">0:00</b></div>
+    <div id="multBanner" class="mult-banner hidden"></div>
+
+    <div data-perm="run" class="row center gap">
+      <button class="primary lg" id="btnStart">▶ Iniciar</button>
+      <button class="lg" id="btnPause">⏸ Pausar</button>
+    </div>
+
+    <div data-perm="add">
+      <div class="quick">
+        <div class="quick-row">
+          <button data-add="60">+1 min</button><button data-add="300">+5 min</button><button data-add="600">+10 min</button><button data-add="1800">+30 min</button><button data-add="3600">+1 h</button>
+        </div>
+        <div class="quick-row minus">
+          <button data-add="-60">−1 min</button><button data-add="-300">−5 min</button><button data-add="-600">−10 min</button><button data-add="-1800">−30 min</button><button data-add="-3600">−1 h</button>
+        </div>
+      </div>
+      <div class="row gap wrap">
+        <label class="inline grow">Sumar/quitar <input id="customAdd" placeholder="ej: 15 o -2:30" class="dur"></label>
+        <button id="btnCustomAdd">Aplicar</button>
+      </div>
+      <p class="hint" id="maxHint"></p>
+    </div>
+
+    <div data-perm="set" class="row gap wrap" style="margin-top:10px">
+      <label class="inline grow">Fijar en <input id="setTime" placeholder="ej: 3:00:00" class="dur"></label>
+      <button id="btnSet">Fijar</button>
+    </div>
+    <p class="no-perm hidden" id="noPermClock">Solo puedes ver el reloj. El dueño del canal no te dio permisos para cambiarlo.</p>
+  </section>
+
+  <section class="card">
+    <h2>Multiplicador</h2>
+    <div class="mult-now" id="multNow">Sin multiplicador activo</div>
+    <div data-perm="mult">
+      <h3>Activar ahora</h3>
+      <div class="seg" id="multSeg">
+        <button data-mv="2" class="on">x2</button><button data-mv="3">x3</button><button data-mv="4">x4</button><button data-mv="5">x5</button>
+      </div>
+      <div class="applies" id="manualApplies"></div>
+      <div class="row gap wrap">
+        <label class="inline">Durante
+          <select id="multMinutes">
+            <option value="10">10 minutos</option>
+            <option value="15">15 minutos</option>
+            <option value="30" selected>30 minutos</option>
+            <option value="60">1 hora</option>
+            <option value="0">Hasta que lo apaguen</option>
+          </select>
+        </label>
+        <button class="primary" id="btnMultOn">Activar</button>
+        <button class="danger-ghost" id="btnMultOff">Apagar</button>
+      </div>
+      <h3>Programar</h3>
+      <div class="sched-form">
+        <label>Desde<input type="datetime-local" id="schStart"></label>
+        <label>Hasta<input type="datetime-local" id="schEnd"></label>
+        <label>Multiplica<select id="schValue"><option value="2">x2</option><option value="3">x3</option><option value="4">x4</option><option value="5">x5</option></select></label>
+      </div>
+      <div class="applies" id="schedApplies"></div>
+      <button id="btnSchedule">Programar</button>
+    </div>
+    <ul class="sched-list" id="schedList"></ul>
+  </section>
+
+  <section class="card hidden" data-perm="rates" style="grid-column: 1 / -1">
+    <h2>Tarifas <span class="sub">cuánto tiempo suma cada cosa</span></h2>
+    <div class="rates" id="modRates"></div>
+    <div class="row gap" style="margin-top:12px"><button class="primary" id="btnSaveRates">Guardar tarifas</button></div>
+    <p class="hint">Los tiempos se escriben como <b>5</b> (minutos), <b>1:30</b> o <b>1:00:00</b>. Proporcional: 2.5 USD con 1 USD = 1:00 suman 2:30.</p>
+  </section>
+
+  <section class="card hidden" data-perm="money">
+    <h2>Montos recibidos <span class="sub">sin contar pruebas</span></h2>
+    <div class="stats" id="modStats"></div>
+  </section>
+
+  <section class="card hidden" data-perm="chat" id="modChat">
+    <h2>Comandos del chat</h2>
+    <div class="chat-perms">
+      <label class="check"><input type="checkbox" data-c="enabled"> Comandos activados</label>
+      <label class="check"><input type="checkbox" data-c="allowLeadMods"> Moderadores líderes (supermods)</label>
+      <label class="check"><input type="checkbox" data-c="allowMods"> Todos los moderadores</label>
+      <label class="check"><input type="checkbox" data-c="allowVips"> VIPs</label>
+      <label class="check"><input type="checkbox" data-c="reply"> Responder en el chat</label>
+      <label class="check"><input type="checkbox" data-c="publicTime"> Cualquiera puede usar !tiempo</label>
+      <label>Usuarios con permiso (uno por línea)<textarea id="chatUsers" rows="3"></textarea></label>
+      <div class="row gap wrap">
+        <label>Prefijo<input id="chatPrefix" maxlength="3" style="width:70px"></label>
+        <label>Máximo por comando<input id="chatMax" class="dur" placeholder="sin límite"></label>
+      </div>
+      <div><button class="primary" id="btnSaveChat">Guardar comandos</button></div>
+    </div>
+  </section>
+
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>Historial <span class="sub">lo que fue sumando tiempo</span></h2>
+    <ul class="log" id="log"></ul>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script src="mod.js"></script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Lluvia de patitos</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden}
+  canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/*  Lluvia de patitos 🦆 — fuente de navegador de PANTALLA COMPLETA (1920 × 1080), encima del juego.
+    Mercado Pago → patitos AMARILLOS · PayPal → patitos VERDES. Caen, rebotan y se apilan abajo mezclados.
+    Se configura en el panel del podio (sección 🦆): cuántos patitos por cuántos dólares, cuánto duran
+    en pantalla, tope por donación y máximo en pantalla. Cuando pasa la duración sin donaciones, se van;
+    con la próxima donación vuelven a caer TODOS los acumulados más los nuevos.
+    Opciones en la URL (opcionales):  tam=24 (tamaño)   desde=0&hasta=1920 (franja donde caen)   prueba=1 */
+const q = new URLSearchParams(location.search);
+const num = (k, d) => (q.has(k) && isFinite(+q.get(k)) ? +q.get(k) : d);
+const R = num('tam', 24);
+let cfg = { usd: 1, patos: 1, duracionMin: 0, maxPorAporte: 60, maxPantalla: 130 }, ultimo = 0;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let W = 0, H = 0, X0 = 0, X1 = 0;
+function medir(){ W = cv.width = innerWidth; H = cv.height = innerHeight; X0 = Math.max(0, num('desde', 0)); X1 = Math.min(W, num('hasta', W)); }
+medir(); addEventListener('resize', medir);
+
+// ---------- dibujo del patito de goma (se pinta una vez por color y se reutiliza) ----------
+const COLORES = {
+  y: { cuerpo: '#FFD93B', sombra: '#F0A800', brillo: '#FFF3A6', borde: '#8a5a00' },   // Mercado Pago
+  g: { cuerpo: '#58E06F', sombra: '#21A33F', brillo: '#C9FFD2', borde: '#0f5222' },   // PayPal
+};
+function sprite(c){
+  const s = Math.ceil(R * 2.7), k = document.createElement('canvas'); k.width = k.height = s;
+  const g = k.getContext('2d'); g.translate(s / 2, s / 2 + R * .1); g.lineWidth = Math.max(1.5, R * .09); g.strokeStyle = c.borde;
+  const grad = (x, y, r) => { const gr = g.createRadialGradient(x - r * .3, y - r * .4, r * .1, x, y, r * 1.1); gr.addColorStop(0, c.brillo); gr.addColorStop(.45, c.cuerpo); gr.addColorStop(1, c.sombra); return gr; };
+  // cola
+  g.beginPath(); g.moveTo(-R * .95, -R * .05); g.quadraticCurveTo(-R * 1.25, -R * .55, -R * .78, -R * .5); g.quadraticCurveTo(-R * .7, -R * .2, -R * .6, -R * .05); g.closePath();
+  g.fillStyle = c.sombra; g.fill(); g.stroke();
+  // cuerpo
+  g.beginPath(); g.ellipse(0, R * .18, R * 1.0, R * .72, 0, 0, Math.PI * 2); g.fillStyle = grad(0, R * .18, R); g.fill(); g.stroke();
+  // ala
+  g.beginPath(); g.ellipse(-R * .12, R * .2, R * .48, R * .3, -.25, 0, Math.PI * 2); g.fillStyle = c.sombra; g.globalAlpha = .75; g.fill(); g.globalAlpha = 1;
+  g.beginPath(); g.ellipse(-R * .12, R * .2, R * .48, R * .3, -.25, Math.PI * .1, Math.PI * .9); g.stroke();
+  // cabeza
+  g.beginPath(); g.arc(R * .45, -R * .52, R * .52, 0, Math.PI * 2); g.fillStyle = grad(R * .45, -R * .52, R * .52); g.fill(); g.stroke();
+  // pico
+  g.beginPath(); g.ellipse(R * .98, -R * .42, R * .32, R * .15, .12, 0, Math.PI * 2); g.fillStyle = '#FF8A00'; g.fill(); g.strokeStyle = '#a34700'; g.stroke();
+  g.beginPath(); g.moveTo(R * .7, -R * .42); g.lineTo(R * 1.26, -R * .4); g.strokeStyle = '#a34700'; g.lineWidth = Math.max(1, R * .05); g.stroke();
+  // ojo
+  g.beginPath(); g.arc(R * .58, -R * .66, R * .1, 0, Math.PI * 2); g.fillStyle = '#111'; g.fill();
+  g.beginPath(); g.arc(R * .61, -R * .69, R * .035, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
+  // mejilla
+  g.beginPath(); g.arc(R * .5, -R * .38, R * .09, 0, Math.PI * 2); g.fillStyle = 'rgba(255,90,90,.45)'; g.fill();
+  return k;
+}
+const SPR = { y: sprite(COLORES.y), g: sprite(COLORES.g) };
+
+// ---------- física: círculos con gravedad, rebote y apilado ----------
+const G = 0.42, REBOTE = 0.28, ROCE = 0.985;
+let patos = [];
+const vivos = () => patos.filter(p => !p.muere);
+function nuevoPato(c, x){
+  const r = R * (0.9 + Math.random() * 0.2);
+  patos.push({ c, x: x ?? (X0 + r + Math.random() * (X1 - X0 - 2 * r)), y: -r - Math.random() * 60, vx: (Math.random() - .5) * 3, vy: Math.random() * 2,
+    r, a: (Math.random() - .5) * .8, va: (Math.random() - .5) * .2, f: Math.random() < .5 ? -1 : 1, alfa: 1, muere: false, lento: false });
+  recortar();
+}
+// Si hay más patitos que el máximo en pantalla, los más viejos se desvanecen
+function recortar(){
+  const v = vivos(), extra = v.length - cfg.maxPantalla;
+  for (let i = 0; i < extra; i++) v[i].muere = true;
+}
+function paso(){
+  const n = patos.length;
+  for (const p of patos){
+    p.vy += G; p.vx *= ROCE; p.vy *= .995;
+    p.x += p.vx; p.y += p.vy;
+    p.a += p.va; p.va *= .96;
+    if (p.y + p.r > H){ p.y = H - p.r; if (p.vy > 0) p.vy *= -REBOTE; p.vx *= .85; p.va += p.vx * .01; }
+    if (p.x - p.r < X0){ p.x = X0 + p.r; p.vx = Math.abs(p.vx) * .4; }
+    if (p.x + p.r > X1){ p.x = X1 - p.r; p.vx = -Math.abs(p.vx) * .4; }
+    if (p.muere) p.alfa -= p.lento ? 0.012 : 0.025;
+  }
+  for (let it = 0; it < 3; it++){
+    for (let i = 0; i < n; i++){
+      const a = patos[i];
+      for (let j = i + 1; j < n; j++){
+        const b = patos[j], dx = b.x - a.x, dy = b.y - a.y, min = (a.r + b.r) * .92, d2 = dx * dx + dy * dy;
+        if (d2 >= min * min || d2 === 0) continue;
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, sobra = (min - d) / 2;
+        a.x -= nx * sobra; a.y -= ny * sobra; b.x += nx * sobra; b.y += ny * sobra;
+        const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (rv < 0){ const imp = -(1 + REBOTE) * rv / 2; a.vx -= imp * nx; a.vy -= imp * ny; b.vx += imp * nx; b.vy += imp * ny; a.va -= imp * .008; b.va += imp * .008; }
+      }
+    }
+  }
+  for (const p of patos) if (Math.abs(p.vy) < .8 && Math.abs(p.vx) < .8){ p.a *= .9; p.va *= .7; }
+  patos = patos.filter(p => p.alfa > 0);
+}
+function dibujar(){
+  ctx.clearRect(0, 0, W, H);
+  for (const p of patos){
+    const s = SPR[p.c], k = (p.r * 2.7) / s.width;
+    ctx.save(); ctx.globalAlpha = Math.max(0, p.alfa); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.scale(p.f * k, k);
+    ctx.drawImage(s, -s.width / 2, -s.height / 2 - R * .1); ctx.restore();
+  }
+}
+let ult = performance.now(), acum = 0;
+function bucle(t){
+  acum += Math.min(100, t - ult); ult = t;
+  while (acum >= 16.67){ paso(); acum -= 16.67; }
+  dibujar(); requestAnimationFrame(bucle);
+}
+requestAnimationFrame(bucle);
+
+// ---------- lluvia: repartida por TODO el ancho de la pantalla ----------
+const cola = [];
+function lluvia(colores){
+  const n = colores.length; if (!n) return;
+  const ancho = (X1 - X0 - 2 * R) / n, orden = [...Array(n).keys()].sort(() => Math.random() - .5);
+  orden.forEach((franja, k) => cola.push({ c: colores[k], x: X0 + R + ancho * (franja + Math.random()) }));
+}
+setInterval(() => { const cuantos = cola.length > 60 ? 4 : 2; for (let i = 0; i < cuantos && cola.length; i++){ const p = cola.shift(); nuevoPato(p.c, p.x); } }, 90);
+const mezclar = (y, g) => [...Array(y).fill('y'), ...Array(g).fill('g')].sort(() => Math.random() - .5);
+
+// ---------- duración en pantalla ----------
+let timerOcultar = null;
+function programarOcultar(desde){
+  clearTimeout(timerOcultar); timerOcultar = null;
+  const dur = (Number(cfg.duracionMin) || 0) * 60000; if (!dur) return;
+  const resta = (desde || Date.now()) + dur - Date.now();
+  if (resta <= 0) return ocultar();
+  timerOcultar = setTimeout(ocultar, resta);
+}
+function ocultar(){
+  clearTimeout(timerOcultar); timerOcultar = null;
+  cola.length = 0;
+  for (const p of patos){ p.muere = true; p.lento = true; }
+  try { localStorage.removeItem(CLAVE); } catch (e) {}
+}
+
+// ---------- llega una donación ----------
+function aporte(m){
+  if (m.config) cfg = m.config;
+  if (m.vaciar){ ocultar(); return; }
+  const c = m.color || (m.source === 'paypal' ? 'g' : 'y'), n = Math.max(1, m.nuevos || 1);
+  if (vivos().length === 0 && cola.length === 0 && m.total){
+    // Pantalla vacía: vuelven a caer TODOS los acumulados más los de esta donación
+    let y = m.total.y + (m.test && c === 'y' ? n : 0), g = m.total.g + (m.test && c === 'g' ? n : 0);
+    const tot = y + g, max = cfg.maxPantalla;
+    if (tot > max){ y = Math.round(y / tot * max); g = max - y; }
+    lluvia(mezclar(y, g));
+  } else {
+    lluvia(Array(n).fill(c));
+  }
+  if (!m.test) ultimo = Date.now();
+  programarOcultar(Date.now());
+}
+
+// ---------- el montón visible se guarda (sobrevive a recargar la fuente u OBS) ----------
+const CLAVE = 'patitos-monton-v1';
+function guardar(){
+  try {
+    const v = vivos(); if (!v.length) return localStorage.removeItem(CLAVE);
+    localStorage.setItem(CLAVE, JSON.stringify({ W, H, p: v.map(p => [p.c, Math.round(p.x), Math.round(p.y), +p.a.toFixed(2), p.f, +(p.r / R).toFixed(2)]) }));
+  } catch (e) {}
+}
+setInterval(guardar, 3000);
+addEventListener('beforeunload', guardar);
+function restaurar(){
+  try {
+    const d = JSON.parse(localStorage.getItem(CLAVE) || 'null'); if (!d) return;
+    const sx = W / (d.W || W), sy = H / (d.H || H);
+    for (const [c, x, y, a, f, rr] of d.p) patos.push({ c, x: x * sx, y: y * sy, vx: 0, vy: 0, r: R * (rr || 1), a, va: 0, f, alfa: 1, muere: false, lento: false });
+    recortar();
+  } catch (e) {}
+}
+
+// ---------- configuración del panel y conexión con el reloj ----------
+async function leerConfig(primera){
+  try {
+    const j = await (await fetch('/api/podio', { cache: 'no-store' })).json();
+    if (!j.patitos) return;
+    const antes = cfg.duracionMin;
+    cfg = j.patitos.config; ultimo = j.patitos.ultimo || 0;
+    if (primera){
+      const dur = (Number(cfg.duracionMin) || 0) * 60000;
+      // Al abrir: si todavía no pasó la duración desde la última donación, el montón sigue en pantalla
+      if (!dur || Date.now() - ultimo < dur){ restaurar(); if (vivos().length) programarOcultar(ultimo); }
+      else { try { localStorage.removeItem(CLAVE); } catch (e) {} }
+    } else if (cfg.duracionMin !== antes && vivos().length){
+      programarOcultar(ultimo || Date.now());
+    }
+    recortar();
+  } catch (e) { if (primera) restaurar(); }
+}
+function conectar(){
+  const es = new EventSource('/events?overlay=1');
+  es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'aporte') aporte(m.payload); } catch (e) {} };
+  es.onerror = () => { es.close(); setTimeout(conectar, 3000); };
+}
+leerConfig(true).then(conectar);
+setInterval(() => leerConfig(false), 10000);
+window.cuantosPatos = () => vivos().length; // para diagnóstico
+if (q.get('prueba') === '1'){ setTimeout(() => aporte({ source: 'mercadopago', nuevos: 12, total: { y: 0, g: 0 }, test: true }), 900); }
+</script>
+</body>
+</html>

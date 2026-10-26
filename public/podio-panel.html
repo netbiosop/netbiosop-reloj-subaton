@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podio mensual · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#a77bff;
+        --good:#3ddc97;--warn:#ffb547;--bad:#ff5d73;--oro:#FFD54A;--dinero:#3ecf8e;--subs:#ff8ad8;--bits:#c18cff;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  header .mes{font-weight:700;color:var(--oro)}
+  header .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;padding:16px 20px 40px;max-width:1400px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  h2 .r{margin-left:auto}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  input,select,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input,select{width:100%}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  button,.btn{cursor:pointer;background:var(--card2);color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  .prim{background:var(--accent);border-color:var(--accent);color:#120c1f;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .peligro{border-color:var(--bad);color:var(--bad)}
+  .fila{display:flex;gap:8px;align-items:flex-end}
+  .fila>*{flex:1;min-width:0}
+  .fila>button,.fila>.btn{flex:0 0 auto}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .nota.ok{color:var(--good)} .nota.mal{color:var(--bad)}
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tabs button{flex:1}
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#120c1f;font-weight:700}
+  ol.rank{margin:0;padding:0;list-style:none;counter-reset:n}
+  ol.rank li{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;counter-increment:n}
+  ol.rank li:nth-child(odd){background:rgba(255,255,255,.03)}
+  ol.rank li::before{content:counter(n);width:22px;text-align:center;font-weight:700;color:var(--muted)}
+  ol.rank li:nth-child(1)::before{content:"🥇"} ol.rank li:nth-child(2)::before{content:"🥈"} ol.rank li:nth-child(3)::before{content:"🥉"}
+  ol.rank li:nth-child(-n+3){font-weight:600}
+  ol.rank .v{margin-left:auto;font-weight:700}
+  ol.rank .ed{padding:2px 7px;font-size:12px;background:transparent;border-color:transparent;opacity:.55}
+  ol.rank li:hover .ed{opacity:1;border-color:var(--line)}
+  .rey{position:relative}
+  .rey .man{display:inline-block;font-size:10px;padding:0 5px;border-radius:5px;background:var(--card);color:var(--oro);margin-left:4px;vertical-align:middle}
+  .rey .acc{display:flex;gap:4px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+  .rey .acc button{padding:3px 8px;font-size:11px}
+  .rey .auto{font-size:11px;color:var(--muted);margin-top:4px}
+  .rey input{width:100%;padding:5px 7px;font-size:12px;margin-top:5px}
+  .vacio{color:var(--muted);padding:8px 2px}
+  .reyes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .rey{background:var(--card2);border-radius:11px;padding:10px;text-align:center;border-top:3px solid var(--c)}
+  .rey .t{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--c);font-weight:700}
+  .rey .n{font-weight:700;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rey .m{font-size:12px;color:var(--muted)}
+  .c-dinero{--c:var(--dinero)} .c-subs{--c:var(--subs)} .c-bits{--c:var(--bits)}
+  .lista{max-height:420px;overflow:auto;margin-top:6px}
+  .ev{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--line)}
+  .ev .ic{font-size:18px;width:24px;text-align:center}
+  .ev .q{flex:1;min-width:0}
+  .ev .q b{cursor:pointer;border-bottom:1px dashed transparent}
+  .ev .q b:hover{border-bottom-color:var(--muted)}
+  .ev small{color:var(--muted)}
+  .ev .x{background:transparent;border-color:transparent;color:var(--bad)}
+  .tag{font-size:10px;padding:1px 6px;border-radius:6px;background:var(--card2);color:var(--muted);margin-left:4px}
+  .obs{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .obs:last-child{border:0}
+  .obs .q{flex:1;min-width:0}
+  .obs code{display:block;font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .obs small{color:var(--muted)}
+  .checks{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .checks label{display:flex;gap:6px;align-items:center;color:var(--text);margin:0;font-size:13px}
+  .checks input{width:auto}
+  .pato-fila{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;font-weight:600}
+  .pato-fila input{width:84px}
+  .pato-acum{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--card2);font-size:13px}
+  .meta-head,.meta-row{display:grid;grid-template-columns:22px 1fr 80px 80px 70px;gap:6px;align-items:center;margin-top:6px}
+  .meta-head span{font-size:11px;color:var(--muted)}
+  .meta-row input[type=checkbox]{width:auto}
+  .meta-row b{font-size:13px;text-align:right}
+  .tasa{display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+  .tasa b{font-size:13px}
+  .tasa span{font-size:12px;color:var(--muted)}
+  .ayuda{font-size:12px;color:var(--muted);background:var(--card2);border-radius:9px;padding:9px 11px;margin-top:10px}
+  @media (max-width:520px){ header{padding:12px} main{padding:12px} .reyes{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏆 Podio mensual</h1>
+  <span class="mes" id="mesActual"></span>
+  <span class="sp"></span>
+  <select id="verMes" style="width:auto" title="Ver otro mes"></select>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+  <a class="btn sm" href="/panel">⏱ Reloj</a>
+</header>
+
+<main>
+  <!-- RANKING -->
+  <section class="card">
+    <h2>Ranking <span id="rankMes"></span></h2>
+    <div class="tabs">
+      <button data-tab="dinero" class="on">💸 Donadores</button>
+      <button data-tab="subs">🎁 Subs</button>
+      <button data-tab="bits">💎 Bits</button>
+    </div>
+    <ol class="rank" id="rank"></ol>
+    <div class="nota" id="rankTotal"></div>
+  </section>
+
+  <!-- REYES DEL MES PASADO -->
+  <section class="card">
+    <h2>👑 Reyes de <span id="reyesMes"></span></h2>
+    <div class="reyes" id="reyes"></div>
+    <div class="ayuda">Los reyes se calculan solos: el día 1 de cada mes el podio vuelve a cero y los #1 del mes que terminó pasan a este overlay. Con <b>Editar</b> o <b>Agregar</b> puedes ponerlos a mano (por ejemplo si alguien donó por transferencia), y con <b>Automático</b> vuelven a calcularse solos.</div>
+  </section>
+
+  <!-- AGREGAR A MANO -->
+  <section class="card">
+    <h2>Agregar a mano</h2>
+    <div class="fila">
+      <div><label>Categoría</label>
+        <select id="addCat">
+          <option value="dinero">💸 Donación</option>
+          <option value="subs">🎁 Subs regaladas</option>
+          <option value="bits">💎 Bits</option>
+        </select></div>
+      <div><label>Nombre</label><input id="addUser" list="nombres" autocomplete="off" placeholder="Usuario de Twitch"></div>
+    </div>
+    <datalist id="nombres"></datalist>
+    <div class="fila">
+      <div><label id="addAmountLbl">Monto</label><input id="addAmount" type="number" min="0" step="any" placeholder="0"></div>
+      <div id="addCurWrap"><label>Moneda</label><select id="addCur"></select></div>
+    </div>
+    <label>Fecha (vacío = ahora)</label>
+    <input id="addAt" type="datetime-local">
+    <div class="nota" id="addNota">Para transferencias que el reloj no detectó. Solo cuenta para el podio, no suma tiempo al reloj.</div>
+    <button class="prim" id="addBtn" style="width:100%;margin-top:6px">Agregar al podio</button>
+  </section>
+
+  <!-- CONVERSIÓN -->
+  <section class="card">
+    <h2>Conversión a dólares <button class="sm r" id="ratesBtn">↻ Actualizar cotización</button></h2>
+    <div id="tasas"></div>
+    <div class="nota" id="ratesNota"></div>
+    <div class="ayuda">PayPal y Mercado Pago se suman en un solo podio en USD. Cada donación se convierte con la tasa <b>del momento en que llegó</b>. Si prefieres otra cotización (por ejemplo el dólar blue o el MEP), escríbela en "Mi tasa"; vacío = automática.</div>
+  </section>
+
+  <!-- METAS -->
+  <section class="card">
+    <h2>🎯 Metas del mes</h2>
+    <label>Título</label>
+    <input id="metaTitulo" placeholder="Metas del mes">
+    <div class="meta-head"><span></span><span>Nombre</span><span>Meta</span><span>Ya tenías*</span><span>Lleva</span></div>
+    <div class="meta-row" data-meta="subs"><input type="checkbox" data-k="on" title="Mostrar"><input data-k="label" placeholder="Subs"><input data-k="meta" type="number" min="0"><input data-k="ajuste" type="number" step="any"><b data-k="total"></b></div>
+    <div class="meta-row" data-meta="bits"><input type="checkbox" data-k="on" title="Mostrar"><input data-k="label" placeholder="Bits"><input data-k="meta" type="number" min="0"><input data-k="ajuste" type="number" step="any"><b data-k="total"></b></div>
+    <div class="meta-row" data-meta="dinero"><input type="checkbox" data-k="on" title="Mostrar"><input data-k="label" placeholder="Donado"><input data-k="meta" type="number" min="0" step="any"><input data-k="ajuste" type="number" step="any"><b data-k="total"></b></div>
+    <div class="checks"><label><input type="checkbox" id="metaBarras"> Mostrar barras de progreso</label></div>
+    <div class="ayuda">Se suma solo: <b>subs</b> = todas (nuevas, resubs y regaladas), <b>bits</b>, y <b>donado</b> = PayPal + Mercado Pago en USD. *"Ya tenías" es lo que llevabas este mes antes de usar el reloj (ej. 47 subs): se suma solo a este mes y el mes que viene arranca en cero.</div>
+  </section>
+
+  <!-- PATITOS -->
+  <section class="card" id="patitos">
+    <h2>🦆 Lluvia de patitos</h2>
+    <div class="ayuda" style="margin-top:0">Fuente de <b>pantalla completa</b> (1920 × 1080): <code>/patitos</code>. Mercado Pago → <b style="color:#FFD93B">amarillos</b>, PayPal → <b style="color:#58E06F">verdes</b>.</div>
+    <div class="pato-fila"><span>Por cada</span><input id="patoUsd" type="number" min="0.5" step="any"><span>USD caen</span><input id="patoCant" type="number" min="1" step="1"><span>patitos</span></div>
+    <div class="nota" id="patoEj"></div>
+    <div class="fila">
+      <div><label>Duración en pantalla (min)</label><input id="patoDur" type="number" min="0" step="any" placeholder="0 = siempre"></div>
+      <div><label>Tope por donación</label><input id="patoMaxAp" type="number" min="1" step="1"></div>
+      <div><label>Máximo en pantalla</label><input id="patoMaxPan" type="number" min="10" max="400" step="1"></div>
+    </div>
+    <div class="nota">Si pasa la duración sin donaciones, los patitos se van. Con la próxima donación vuelven a caer <b>todos los acumulados</b> más los nuevos. 0 = no se van nunca.</div>
+    <div class="checks"><label><input type="checkbox" id="patoPorStream"> Empezar de cero en cada stream nuevo</label></div>
+    <div class="pato-fila" style="margin-top:6px;font-weight:500;font-size:13px"><span>Si el stream se corta y vuelve en menos de</span><input id="patoMargen" type="number" min="0" step="1" style="width:70px"><span>min, sigue siendo el mismo (no se pierden los patitos)</span></div>
+    <div class="pato-acum" id="patoAcum"></div>
+    <div class="fila" style="margin-top:8px;flex-wrap:wrap">
+      <button id="patoMp">🟡 Probar Mercado Pago</button>
+      <button id="patoPp">🟢 Probar PayPal</button>
+      <button id="patoVaciar" class="peligro">Vaciar acumulados</button>
+    </div>
+    <div class="nota" id="patoNota">Las pruebas tiran patitos (5 USD) pero no se acumulan, no suman tiempo ni cuentan para el podio.</div>
+  </section>
+
+  <!-- OVERLAYS -->
+  <section class="card">
+    <h2>Overlays para OBS</h2>
+    <div id="obs"></div>
+    <div class="ayuda">En OBS: Fuentes → + → Navegador, y pega la URL. Agrega <code>?escala=1.3</code> para agrandar o <code>?repetir=60</code> para repetir la animación de entrada cada 60 s.</div>
+  </section>
+
+  <section class="card">
+    <h2>Ajustes de los overlays</h2>
+    <div class="fila">
+      <div><label>Podio: mostrar</label>
+        <select id="modo">
+          <option value="rotar">Rotar: Donadores → Subs → Bits</option>
+          <option value="dinero">Solo donadores</option>
+          <option value="subs">Solo subs regaladas</option>
+          <option value="bits">Solo bits</option>
+        </select></div>
+      <div style="flex:0 0 110px"><label>Seg. por categoría</label><input id="segundos" type="number" min="3" max="300"></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" data-m="dinero"> Donadores</label>
+      <label><input type="checkbox" data-m="subs"> Subs</label>
+      <label><input type="checkbox" data-m="bits"> Bits</label>
+    </div>
+    <label>Títulos</label>
+    <div class="fila"><input data-t="dinero" placeholder="Top Donadores"><input data-t="subs" placeholder="Top Subs Regaladas"></div>
+    <div class="fila" style="margin-top:8px"><input data-t="bits" placeholder="Top Bits"><input data-t="general" placeholder="Top General"></div>
+    <input data-t="reyes" placeholder="Reyes de {mes}" style="margin-top:8px">
+    <div class="nota">En el título de los reyes, <code>{mes}</code> se cambia por el nombre del mes pasado.</div>
+  </section>
+
+  <!-- APORTES -->
+  <section class="card ancho">
+    <h2>Aportes de <span id="evMes"></span>
+      <select id="evFiltro" class="r" style="width:auto">
+        <option value="">Todos</option><option value="dinero">Donaciones</option><option value="subs">Subs regaladas</option><option value="bits">Bits</option>
+      </select></h2>
+    <div class="nota" style="margin-top:-4px">Clic en un nombre para cambiarlo (ej. si Mercado Pago lo trajo como "Juan" y en Twitch es "juancho99", así se suman juntos). ✕ lo quita del podio (no del reloj).</div>
+    <div class="lista" id="eventos"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const FMT = { dinero:v=>'$'+Number(v).toFixed(2)+' USD', subs:v=>v+(v===1?' sub':' subs'), bits:v=>Number(v).toLocaleString('es')+' bits' };
+const ICO = { dinero:'💸', subs:'🎁', bits:'💎' };
+const SRC = { paypal:'PayPal', mercadopago:'Mercado Pago', bits:'Twitch', subs:'Twitch', manual:'a mano' };
+let D = null, tab = 'dinero', mesVer = '', firma = '';
+
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+function nota(el, txt, cls=''){ el.textContent = txt; el.className = 'nota '+cls; }
+
+async function cargar(){
+  try{
+    const j = await api('/api/podio/admin'+(mesVer?'?mes='+mesVer:''));
+    const f = JSON.stringify(j); if(f===firma) return; firma = f;
+    D = j; pintar();
+  }catch(e){ /* reloj apagado */ }
+}
+
+function pintar(){
+  $('mesActual').textContent = cap(D.mes.label);
+  $('verMes').innerHTML = D.months.map(m=>`<option value="${m.key}" ${m.key===D.month.key?'selected':''}>${cap(m.label)}${m.key===D.mes.key?' (actual)':''}</option>`).join('');
+  $('rankMes').textContent = '· '+D.month.label; $('evMes').textContent = D.month.label;
+
+  const r = D.top[tab] || [];
+  $('rank').innerHTML = r.map(x=>`<li><span>${esc(x.name)}</span><span class="v">${FMT[tab](x.total)}</span><button class="sm ed" data-renom="${esc(x.name)}" title="Cambiar el nombre en todos sus aportes del mes">✏️</button></li>`).join('') || '<div class="vacio">Todavía no hay aportes este mes.</div>';
+  const evs = D.events.filter(e=>e.cat===tab && (tab!=='subs' || !e.kind || e.kind==='gift'));
+  const tot = evs.reduce((a,e)=>a+(tab==='dinero'?Number(e.usd)||0:tab==='bits'?e.amount:e.count),0);
+  $('rankTotal').textContent = evs.length ? `Total del mes: ${FMT[tab](tab==='dinero'?Math.round(tot*100)/100:tot)} · ${evs.length} aporte(s)` : '';
+
+  $('reyesMes').textContent = D.mesAnterior.label;
+  if(!editRey) $('reyes').innerHTML = ['dinero','subs','bits'].map(c=>{
+    const k = (D.anterior[c]||[])[0], auto = (D.reyesAuto && D.reyesAuto[c]||[])[0];
+    const titulo = `<div class="t">${ICO[c]} ${c==='dinero'?'Donador':c==='subs'?'Subs':'Bits'}</div>`;
+    return `<div class="rey c-${c}">${titulo}
+      <div class="n">${k?esc(k.name):'—'}${k&&k.manual?'<span class="man">a mano</span>':''}</div><div class="m">${k?FMT[c](k.total):'sin aportes'}</div>
+      ${k&&k.manual?`<div class="auto">Automático: ${auto?esc(auto.name)+' · '+FMT[c](auto.total):'sin aportes'}</div>`:''}
+      <div class="acc"><button data-rey-ed="${c}">${k?'✏️ Editar':'＋ Agregar'}</button>${k&&k.manual?`<button data-rey-auto="${c}">↺ Automático</button>`:''}</div></div>`;
+  }).join('');
+
+  // Monedas
+  const curs = ['USD', ...D.currencies.map(c=>c.code)];
+  const sel = $('addCur').value;
+  $('addCur').innerHTML = curs.map(c=>`<option ${c===(sel||'USD')?'selected':''}>${c}</option>`).join('');
+  const enfocado = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.rate;
+  if(!enfocado){
+    $('tasas').innerHTML = `<div class="tasa"><span>Moneda</span><span>Automática</span><span>Mi tasa (1 USD =)</span></div>` +
+      D.currencies.map(c=>`<div class="tasa"><b>${c.code}</b><span>${c.auto?'1 USD = '+fmtNum(c.auto)+' '+c.code:'sin datos'}</span>
+        <input type="number" min="0" step="any" data-rate="${c.code}" value="${c.manual||''}" placeholder="automática"></div>`).join('');
+  }
+  $('ratesNota').textContent = D.ratesAt ? 'Cotización automática del '+new Date(D.ratesAt).toLocaleString('es') : 'Sin cotización automática todavía (¿sin internet?).';
+
+  // Overlays OBS
+  const base = location.origin;
+  const ovs = [
+    ['/metas','Metas del mes','306 × 210'],
+    ['/podio','Podio del mes (rota Donadores → Subs → Bits)','306 × 215'],
+    ['/top-general','Top General del mes (el #1 de cada categoría)','306 × 215'],
+    ['/patitos','Lluvia de patitos (pantalla completa)','1920 × 1080'],
+    ['/reyes','Reyes del mes pasado','640 × 110'],
+  ];
+  if(!$('obs').dataset.ok){
+    $('obs').innerHTML = ovs.map(([p,t,s])=>`<div class="obs"><div class="q"><b>${t}</b><code>${base}${p}</code><small>Tamaño: ${s}</small></div>
+      <button class="sm" data-copy="${base}${p}">Copiar</button><a class="btn sm" href="${p}" target="_blank">Ver</a></div>`).join('');
+    $('obs').dataset.ok = 1;
+  }
+
+  // Ajustes (sin pisar lo que se está escribiendo)
+  const c = D.fullConfig;
+  if(document.activeElement!==$('modo')) $('modo').value = c.modo;
+  if(document.activeElement!==$('segundos')) $('segundos').value = c.segundos;
+  document.querySelectorAll('[data-m]').forEach(cb=>cb.checked=!!c.mostrar[cb.dataset.m]);
+  // Metas
+  if(document.activeElement!==$('metaTitulo')) $('metaTitulo').value = c.metas.titulo;
+  $('metaBarras').checked = !!c.metas.barras;
+  document.querySelectorAll('[data-meta]').forEach(row=>{
+    const k = row.dataset.meta, m = c.metas[k];
+    row.querySelectorAll('[data-k]').forEach(el=>{
+      const f = el.dataset.k;
+      if(document.activeElement===el) return;
+      if(f==='on') el.checked = !!m.on;
+      else if(f==='label') el.value = m.label;
+      else if(f==='meta') el.value = m.meta;
+      else if(f==='ajuste') el.value = D.month.current ? (D.ajusteMes[k]||'') : '';
+      else if(f==='total') el.textContent = k==='dinero' ? '$'+Number(D.totales[k]).toFixed(2) : fmtNum(D.totales[k]);
+      if(f==='ajuste') el.disabled = !D.month.current;
+    });
+  });
+  document.querySelectorAll('[data-t]').forEach(i=>{ if(document.activeElement!==i) i.value = c.titulos[i.dataset.t]||''; });
+
+  pintarPatos();
+
+  // Aportes
+  const filtro = $('evFiltro').value;
+  const lista = D.events.filter(e=>!filtro || e.cat===filtro);
+  $('eventos').innerHTML = lista.map(e=>{
+    const det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${e.currency}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
+              : e.cat==='bits' ? `${fmtNum(e.amount)} bits` : e.kind==='new' ? 'sub nueva (solo meta)' : e.kind==='resub' ? 'resub (solo meta)' : `${e.count} sub${e.count>1?'s':''} regalada${e.count>1?'s':''}`;
+    const h = new Date(e.at).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div class="ev"><span class="ic">${ICO[e.cat]}</span>
+      <div class="q"><b data-ren="${e.id}" title="Cambiar nombre">${esc(e.user)}</b> <small>· ${det}</small><br>
+      <small>${h} · ${SRC[e.source]||e.source}</small>${e.manual?'<span class="tag">a mano</span>':''}</div>
+      <button class="sm x" data-del="${e.id}" title="Quitar del podio">✕</button></div>`;
+  }).join('') || '<div class="vacio">Sin aportes en este mes.</div>';
+
+  const nombres = [...new Set(D.events.map(e=>e.user))].sort((a,b)=>a.localeCompare(b));
+  $('nombres').innerHTML = nombres.map(n=>`<option value="${esc(n)}">`).join('');
+  actualizarForm();
+}
+const cap = s => s ? s[0].toUpperCase()+s.slice(1) : s;
+const fmtNum = n => Number(n).toLocaleString('es',{maximumFractionDigits:2});
+
+/* ---- eventos de la página ---- */
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
+  tab=b.dataset.tab; document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b)); pintar();
+});
+$('verMes').onchange = ()=>{ mesVer = $('verMes').value===D.mes.key ? '' : $('verMes').value; firma=''; cargar(); };
+$('evFiltro').onchange = pintar;
+
+function actualizarForm(){
+  const c = $('addCat').value;
+  $('addCurWrap').style.display = c==='dinero' ? '' : 'none';
+  $('addAmountLbl').textContent = c==='dinero' ? 'Monto' : c==='bits' ? 'Cantidad de bits' : 'Subs regaladas';
+}
+$('addCat').onchange = actualizarForm;
+$('addBtn').onclick = async ()=>{
+  const n = $('addNota');
+  try{
+    const at = $('addAt').value ? new Date($('addAt').value).getTime() : undefined;
+    await api('/api/podio/event','POST',{cat:$('addCat').value, user:$('addUser').value, amount:$('addAmount').value, currency:$('addCur').value, at});
+    nota(n, '✔ Agregado: '+$('addUser').value, 'ok');
+    $('addUser').value=''; $('addAmount').value=''; $('addAt').value='';
+    firma=''; cargar();
+  }catch(e){ nota(n, e.message, 'mal'); }
+};
+
+$('eventos').addEventListener('click', async (ev)=>{
+  const del = ev.target.closest('[data-del]'), ren = ev.target.closest('[data-ren]');
+  if(del){
+    const e = D.events.find(x=>x.id===del.dataset.del);
+    if(!confirm(`¿Quitar del podio el aporte de ${e.user}? (el reloj no cambia)`)) return;
+    try{ await api('/api/podio/event/'+e.id,'DELETE'); firma=''; cargar(); }catch(err){ alert(err.message); }
+  }
+  if(ren){
+    const e = D.events.find(x=>x.id===ren.dataset.ren);
+    const nuevo = prompt('Nombre para este aporte (usa el mismo nombre para sumar aportes de una misma persona):', e.user);
+    if(!nuevo || nuevo.trim()===e.user) return;
+    try{ await api('/api/podio/event/'+e.id,'POST',{user:nuevo}); firma=''; cargar(); }catch(err){ alert(err.message); }
+  }
+});
+
+$('tasas').addEventListener('change', async (ev)=>{
+  const i = ev.target.closest('[data-rate]'); if(!i) return;
+  try{ await api('/api/podio/config','POST',{manualRates:{[i.dataset.rate]: i.value}}); nota($('ratesNota'),'✔ Tasa guardada para las próximas donaciones','ok'); i.blur(); firma=''; cargar(); }
+  catch(e){ nota($('ratesNota'),e.message,'mal'); }
+});
+$('ratesBtn').onclick = async ()=>{
+  nota($('ratesNota'),'Consultando…');
+  try{ await api('/api/podio/rates','POST',{}); firma=''; await cargar(); nota($('ratesNota'),'✔ Cotización actualizada','ok'); }
+  catch(e){ nota($('ratesNota'),e.message,'mal'); }
+};
+
+const guardar = (body)=>api('/api/podio/config','POST',body).then(()=>{ firma=''; cargar(); }).catch(e=>alert(e.message));
+$('modo').onchange = ()=>guardar({modo:$('modo').value});
+$('segundos').onchange = ()=>guardar({segundos:$('segundos').value});
+document.querySelectorAll('[data-m]').forEach(cb=>cb.onchange=()=>guardar({mostrar:{[cb.dataset.m]:cb.checked}}));
+document.querySelectorAll('[data-t]').forEach(i=>i.onchange=()=>guardar({titulos:{[i.dataset.t]:i.value}}));
+// Ranking: cambiar el nombre de una persona en todos sus aportes del mes
+$('rank').addEventListener('click', async (ev)=>{
+  const b = ev.target.closest('[data-renom]'); if(!b) return;
+  const de = b.dataset.renom;
+  const a = prompt(`Nuevo nombre para "${de}" (se cambia en todos sus aportes de ${D.month.label}).\nSi escribes un nombre que ya está en el ranking, se suman juntos.`, de);
+  if(!a || a.trim()===de) return;
+  try{ const r = await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
+});
+// Reyes del mes pasado: automáticos, con opción de ponerlos a mano
+let editRey = null;
+$('reyes').addEventListener('click', async (ev)=>{
+  const ed = ev.target.closest('[data-rey-ed]'), au = ev.target.closest('[data-rey-auto]'), gu = ev.target.closest('[data-rey-guardar]'), ca = ev.target.closest('[data-rey-cancelar]');
+  if(ed){
+    const c = ed.dataset.reyEd, k = (D.anterior[c]||[])[0], card = ed.closest('.rey');
+    editRey = c;
+    card.innerHTML = `<div class="t">${ICO[c]} ${c==='dinero'?'Donador':c==='subs'?'Subs':'Bits'}</div>
+      <input id="reyNom" placeholder="Nombre" value="${k?esc(k.name):''}">
+      <input id="reyTot" type="number" min="0" step="any" placeholder="${c==='dinero'?'Monto en USD':c==='subs'?'Subs regaladas':'Bits'}" value="${k?k.total:''}">
+      <div class="acc"><button data-rey-guardar="${c}">Guardar</button><button data-rey-cancelar>Cancelar</button></div>`;
+    $('reyNom').focus();
+  }
+  if(gu){
+    const c = gu.dataset.reyGuardar, name = $('reyNom').value.trim(), total = $('reyTot').value;
+    if(!name) return alert('Escribe el nombre');
+    try{ await api('/api/podio/rey','POST',{mes:D.mesAnterior.key, cat:c, name, total}); editRey=null; firma=''; await cargar(); }catch(e){ alert(e.message); }
+  }
+  if(ca){ editRey=null; firma=''; cargar(); }
+  if(au){
+    try{ await api('/api/podio/rey','POST',{mes:D.mesAnterior.key, cat:au.dataset.reyAuto, name:''}); firma=''; await cargar(); }catch(e){ alert(e.message); }
+  }
+});
+
+// Patitos
+const patoNota = (t)=>{ $('patoNota').textContent = t; };
+function pintarPatos(){
+  const P = D.patitos; if(!P) return;
+  const c = P.config;
+  for (const [id,v] of [['patoUsd',c.usd],['patoCant',c.patos],['patoDur',c.duracionMin],['patoMaxAp',c.maxPorAporte],['patoMaxPan',c.maxPantalla],['patoMargen',c.margenMin ?? 30]])
+    if(document.activeElement!==$(id)) $(id).value = v;
+  $('patoPorStream').checked = c.porStream !== false;
+  $('patoMargen').disabled = c.porStream === false;
+  const por = c.patos / c.usd, ej = (u)=>Math.max(1, Math.min(c.maxPorAporte, Math.round(u*por)));
+  $('patoEj').textContent = `Ejemplos: 1 USD → ${ej(1)} · 5 USD → ${ej(5)} · 10 USD → ${ej(10)} · 20 USD → ${ej(20)} patitos`;
+  const hace = P.ultimo ? Math.round((Date.now()-P.ultimo)/60000) : null;
+  const visible = P.ultimo && (!c.duracionMin || (Date.now()-P.ultimo) < c.duracionMin*60000);
+  $('patoAcum').innerHTML = `Acumulados: <b style="color:#FFD93B">🟡 ${P.y}</b> amarillos · <b style="color:#58E06F">🟢 ${P.g}</b> verdes = <b>${P.y+P.g}</b>`
+    + (P.ultimo ? ` · última donación hace ${hace<1?'menos de 1':hace} min · ${visible?'<b>en pantalla</b>':'ocultos hasta la próxima donación'}` : '');
+}
+const guardarPatos = ()=>guardar({patitos:{usd:$('patoUsd').value, patos:$('patoCant').value, duracionMin:$('patoDur').value, maxPorAporte:$('patoMaxAp').value, maxPantalla:$('patoMaxPan').value, porStream:$('patoPorStream').checked, margenMin:$('patoMargen').value}});
+['patoUsd','patoCant','patoDur','patoMaxAp','patoMaxPan','patoPorStream','patoMargen'].forEach(id=>$(id).onchange=guardarPatos);
+$('patoMp').onclick = ()=>api('/api/patitos/probar','POST',{source:'mercadopago',usd:5}).then(()=>patoNota('🟡 Prueba de Mercado Pago (5 USD)')).catch(e=>patoNota(e.message));
+$('patoPp').onclick = ()=>api('/api/patitos/probar','POST',{source:'paypal',usd:5}).then(()=>patoNota('🟢 Prueba de PayPal (5 USD)')).catch(e=>patoNota(e.message));
+$('patoVaciar').onclick = ()=>{ if(confirm('¿Vaciar los patitos acumulados? Se van de la pantalla y la cuenta vuelve a cero.')) api('/api/patitos/vaciar','POST',{}).then(()=>{ patoNota('Acumulados en cero'); firma=''; cargar(); }).catch(e=>patoNota(e.message)); };
+$('metaTitulo').onchange = ()=>guardar({metas:{titulo:$('metaTitulo').value}});
+$('metaBarras').onchange = ()=>guardar({metas:{barras:$('metaBarras').checked}});
+document.querySelectorAll('[data-meta]').forEach(row=>{
+  const k = row.dataset.meta;
+  row.querySelectorAll('[data-k]').forEach(el=>el.onchange=()=>{
+    const f = el.dataset.k;
+    if(f==='ajuste') return guardar({ajuste:{mes:D.month.key,[k]:el.value}});
+    guardar({metas:{[k]:{[f]: f==='on' ? el.checked : el.value}}});
+  });
+});
+
+document.addEventListener('click', (ev)=>{
+  const b = ev.target.closest('[data-copy]'); if(!b) return;
+  navigator.clipboard?.writeText(b.dataset.copy).then(()=>{ const t=b.textContent; b.textContent='✔ Copiado'; setTimeout(()=>b.textContent=t,1200); });
+});
+
+cargar();
+setInterval(cargar, 3000);
+</script>
+</body>
+</html>

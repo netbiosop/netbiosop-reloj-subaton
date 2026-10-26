@@ -1,0 +1,13 @@
+# Tus datos y archivos personales: NUNCA se suben a GitHub ni los toca el actualizador
+data/
+logs/
+videos/
+sonidos/*
+!sonidos/LEEME.txt
+respaldo-config.json
+.version-anterior/
+.actualizacion/
+node_modules/
+*.zip
+*.danado-*
+*.antes-de-restaurar-*

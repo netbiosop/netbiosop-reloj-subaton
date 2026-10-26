@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reyes del mes pasado</title>
+<link rel="stylesheet" href="marca.css">
+<style>
+  #wrap{width:640px;padding:2px 6px;transform-origin:top left;position:relative;text-align:center}
+  .polvo span{position:absolute;bottom:0;width:3px;height:3px;border-radius:50%;background:var(--oro);opacity:0;box-shadow:0 0 5px var(--oro);animation:polvo linear infinite}
+  .cab{display:flex;align-items:center;justify-content:center;gap:10px}
+  .cab .raya{flex:1;height:3px;background:linear-gradient(90deg,transparent,var(--rojo));transform:skewX(-20deg);box-shadow:0 0 8px rgba(227,18,27,.5)}
+  .cab .raya.d{background:linear-gradient(90deg,var(--rojo),transparent)}
+  .m-titulo{font-size:30px}
+  .cab .m-corona{font-size:22px}
+  .entra .cab .m-corona{animation:caer .9s .1s cubic-bezier(.3,1.5,.5,1) both}
+  .entra .cab .m-titulo{animation:m-bajar .7s .3s both}
+  .entra .cab .raya{animation:abrir .8s .45s both}
+  .tronos{display:flex;align-items:stretch;justify-content:center;margin-top:0}
+  .trono{position:relative;flex:1;min-width:0;padding:15px 8px 0}
+  .trono + .trono::before{content:"";position:absolute;left:0;top:20px;bottom:4px;width:3px;background:var(--rojo);transform:skewX(-20deg);box-shadow:0 0 6px rgba(227,18,27,.6)}
+  .trono.entra{animation:levantar .8s cubic-bezier(.2,.9,.3,1.15) both}
+  .corona{position:absolute;top:-4px;left:50%;font-size:17px;line-height:1;transform:translateX(-50%);opacity:0;filter:drop-shadow(0 0 5px rgba(255,200,58,.8)) drop-shadow(0 1px 1px #000)}
+  .trono.entra .corona{animation:coronar 1s cubic-bezier(.3,1.6,.5,1) both}
+  .trono.listo .corona{opacity:1;animation:brillar 3s ease-in-out infinite}
+  .cat{font-size:16px;letter-spacing:1.4px}
+  .rey{font-family:var(--f-titulo);font-size:33px;line-height:1;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:var(--contorno-duro)}
+  .monto{font-weight:800;font-size:17px;line-height:1.1;color:#e4e7ec;text-shadow:var(--contorno-duro)}
+  .vacio .rey{opacity:.4} .vacio .monto{visibility:hidden} .vacio .corona{filter:grayscale(1);opacity:.3!important}
+  @keyframes caer{from{opacity:0;transform:translateY(-30px) rotate(-25deg) scale(1.6)}to{opacity:1;transform:none}}
+  @keyframes abrir{from{opacity:0;transform:skewX(-20deg) scaleX(0)}to{opacity:1;transform:skewX(-20deg) scaleX(1)}}
+  @keyframes levantar{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+  @keyframes coronar{0%{opacity:0;transform:translate(-50%,-40px) rotate(-30deg) scale(1.5)}70%{opacity:1;transform:translate(-50%,3px) rotate(6deg) scale(1)}100%{opacity:1;transform:translate(-50%,0)}}
+  @keyframes brillar{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px) scale(1.08)}}
+  @keyframes polvo{0%{opacity:0;transform:translateY(0)}15%{opacity:.9}100%{opacity:0;transform:translateY(-80px) translateX(10px)}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="polvo" id="polvo"></div>
+  <div class="cab"><span class="raya"></span><span class="m-corona">👑</span><span class="m-titulo" id="titulo">Reyes <em>del mes</em></span><span class="raya d"></span></div>
+  <div class="tronos" id="tronos"></div>
+</div>
+<script>
+// Reyes del mes pasado (estilo BYTEDEMOND): el #1 de cada categoría del mes que terminó.
+// Cambia solo el día 1 de cada mes. Opciones en la URL:  ?escala=1.2   ?repetir=60
+const CATS = {
+  subs:  {nombre:'Rey subs', fmt:v=>v+(v===1?' sub':' subs')},
+  dinero:{nombre:'Rey $',    fmt:v=>'$'+Number(v).toFixed(2)},
+  bits:  {nombre:'Rey bits', fmt:v=>Number(v).toLocaleString('es')+' bits'}
+};
+const ORDEN = ['subs','dinero','bits'];
+const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+const params = new URLSearchParams(location.search);
+const escala = parseFloat(params.get('escala'));
+if(escala>0) document.getElementById('wrap').style.transform = `scale(${escala})`;
+
+const polvo = document.getElementById('polvo');
+for(let i=0;i<12;i++){
+  const s = document.createElement('span');
+  s.style.left = (Math.random()*100)+'%';
+  s.style.animationDuration = (4+Math.random()*5).toFixed(1)+'s';
+  s.style.animationDelay = (-Math.random()*8).toFixed(1)+'s';
+  polvo.appendChild(s);
+}
+const tronosEl = document.getElementById('tronos'), tronos = {};
+ORDEN.forEach(cat=>{
+  const t = document.createElement('div');
+  t.className = 'trono';
+  t.innerHTML = `<div class="corona">👑</div><div class="cat m-cat">${CATS[cat].nombre}</div><div class="rey">—</div><div class="monto">&nbsp;</div>`;
+  tronosEl.appendChild(t); tronos[cat] = t;
+});
+// Achica el nombre solo si no entra en su columna (así se ve completo y lo más grande posible)
+function encajar(el, max, min){
+  let t = max; el.style.fontSize = t+'px';
+  while(t>min && el.scrollWidth > el.clientWidth + 1){ t -= 1; el.style.fontSize = t+'px'; }
+}
+const encajarTodos = ()=>ORDEN.forEach(c=>encajar(tronos[c].querySelector('.rey'), 33, 16));
+function entrada(){
+  replay(document.getElementById('wrap'),'entra');
+  ORDEN.forEach((cat,i)=>{
+    const t = tronos[cat];
+    t.classList.remove('listo');
+    const delay = 0.5 + i*0.3;
+    t.style.animationDelay = delay+'s';
+    t.querySelector('.corona').style.animationDelay = (delay+0.45)+'s';
+    replay(t,'entra');
+    clearTimeout(t._listo);
+    t._listo = setTimeout(()=>{ t.classList.remove('entra'); t.classList.add('listo'); }, (delay+1.6)*1000);
+  });
+}
+function pintarTitulo(t){
+  const [a, ...b] = String(t).split(' ');
+  const el = document.getElementById('titulo'); el.textContent = a + (b.length ? ' ' : '');
+  if(b.length){ const em = document.createElement('em'); em.textContent = b.join(' '); el.appendChild(em); }
+}
+let firma = '';
+async function cargar(){
+  try{
+    const j = await (await fetch('/api/podio',{cache:'no-store'})).json();
+    const f = JSON.stringify([j.mesAnterior.key, j.anterior, j.config.titulos.reyes]);
+    if(f===firma) return;
+    firma = f;
+    pintarTitulo(j.config.titulos.reyes);
+    ORDEN.forEach(cat=>{
+      const d = (j.anterior[cat]||[])[0], t = tronos[cat];
+      t.classList.toggle('vacio', !d);
+      t.querySelector('.rey').textContent = d ? d.name : '—';
+      t.querySelector('.monto').textContent = d ? CATS[cat].fmt(d.total) : ' ';
+    });
+    encajarTodos(); entrada();
+  }catch(e){ /* reloj apagado: queda lo último */ }
+}
+cargar(); setInterval(cargar, 5000);
+document.fonts.ready.then(encajarTodos);
+// Cuando pasa la cinta de noticias del código de creador (que va abajo), los reyes se esconden y vuelven después
+const wrapEl = document.getElementById('wrap'); let timerCinta = null;
+wrapEl.style.transition = 'opacity .5s, transform .5s';
+try {
+  const es = new EventSource('/events?overlay=1');
+  es.onmessage = (ev) => { try { const m = JSON.parse(ev.data);
+    if (m.type === 'codigo' && m.payload.que === 'cinta' && m.payload.config.cinta.ocultarReyes !== false) {
+      wrapEl.style.opacity = 0; wrapEl.style.translate = '0 30px';
+      clearTimeout(timerCinta); timerCinta = setTimeout(() => { wrapEl.style.opacity = ''; wrapEl.style.translate = ''; entrada(); }, (m.payload.dur + 0.8) * 1000);
+    } } catch (e) {} };
+} catch (e) {}
+const repetir = parseFloat(params.get('repetir'));
+if(repetir>=10) setInterval(entrada, repetir*1000);
+</script>
+</body>
+</html>

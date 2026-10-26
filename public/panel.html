@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel · Reloj Subatón</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<script>
+  // Misma página, dos vistas: /panel (reloj) y /configuracion (stream, acceso remoto, conexiones, chat)
+  if (/^\/configuracion/.test(location.pathname)) { document.body.classList.add('v-config'); document.title = 'Configuración · Reloj Subatón'; }
+</script>
+<header class="top">
+  <a class="ghost sm btn" href="/menu" title="Menú principal">🏠 Menú</a>
+  <div class="brand"><span class="dot"></span> <span class="solo-reloj">Reloj Subatón</span><span class="solo-config">⚙️ Configuración</span></div>
+  <a class="ghost sm btn solo-reloj" href="/configuracion" target="panel-config" title="Stream, acceso remoto, conexiones y comandos del chat">⚙️ Configuración</a>
+  <a class="ghost sm btn solo-config" href="/panel" target="panel-reloj">⏱ Reloj</a>
+  <div class="chips" id="connChips"></div>
+  <div class="overlay-url solo-reloj">
+    <span>Overlay OBS</span>
+    <code id="overlayUrl"></code>
+    <button class="ghost sm" data-copy="#overlayUrl">Copiar</button>
+    <a class="ghost sm btn" id="overlayOpen" target="_blank">Abrir</a>
+  </div>
+  <a class="ghost sm btn" href="/podio-panel" target="_blank" title="Podio mensual: Top donadores, subs regaladas y bits">🏆 Podio</a>
+</header>
+
+<main class="grid">
+  <!-- RELOJ -->
+  <section class="card clock-card">
+    <div class="clock-head">
+      <h2>Reloj</h2>
+      <span class="pill" id="runPill">En pausa</span>
+    </div>
+    <div class="big" id="bigTime">--:--:--</div>
+    <div id="multBanner" class="mult-banner hidden"></div>
+    <div class="row center gap">
+      <button class="primary lg" id="btnStart">▶ Iniciar</button>
+      <button class="lg" id="btnPause">⏸ Pausar</button>
+    </div>
+    <div class="quick">
+      <div class="quick-row">
+        <button data-add="60">+1 min</button><button data-add="300">+5 min</button><button data-add="600">+10 min</button><button data-add="1800">+30 min</button><button data-add="3600">+1 h</button>
+      </div>
+      <div class="quick-row minus">
+        <button data-add="-60">−1 min</button><button data-add="-300">−5 min</button><button data-add="-600">−10 min</button><button data-add="-1800">−30 min</button><button data-add="-3600">−1 h</button>
+      </div>
+    </div>
+    <div class="row gap wrap">
+      <label class="inline grow">Sumar/quitar
+        <input id="customAdd" placeholder="ej: 15 o -2:30" class="dur">
+      </label>
+      <button id="btnCustomAdd">Aplicar</button>
+      <label class="inline grow">Fijar en
+        <input id="setTime" placeholder="ej: 3:00:00" class="dur">
+      </label>
+      <button id="btnSet">Fijar</button>
+    </div>
+    <p class="hint">Un número solo = minutos. También acepta <b>h:mm:ss</b> o <b>m:ss</b>. Los ajustes manuales no se multiplican.</p>
+  </section>
+
+  <!-- MULTIPLICADOR -->
+  <section class="card">
+    <h2>Multiplicador <span class="sub">duplica o triplica el tiempo</span></h2>
+    <div class="mult-now" id="multNow">Sin multiplicador activo</div>
+
+    <h3>Activar ahora</h3>
+    <div class="seg" id="multSeg">
+      <button data-mv="2" class="on">x2</button>
+      <button data-mv="3">x3</button>
+      <button data-mv="4">x4</button>
+      <button data-mv="5">x5</button>
+      <input id="multCustom" type="number" min="1" step="0.1" placeholder="otro">
+    </div>
+    <div class="applies" id="manualApplies"></div>
+    <div class="row gap wrap">
+      <label class="inline">Durante
+        <select id="multMinutes">
+          <option value="0">Hasta que lo apague</option>
+          <option value="10">10 minutos</option>
+          <option value="15">15 minutos</option>
+          <option value="30" selected>30 minutos</option>
+          <option value="60">1 hora</option>
+          <option value="120">2 horas</option>
+        </select>
+      </label>
+      <button class="primary" id="btnMultOn">Activar</button>
+      <button class="danger-ghost" id="btnMultOff">Apagar</button>
+    </div>
+
+    <h3>Programar (elige cuándo)</h3>
+    <div class="sched-form">
+      <label>Desde<input type="datetime-local" id="schStart"></label>
+      <label>Hasta<input type="datetime-local" id="schEnd"></label>
+      <label>Multiplica<select id="schValue"><option value="2">x2</option><option value="3">x3</option><option value="4">x4</option><option value="5">x5</option></select></label>
+    </div>
+    <div class="applies" id="schedApplies"></div>
+    <button id="btnSchedule">Programar</button>
+    <ul class="sched-list" id="schedList"></ul>
+  </section>
+
+  <!-- STREAM Y REGISTROS -->
+  <section class="card span2" id="streamCard" data-vista="config">
+    <div class="stream-grid">
+      <div>
+        <h2>Stream <span class="live-dot" id="liveDot"></span><span class="sub" id="liveText">Conecta Twitch para detectarlo</span></h2>
+        <label class="check"><input type="checkbox" id="autoPause"> Pausar el reloj cuando termina el stream (el tiempo queda guardado)</label>
+        <label class="check"><input type="checkbox" id="autoResume"> Reanudar el reloj solo cuando vuelvo a estar en vivo</label>
+        <p class="hint" id="savedHint"></p>
+      </div>
+      <div>
+        <h2>Registros y programa</h2>
+        <p class="hint" style="margin:0 0 10px">Cada stream queda guardado en un archivo de texto en la carpeta <b>logs</b>: donaciones, bits, subs, comandos de mods, pausas y un resumen al final.</p>
+        <div class="row gap wrap">
+          <a class="btn" href="/api/logs/current" target="_blank">Ver registro actual</a>
+          <button id="btnLogsFolder">Abrir carpeta de logs</button>
+          <button class="danger-ghost" id="btnShutdown">Apagar el reloj</button>
+        </div>
+        <label class="check"><input type="checkbox" id="offOnClose"> Apagar el reloj cuando cierre el panel <span class="hint" style="margin:0">(espera 20 s por si solo recargas la página)</span></label>
+        <label class="check sub-opt"><input type="checkbox" id="keepLive"> …pero no mientras estoy en vivo: se apaga solo cuando termine el stream</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- SONIDOS -->
+  <section class="card span2" id="soundCard">
+    <h2>Sonidos del overlay <span class="sub" id="soundSave">Se escuchan en OBS, desde la fuente del overlay</span></h2>
+    <div class="sound-top">
+      <label class="check"><input type="checkbox" id="sndOn"> Sonidos activados</label>
+      <label class="inline grow">Volumen <input type="range" id="sndVol" min="0" max="100" step="5"> <b id="sndVolTxt"></b></label>
+      <button class="ghost sm" id="btnSndFolder">Abrir carpeta de sonidos propios</button>
+    </div>
+    <div class="sound-grid" id="sndList"></div>
+    <p class="hint">En OBS, en la fuente del overlay marca <b>"Controlar audio mediante OBS"</b> para que aparezca en el mezclador y se escuche en el stream. <b>Probar</b> lo reproduce aquí; <b>En OBS</b> lo reproduce en el overlay. Para usar tus propios sonidos, pon archivos con esos nombres (ej. <code>sub.mp3</code>, <code>grande.mp3</code>) en la carpeta <code>sonidos</code>.</p>
+  </section>
+
+  <!-- ACCESO REMOTO -->
+  <section class="card span2" id="remoteCard" data-vista="config">
+    <h2>Acceso remoto y usuarios <span class="sub" id="remoteSub"></span></h2>
+    <p class="hint" style="margin:0 0 12px">En esta PC el panel nunca pide contraseña. Desde otra PC o el celular se entra con usuario y contraseña: <b>admin</b> abre este panel completo; los <b>moderadores</b> que crees abajo solo ven el <b>panel de mods</b> (reloj, multiplicadores e historial). Tarifas, montos de dinero y comandos del chat solo si les das esos permisos 🔒. Conexiones, tokens, logs, usuarios y ajustes generales son siempre solo tuyos.</p>
+    <div class="remote-grid">
+      <div class="remote-col">
+        <h3>1 · Activar</h3>
+        <label class="check"><input type="checkbox" id="remoteOn"> Permitir entrar desde otra PC o el celular</label>
+        <div class="warn-box hidden" id="remoteRestart">Para aplicar el cambio hay que reiniciar el reloj (el tiempo queda guardado). <button class="primary sm" id="btnRestart">Reiniciar ahora</button></div>
+        <h3>Direcciones para entrar</h3>
+        <ul class="addr-list" id="remoteAddrs"></ul>
+        <p class="hint">Fuera de tu casa: <a href="https://tailscale.com/download" target="_blank">Tailscale</a> (gratis) en las dos PCs con la misma cuenta, y usa la dirección <b>100.x.x.x</b>. Conectar Twitch solo funciona desde esta PC.</p>
+        <h3>Dueño desde otra PC (opcional)</h3>
+        <div class="row gap wrap local-only">
+          <label class="grow">Contraseña del usuario <b>admin</b><input id="remotePw" type="password" autocomplete="new-password"></label>
+          <button id="btnRemotePw">Guardar</button>
+          <button class="danger-ghost sm" id="btnRemoteClear">Quitar</button>
+        </div>
+        <button class="ghost sm hidden" id="btnLogout">Cerrar sesión en este dispositivo</button>
+      </div>
+      <div class="remote-col">
+        <h3>2 · Moderadores con acceso al panel de mods</h3>
+        <div class="user-form">
+          <label>Usuario<input id="uName" autocomplete="off" autocapitalize="none" placeholder="ej: juan_mod"></label>
+          <label>Contraseña<input id="uPw" type="password" autocomplete="new-password" placeholder="mín. 6 caracteres"></label>
+          <div class="perms" id="uPerms">
+            <label class="check"><input type="checkbox" data-p="run" checked> Iniciar / pausar</label>
+            <label class="check"><input type="checkbox" data-p="add" checked> Sumar / quitar tiempo</label>
+            <label class="check"><input type="checkbox" data-p="set"> Fijar tiempo exacto</label>
+            <label class="check"><input type="checkbox" data-p="mult" checked> Multiplicadores (hasta x5)</label>
+            <span class="perm-sep">Sensibles:</span>
+            <label class="check"><input type="checkbox" data-p="rates"> 🔒 Ver y cambiar tarifas</label>
+            <label class="check"><input type="checkbox" data-p="money"> 🔒 Ver montos de dinero</label>
+            <label class="check"><input type="checkbox" data-p="chat"> 🔒 Configurar comandos del chat</label>
+          </div>
+          <button class="primary" id="btnAddUser">Crear usuario</button>
+        </div>
+        <ul class="user-list" id="userList"></ul>
+        <label class="inline" style="margin-top:12px">Máximo que un mod puede sumar o quitar por acción <input id="modMax" class="dur" data-dur placeholder="sin límite"></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- TARIFAS -->
+  <section class="card span2">
+    <h2>Tiempo que suma cada cosa <span class="sub" id="saveState">Los cambios se guardan solos</span></h2>
+    <div class="rates" id="rates">
+      <div class="rate" data-src="paypal">
+        <div class="rate-head"><span class="tag paypal">PayPal</span><label class="switch"><input type="checkbox" data-f="enabled"><span></span></label></div>
+        <div class="rate-line">Por cada <input type="number" step="any" min="0" data-f="amount"> <input class="cur" data-f="currency" maxlength="3"> suma <input class="dur" data-f="seconds" data-dur></div>
+        <div class="rate-line small">Mínimo <input type="number" step="any" min="0" data-f="minAmount"> <label class="check"><input type="checkbox" data-f="proportional"> Proporcional</label></div>
+        <div class="example" data-ex></div>
+      </div>
+      <div class="rate" data-src="mercadopago">
+        <div class="rate-head"><span class="tag mercadopago">Mercado Pago</span><label class="switch"><input type="checkbox" data-f="enabled"><span></span></label></div>
+        <div class="rate-line">Por cada <input type="number" step="any" min="0" data-f="amount"> <input class="cur" data-f="currency" maxlength="3"> suma <input class="dur" data-f="seconds" data-dur></div>
+        <div class="rate-line small">Mínimo <input type="number" step="any" min="0" data-f="minAmount"> <label class="check"><input type="checkbox" data-f="proportional"> Proporcional</label></div>
+        <div class="example" data-ex></div>
+      </div>
+      <div class="rate" data-src="bits">
+        <div class="rate-head"><span class="tag bits">Bits</span><label class="switch"><input type="checkbox" data-f="enabled"><span></span></label></div>
+        <div class="rate-line">Por cada <input type="number" step="1" min="1" data-f="amount"> bits suma <input class="dur" data-f="seconds" data-dur></div>
+        <div class="rate-line small">Mínimo <input type="number" step="1" min="0" data-f="minAmount"> <label class="check"><input type="checkbox" data-f="proportional"> Proporcional</label></div>
+        <div class="example" data-ex></div>
+      </div>
+      <div class="rate" data-src="subs">
+        <div class="rate-head"><span class="tag subs">Subs</span><label class="switch"><input type="checkbox" data-f="enabled"><span></span></label></div>
+        <div class="tiers">
+          <label>Tier 1 / Prime<input class="dur" data-f="tier1" data-dur></label>
+          <label>Tier 2<input class="dur" data-f="tier2" data-dur></label>
+          <label>Tier 3<input class="dur" data-f="tier3" data-dur></label>
+        </div>
+        <div class="rate-line small">
+          <label class="check"><input type="checkbox" data-f="countResubs"> Contar resubs</label>
+          <label class="check"><input type="checkbox" data-f="countGifts"> Contar subs regaladas (cada una)</label>
+        </div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>Tiempo inicial<input class="dur" id="setInitial" data-dur></label>
+      <label>Tiempo máximo restante<input class="dur" id="setMax" data-dur placeholder="0 = sin límite"></label>
+      <label class="check"><input type="checkbox" id="setAfterEnd"> Seguir sumando aunque el reloj llegue a 0</label>
+    </div>
+    <div class="settings-row daily-row" id="dailyRow">
+      <label class="check daily-on"><input type="checkbox" id="setDailyOn"> <b>Horas diarias automáticas:</b>&nbsp;al cortar el stream, sumar</label>
+      <label class="daily-h"><input class="dur" id="setDaily" data-dur placeholder="4:00:00"></label>
+      <label class="check"><input type="checkbox" id="setDailyOnce"> Solo una vez por día</label>
+      <button class="ghost sm" id="btnDailyNow" type="button" title="Sumar esas horas ahora mismo">+ Sumar ahora</button>
+    </div>
+    <p class="hint" id="dailyHint"></p>
+    <p class="hint"><b>Proporcional:</b> con 1 USD = 1:00, una donación de 2.5 USD suma 2:30. Sin proporcional solo cuentan bloques completos (2:00). Las donaciones en otra moneda distinta a la configurada no suman y aparecen avisadas en el historial.</p>
+  </section>
+
+  <!-- CONEXIONES -->
+  <section class="card span2" data-vista="config">
+    <h2>Conexiones</h2>
+    <div class="conns">
+      <details class="conn" open>
+        <summary><span class="tag bits">Twitch</span> Bits y Subs <span class="status" id="stTwitch"></span></summary>
+        <ol class="steps">
+          <li>Entra a <a href="https://dev.twitch.tv/console/apps" target="_blank">dev.twitch.tv/console/apps</a> → <b>Registrar aplicación</b>.</li>
+          <li>En <b>URL de redireccionamiento OAuth</b> pega: <code id="twRedirect"></code> <button class="ghost sm" data-copy="#twRedirect">Copiar</button></li>
+          <li>Categoría: <i>Broadcaster Suite</i>. Copia el Client ID y genera un Client Secret.</li>
+        </ol>
+        <div class="form">
+          <label>Client ID<input id="twClientId" autocomplete="off"></label>
+          <label>Client Secret<input id="twSecret" type="password" autocomplete="off"></label>
+        </div>
+        <div class="row gap">
+          <button id="btnTwSave">Guardar</button>
+          <a class="btn primary" id="btnTwConnect" href="/auth/twitch" target="_blank">Conectar con Twitch</a>
+          <button class="ghost" id="btnTwReconnect">Reconectar</button>
+          <button class="danger-ghost" id="btnTwDisconnect">Desconectar</button>
+        </div>
+      </details>
+
+      <details class="conn">
+        <summary><span class="tag mercadopago">Mercado Pago</span> donaciones <span class="status" id="stMp"></span></summary>
+        <ol class="steps">
+          <li>En <a href="https://www.mercadopago.com/developers/panel/app" target="_blank">Mercado Pago Developers → Tus integraciones</a> crea una aplicación.</li>
+          <li>En <b>Credenciales de producción</b> copia el <b>Access Token</b> (empieza con <code>APP_USR-</code>).</li>
+          <li>Modo <b>Revisar pagos</b> no necesita túnel: el reloj consulta tus pagos recibidos cada pocos segundos.</li>
+        </ol>
+        <div class="form">
+          <label>Access Token<input id="mpToken" type="password" autocomplete="off"></label>
+          <label>Modo
+            <select id="mpMode"><option value="polling">Revisar pagos (sin túnel, recomendado)</option><option value="webhook">Webhook (con túnel)</option></select>
+          </label>
+          <label>Revisar cada (segundos)<input id="mpPoll" type="number" min="5" step="1"></label>
+          <label>Nombre de quien dona
+            <select id="mpNombre"><option value="inicial">Nombre e inicial (Juan P.)</option><option value="nombre">Solo el nombre (Juan)</option><option value="completo">Nombre completo (Juan Pérez)</option></select>
+          </label>
+          <label>Clave secreta del webhook (opcional)<input id="mpSecret" type="password" autocomplete="off"></label>
+        </div>
+        <p class="hint">URL del webhook (evento <b>Pagos</b>): <code class="hookurl" data-hook="/webhooks/mercadopago"></code></p>
+        <div class="row gap"><button class="primary" id="btnMpSave">Guardar y conectar</button><button class="danger-ghost" id="btnMpClear">Quitar token</button></div>
+      </details>
+
+      <details class="conn">
+        <summary><span class="tag paypal">PayPal</span> donaciones <span class="status" id="stPp"></span></summary>
+        <h4>Opción recomendada · StreamElements (si recibes PayPal con tu página de propinas de StreamElements)</h4>
+        <ol class="steps">
+          <li>Entra a <a href="https://streamelements.com/dashboard" target="_blank">streamelements.com/dashboard</a>.</li>
+          <li>Clic en tu <b>foto de perfil</b> (arriba a la derecha) → <b>tu nombre de canal</b> → <b>Show secrets</b> / <b>Mostrar secretos</b>.</li>
+          <li>Copia el <b>JWT Token</b> y pégalo aquí. No necesita túnel. Estas donaciones usan la tarifa de <b>PayPal</b> de "Tiempo que suma cada cosa".</li>
+        </ol>
+        <div class="form">
+          <label>JWT Token de StreamElements<input id="seJwt" type="password" autocomplete="off"></label>
+          <label>Estado<input id="seState" disabled></label>
+        </div>
+        <div class="row gap"><button class="primary" id="btnSeSave">Guardar y conectar</button><button class="danger-ghost" id="btnSeClear">Quitar token</button></div>
+        <hr class="sep">
+        <h4>Otras opciones · PayPal directo (sin StreamElements)</h4>
+        <p class="hint">PayPal solo avisa por internet, así que necesitas un <b>túnel</b> (ngrok o Cloudflare Tunnel) apuntando al puerto <b id="hookPort"></b>. Pega aquí la URL pública que te da:</p>
+        <div class="form one"><label>URL pública del túnel<input id="publicUrl" placeholder="https://tu-nombre.ngrok-free.app"></label></div>
+        <h4>Opción A · IPN (botón "Donar" de PayPal) — la más simple</h4>
+        <ol class="steps">
+          <li>En PayPal: <b>Configuración de la cuenta → Notificaciones → Notificaciones de pago instantáneas → Actualizar</b>.</li>
+          <li>URL de notificación: <code class="hookurl" data-hook="/webhooks/paypal-ipn"></code> y actívalas.</li>
+        </ol>
+        <h4>Opción B · Webhooks REST (si cobras con PayPal Checkout)</h4>
+        <ol class="steps">
+          <li>En <a href="https://developer.paypal.com/dashboard/applications/live" target="_blank">developer.paypal.com</a> crea una app, añade un webhook con la URL <code class="hookurl" data-hook="/webhooks/paypal"></code></li>
+          <li>Marca los eventos <b>Payment capture completed</b> y <b>Payment sale completed</b>. Copia el <b>Webhook ID</b>.</li>
+        </ol>
+        <div class="form">
+          <label>Modo<select id="ppMode"><option value="live">Real (live)</option><option value="sandbox">Pruebas (sandbox)</option></select></label>
+          <label>Tu email de PayPal (receptor)<input id="ppEmail" autocomplete="off"></label>
+          <label>Client ID (opción B)<input id="ppClientId" autocomplete="off"></label>
+          <label>Client Secret (opción B)<input id="ppSecret" type="password" autocomplete="off"></label>
+          <label>Webhook ID (opción B)<input id="ppWebhookId" autocomplete="off"></label>
+        </div>
+        <div class="row gap"><button class="primary" id="btnPpSave">Guardar</button></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- COMANDOS DEL CHAT -->
+  <section class="card span2" id="chatCard" data-vista="config">
+    <h2>Comandos del chat <span class="sub" id="chatSave">Para ti, tus mods y supermods</span></h2>
+    <p class="hint warn-box" id="chatWarn">Si conectaste Twitch antes de esta versión, pulsa <b>Desconectar</b> y luego <b>Conectar con Twitch</b> otra vez para darle permiso al reloj de leer y responder el chat.</p>
+    <div class="chat-grid">
+      <div class="chat-perms">
+        <h3>Quién puede controlar el reloj</h3>
+        <label class="check"><input type="checkbox" data-c="enabled"> Comandos activados</label>
+        <label class="check"><input type="checkbox" data-c="allowLeadMods"> Moderadores líderes (supermods)</label>
+        <label class="check"><input type="checkbox" data-c="allowMods"> Todos los moderadores</label>
+        <label class="check"><input type="checkbox" data-c="allowVips"> VIPs</label>
+        <label>Usuarios con permiso (tu lista de supermods, uno por línea)
+          <textarea id="chatUsers" rows="4" placeholder="usuario1&#10;usuario2"></textarea>
+        </label>
+        <p class="hint">Tú (el dueño del canal) siempre puedes usar todos los comandos.</p>
+      </div>
+      <div class="chat-perms">
+        <h3>Opciones</h3>
+        <label class="check"><input type="checkbox" data-c="reply"> Responder en el chat</label>
+        <label class="check"><input type="checkbox" data-c="publicTime"> Cualquiera puede usar <code>!tiempo</code></label>
+        <div class="row gap wrap">
+          <label>Prefijo<input id="chatPrefix" maxlength="3" style="width:70px"></label>
+          <label>Máximo por comando<input id="chatMax" class="dur" data-dur placeholder="sin límite"></label>
+        </div>
+        <p class="hint">El máximo evita que un mod sume o quite demasiado de golpe (ej. <code>1:00:00</code>).</p>
+      </div>
+      <div class="cmd-ref">
+        <h3>Comandos</h3>
+        <table id="cmdTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="card span2">
+    <div class="clock-head">
+      <h2>Historial</h2>
+      <div class="row gap"><button class="ghost sm" id="btnClearLog">Limpiar</button><button class="danger-ghost sm" id="btnReset">Reiniciar subatón</button></div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <ul class="log" id="log"></ul>
+  </section>
+  <!-- SIMULADOR -->
+  <section class="card plegable span2" id="simCard">
+    <details id="simDet">
+    <summary><h2>🧪 Probar <span class="sub">simula un evento · toca para mostrar u ocultar</span></h2></summary>
+    <div class="form">
+      <label>Tipo
+        <select id="simSource">
+          <option value="paypal">Donación PayPal</option>
+          <option value="mercadopago">Donación Mercado Pago</option>
+          <option value="bits">Bits</option>
+          <option value="subs">Subs</option>
+        </select>
+      </label>
+      <label>Nombre<input id="simUser" value="Viewer de prueba"></label>
+      <label class="sim-money">Monto<input id="simAmount" type="number" step="any" value="5"></label>
+      <label class="sim-subs hidden">Tipo de sub
+        <select id="simKind"><option value="new">Nueva</option><option value="resub">Resub</option><option value="gift">Regaladas</option></select>
+      </label>
+      <label class="sim-subs hidden">Tier<select id="simTier"><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option></select></label>
+      <label class="sim-subs hidden">Cantidad<input id="simCount" type="number" min="1" value="1"></label>
+    </div>
+    <div class="row gap wrap">
+      <button class="primary" id="btnSim">Simular</button>
+      <button class="ghost" id="btnSimLive">🔴 Simular inicio de stream</button>
+      <button class="ghost" id="btnSimOff">⚫ Simular fin de stream</button>
+    </div>
+    <p class="hint">La prueba suma tiempo de verdad al reloj (para que lo veas en OBS) pero no cuenta en los totales.</p>
+    </details>
+  </section>
+  <script>
+    // Recordar si "Probar" quedó abierto u oculto (cerrado por defecto)
+    (function(){
+      const d = document.getElementById('simDet');
+      try { d.open = localStorage.getItem('probarAbierto') === '1'; } catch (e) {}
+      d.addEventListener('toggle', () => { try { localStorage.setItem('probarAbierto', d.open ? '1' : '0'); } catch (e) {} });
+    })();
+  </script>
+</main>
+<div class="toast" id="toast"></div>
+<script src="sounds.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

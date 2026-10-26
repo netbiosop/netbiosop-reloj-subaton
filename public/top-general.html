@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Top General del mes</title>
+<link rel="stylesheet" href="marca.css">
+<style>
+  #wrap{width:306px;padding:4px 6px;transform-origin:top left;position:relative}
+  .m-titulo{font-size:27px}
+  .m-cab .m-corona{font-size:22px;animation:m-rebote 2.2s ease-in-out infinite}
+  .sub{display:flex;align-items:center;gap:8px;margin-top:3px}
+  .sub .m-linea{flex:1;margin:0}
+  .entra .m-cab{animation:m-bajar .6s .1s both}
+  .entra .sub{animation:m-bajar .6s .25s both}
+  .cols{display:flex;gap:4px;margin-top:16px;perspective:800px}
+  .slot{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .slot.flip{animation:flip .9s cubic-bezier(.2,.9,.3,1.15) both}
+  .slot .m-hex{animation:m-flotar 2.6s ease-in-out infinite}
+  .slot:nth-child(2) .m-hex{animation-delay:.4s} .slot:nth-child(3) .m-hex{animation-delay:.8s}
+  .cat{margin-top:5px;font-size:14px;letter-spacing:.6px}
+  .nombre{font-weight:800;font-size:22px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:var(--contorno-duro);line-height:1.1;margin-top:1px;padding:0 2px}
+  .m-monto{margin-top:5px;font-size:16px}
+  .slot .m-hex.grande{width:46px;height:52px;flex-basis:46px}
+  .slot .m-hex.grande > .ic{width:33px;height:33px}
+  .m-monto.pop{animation:m-pop .6s ease}
+  .vacio .nombre{opacity:.4} .vacio .m-monto{visibility:hidden}
+  .badge{position:absolute;top:-8px;left:50%;z-index:3;transform:translateX(-50%) scale(0);white-space:nowrap;
+         font-weight:800;font-size:12px;letter-spacing:1px;color:#fff;background:var(--rojo);padding:1px 7px;box-shadow:0 0 12px var(--rojo)}
+  .nuevo .badge{animation:badge 4.5s ease both}
+  .nuevo .nombre{animation:destello 1s ease 3}
+  .confeti{position:absolute;top:40%;left:50%;width:6px;height:9px;pointer-events:none;z-index:2}
+  @keyframes flip{from{opacity:0;transform:rotateY(-90deg) translateY(20px) scale(.8)}to{opacity:1;transform:none}}
+  @keyframes destello{50%{color:var(--rojo-claro)}}
+  @keyframes badge{0%{transform:translateX(-50%) scale(0)}8%{transform:translateX(-50%) scale(1.2)}14%,86%{transform:translateX(-50%) scale(1)}100%{transform:translateX(-50%) scale(0)}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="m-cab"><span class="m-corona">👑</span><span class="m-titulo" id="titulo">Top <em>General</em></span></div>
+  <div class="sub"><span class="m-tag"><span id="mes"></span></span><span class="m-linea"></span></div>
+  <div class="cols" id="cols"></div>
+</div>
+<script src="iconos.js"></script>
+<script>
+// Top General del mes (estilo BYTEDEMOND): el #1 de Donaciones, Subs regaladas y Bits.
+// Opciones en la URL:  ?escala=1.3   ?repetir=60   ?regalo=segundos
+const CATS = {
+  dinero:{nombre:'Donación',       fmt:v=>'$'+Number(v).toFixed(2)},
+  subs:  {nombre:'Subs regaladas', fmt:v=>v+(v===1?' sub':' subs')},
+  bits:  {nombre:'Bits',           fmt:v=>Number(v).toLocaleString('es')+' bits'}
+};
+const ORDEN = ['dinero','subs','bits'];
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+const params = new URLSearchParams(location.search);
+const escala = parseFloat(params.get('escala'));
+if(escala>0) document.getElementById('wrap').style.transform = `scale(${escala})`;
+
+const colsEl = document.getElementById('cols'), slots = {};
+ORDEN.forEach(cat=>{
+  const d = document.createElement('div');
+  d.className = 'slot';
+  d.innerHTML = `<div class="badge">¡NUEVO #1!</div><span class="m-hex grande">${Iconos.svg(cat)}</span>
+      <div class="cat m-cat">${CATS[cat].nombre}</div><div class="nombre">—</div><div class="m-monto"><span>&nbsp;</span></div>`;
+  colsEl.appendChild(d); slots[cat] = d;
+});
+function confeti(slot){
+  const colores = ['#e3121b','#ff4a52','#ffffff','#ffc83a','#8e0a10'];
+  for(let i=0;i<24;i++){
+    const s = document.createElement('span'); s.className='confeti'; s.style.background = colores[i%5]; slot.appendChild(s);
+    const a = Math.random()*Math.PI*2, d = 40+Math.random()*70;
+    s.animate([{transform:'translate(-50%,-50%)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d+50}px) rotate(${Math.random()*720}deg)`,opacity:0}],
+      {duration:1200+Math.random()*700,easing:'cubic-bezier(.2,.7,.4,1)'}).onfinish=()=>s.remove();
+  }
+}
+// Achica el nombre solo si no entra en su columna (así se ve completo y lo más grande posible)
+function encajar(el, max, min){
+  let t = max; el.style.fontSize = t+'px';
+  while(t>min && el.scrollWidth > el.clientWidth + 1){ t -= 1; el.style.fontSize = t+'px'; }
+}
+const encajarTodos = ()=>ORDEN.forEach(c=>encajar(slots[c].querySelector('.nombre'), 22, 14));
+const timersNuevo = {};
+function celebrar(cat){
+  const slot = slots[cat];
+  slot.style.animationDelay = '0s'; replay(slot,'flip');
+  slot.classList.add('nuevo');
+  clearTimeout(timersNuevo[cat]);
+  timersNuevo[cat] = setTimeout(()=>slot.classList.remove('nuevo'), 4600);
+  setTimeout(()=>confeti(slot), 350);
+  if(cat==='subs') setTimeout(()=>Iconos.abrir(slot), 900);
+  if(cat==='dinero') setTimeout(()=>Iconos.contar(slot), 900);
+}
+let ultimo = {}, mesActual = null, firma = '';
+function pintarTitulo(t){
+  const [a, ...b] = String(t).split(' ');
+  const el = document.getElementById('titulo'); el.textContent = a + (b.length ? ' ' : '');
+  if(b.length){ const em = document.createElement('em'); em.textContent = b.join(' '); el.appendChild(em); }
+}
+function actualizar(data, sinFestejo){
+  pintarTitulo(data.config.titulos.general);
+  document.getElementById('mes').textContent = data.mes.label;
+  ORDEN.forEach(cat=>{
+    const slot = slots[cat], d = (data.actual[cat]||[])[0], prev = ultimo[cat];
+    slot.classList.toggle('vacio', !d);
+    slot.querySelector('.nombre').textContent = d ? d.name : '—';
+    const monto = slot.querySelector('.m-monto');
+    monto.firstChild.textContent = d ? CATS[cat].fmt(d.total) : ' ';
+    if(!sinFestejo && d){
+      if(!prev || prev.name.toLowerCase()!==d.name.toLowerCase()) celebrar(cat);
+      else if(prev.total!==d.total){ replay(monto,'pop'); if(cat==='subs') Iconos.abrir(slot); if(cat==='dinero') Iconos.contar(slot); }
+    }
+    ultimo[cat] = d ? {name:d.name,total:d.total} : null;
+  });
+  encajarTodos();
+}
+function entrada(){
+  replay(document.getElementById('wrap'),'entra');
+  ORDEN.forEach((cat,i)=>{ slots[cat].style.animationDelay = (0.4+i*0.2)+'s'; replay(slots[cat],'flip'); });
+}
+async function cargar(){
+  try{
+    const j = await (await fetch('/api/podio',{cache:'no-store'})).json();
+    const f = JSON.stringify([j.mes.key, j.actual, j.config.titulos.general]);
+    if(f===firma) return;
+    firma = f;
+    const primera = mesActual===null, mesNuevo = !primera && mesActual!==j.mes.key;
+    mesActual = j.mes.key;
+    actualizar(j, primera || mesNuevo);
+    if(primera || mesNuevo) entrada();
+  }catch(e){ /* reloj apagado: queda lo último */ }
+}
+cargar(); setInterval(cargar, 2000);
+document.fonts.ready.then(encajarTodos);
+Iconos.auto(colsEl);
+const repetir = parseFloat(params.get('repetir'));
+if(repetir>=10) setInterval(entrada, repetir*1000);
+</script>
+</body>
+</html>

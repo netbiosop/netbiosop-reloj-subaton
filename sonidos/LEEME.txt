@@ -1,0 +1,13 @@
+Pon aqui tus propios sonidos (mp3, wav, ogg o m4a) con estos nombres para reemplazar los que trae el reloj:
+
+  sub.mp3
+  bits.mp3
+  paypal.mp3
+  mercadopago.mp3
+  grande.mp3
+  multiplicador.mp3
+  final.mp3
+  fin.mp3
+  manual.mp3
+
+Si no hay archivo, se usa el sonido incluido.

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copias de seguridad · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#3ddc97;--bad:#ff5d73;--warn:#ffb547;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  header .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;padding:16px 20px 40px;max-width:1200px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input[type=text]{width:100%}
+  input[type=checkbox]{accent-color:var(--accent);transform:scale(1.15)}
+  button,.btn{cursor:pointer;background:var(--card2);text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  .prim{background:var(--accent);border-color:var(--accent);color:#06210f;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .fila{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+  .fila>input{flex:1;min-width:200px}
+  .check{display:flex;align-items:center;gap:8px;margin:6px 0;color:var(--text);font-size:13px;cursor:pointer}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .nota.ok{color:var(--accent)} .nota.mal{color:var(--bad)}
+  .grande{font-family:'Bebas Neue';font-size:34px;letter-spacing:1px;line-height:1}
+  .estado{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:10px}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8;word-break:break-all}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)} th{font-size:12px;color:var(--muted);font-weight:600}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  ul{margin:6px 0 0;padding-left:18px} li{margin:4px 0}
+  @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>💾 Copias de seguridad</h1>
+  <span class="sp"></span>
+  <button class="prim" id="ahora">💾 Hacer una copia ahora</button>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card">
+    <h2>Estado</h2>
+    <div class="estado">
+      <div><div class="nota">Última copia</div><div class="grande" id="ultima">—</div></div>
+      <div><div class="nota">Copias guardadas</div><div class="grande" id="total">—</div></div>
+    </div>
+    <label class="check"><input type="checkbox" id="on"> Hacer copias automáticas</label>
+    <div class="nota" id="nota"></div>
+    <h2 style="margin-top:14px">Cómo funciona</h2>
+    <ul>
+      <li>Copia <b>subs, bits, donaciones, podio, metas y ajustes</b> <b>cada vez que entra una donación, sub o bits</b> (si llegan varios juntos, espera 5 segundos y hace una sola copia con todo). También al abrir, al terminar cada stream y al cerrar el reloj, y copia los registros de cada stream.</li>
+      <li>Guarda las <b>últimas 100 copias</b> y <b>una por día</b> de los últimos 60 días.</li>
+      <li>Si un archivo se borra o se daña, <b>al abrir el reloj se recupera solo</b> de la última copia buena.</li>
+      <li>Si instalas una versión nueva en otra carpeta, también recupera todo solo.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Dónde se guardan</h2>
+    <label>Carpeta de las copias (fuera de la carpeta del reloj)</label>
+    <div class="fila"><input type="text" id="carpeta"><button id="abrir">📂 Abrir</button></div>
+    <div class="nota" id="porDefecto"></div>
+    <label>Segunda carpeta (opcional): un pendrive, otro disco o Google Drive</label>
+    <div class="fila"><input type="text" id="extra" placeholder="Ej: D:\Respaldos reloj  ·  G:\Mi unidad\Reloj"></div>
+    <div class="fila" style="margin-top:10px"><button id="guardar">Guardar carpetas</button></div>
+    <div class="nota" id="notaC"></div>
+  </section>
+
+  <section class="card ancho">
+    <h2>Volver a una copia</h2>
+    <div class="nota" style="margin-bottom:8px">Restaurar reemplaza los datos actuales por los de esa copia y reinicia el reloj (antes guarda una copia de cómo está ahora, por si te arrepientes).</div>
+    <table><thead><tr><th>Fecha</th><th>Contenido</th><th>Tamaño</th><th></th></tr></thead><tbody id="lista"></tbody></table>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+function nota(el, txt, cls=''){ el.textContent = txt; el.className = 'nota '+cls; }
+const fecha = (n) => { const [d, h] = n.split('_'); const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y} ${h.replace(/-/g, ':')}`; };
+const hace = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : 'hace ' + Math.round(s / 3600) + ' h'; };
+function pintar(j){
+  $('on').checked = j.on;
+  $('ultima').textContent = j.ultima ? hace(j.ultima.at) : (j.copias[0] ? fecha(j.copias[0].nombre) : 'ninguna');
+  $('total').textContent = j.total;
+  if (document.activeElement !== $('carpeta')) $('carpeta').value = j.carpeta;
+  if (document.activeElement !== $('extra')) $('extra').value = j.extra;
+  $('porDefecto').textContent = j.porDefecto ? 'Carpeta por defecto (en tus Documentos). Si tus Documentos están en OneDrive, las copias además quedan en la nube.' : '';
+  $('lista').innerHTML = j.copias.map((c, i) => `<tr><td>${fecha(c.nombre)}${i === 0 ? ' <span class="nota ok">· la más nueva</span>' : ''}</td><td>${c.resumen || ''}</td><td>${(c.tam / 1024).toFixed(1)} KB</td>
+    <td style="text-align:right"><button class="sm" data-r="${c.nombre}">↩ Restaurar</button></td></tr>`).join('') || '<tr><td colspan="4" class="nota">Todavía no hay copias. Toca "Hacer una copia ahora".</td></tr>';
+}
+async function cargar(){ try { pintar(await api('/api/respaldo')); } catch(e){ nota($('nota'), e.message, 'mal'); } }
+$('ahora').onclick = async ()=>{ try { const j = await api('/api/respaldo/ahora','POST',{}); pintar(j.result); nota($('nota'),'✔ Copia guardada','ok'); } catch(e){ nota($('nota'), e.message, 'mal'); } };
+$('on').onchange = async ()=>{ try { pintar((await api('/api/respaldo/config','POST',{ on: $('on').checked })).result); nota($('nota'), $('on').checked ? '✔ Copias automáticas activadas' : 'Copias automáticas apagadas', $('on').checked ? 'ok' : 'mal'); } catch(e){ nota($('nota'), e.message, 'mal'); } };
+$('guardar').onclick = async ()=>{ try { pintar((await api('/api/respaldo/config','POST',{ carpeta: $('carpeta').value, extra: $('extra').value })).result); nota($('notaC'),'✔ Carpetas guardadas','ok'); } catch(e){ nota($('notaC'), e.message, 'mal'); } };
+$('abrir').onclick = ()=> api('/api/respaldo/abrir','POST',{}).catch(()=>{});
+$('lista').onclick = async (e)=>{
+  const b = e.target.closest('[data-r]'); if(!b) return;
+  if (!confirm('¿Volver a la copia del ' + fecha(b.dataset.r) + '?\nSe reemplazan los datos actuales y el reloj se reinicia.')) return;
+  try { await api('/api/respaldo/restaurar','POST',{ copia: b.dataset.r }); nota($('nota'),'↩ Restaurando… el reloj se reinicia en unos segundos','ok'); setTimeout(()=>location.reload(), 6000); }
+  catch(err){ nota($('nota'), err.message, 'mal'); }
+};
+cargar(); setInterval(cargar, 15000);
+</script>
+</body>
+</html>

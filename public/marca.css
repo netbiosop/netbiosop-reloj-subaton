@@ -1,0 +1,64 @@
+/* ============================================================
+   Estilo de marca BYTEDEMOND, compartido por todos los overlays.
+   Rojo intenso sobre negro, hexágonos y tipografía condensada
+   (Bebas Neue para títulos y números, Barlow Condensed para textos).
+   Cambiando estos colores se actualizan todos los overlays a la vez.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700;800&display=swap');
+
+:root {
+  --rojo: #e3121b;        /* rojo principal (el de "EMPEZANDO") */
+  --rojo-claro: #ff4a52;
+  --rojo-oscuro: #8e0a10;
+  --vino: #4a0408;
+  --negro: #0b0b0d;
+  --plata: #c9cdd4;
+  --oro: #ffc83a;         /* solo para coronas y metas cumplidas */
+  --blanco: #ffffff;
+  --f-titulo: 'Bebas Neue', 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+  --f-texto: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  /* contorno oscuro para leerse sobre cualquier juego */
+  --contorno: 0 2px 0 #000, 0 0 2px #000, 1px 1px 0 #000, -1px -1px 0 #000, 0 0 10px rgba(0,0,0,.75);
+  /* contorno duro (sin halo difuso): el texto chico queda nítido aunque Twitch comprima la imagen */
+  --contorno-duro: 0 2px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 4px rgba(0,0,0,.9);
+  --contorno-rojo: 0 2px 0 #3a0003, 0 0 2px #000, 0 0 12px rgba(227,18,27,.45), 0 0 10px rgba(0,0,0,.7);
+}
+
+html, body { background: transparent; margin: 0; overflow: hidden; color: var(--blanco); font-family: var(--f-texto); }
+* { box-sizing: border-box; }
+
+/* Encabezado: título grande + etiqueta roja inclinada con el mes */
+.m-cab { display: flex; align-items: center; gap: 8px; }
+.m-titulo { font-family: var(--f-titulo); font-size: 30px; line-height: .95; letter-spacing: 1px; text-transform: uppercase; text-shadow: var(--contorno); white-space: nowrap; }
+.m-titulo em { font-style: normal; color: var(--rojo); text-shadow: var(--contorno-rojo); }
+.m-tag { display: inline-block; font-family: var(--f-texto); font-weight: 800; font-size: 14px; letter-spacing: 1.4px; text-transform: uppercase;
+  color: #fff; background: linear-gradient(90deg, var(--rojo), var(--rojo-oscuro)); padding: 1px 10px 0; transform: skewX(-14deg);
+  box-shadow: 0 2px 6px rgba(0,0,0,.55); white-space: nowrap; }
+.m-tag > span { display: inline-block; transform: skewX(14deg); }
+.m-linea { height: 3px; margin: 6px 0 2px; background: linear-gradient(90deg, var(--rojo) 0%, var(--rojo) 40%, transparent); transform: skewX(-20deg); transform-origin: left; box-shadow: 0 0 8px rgba(227,18,27,.55); }
+
+/* Insignia hexagonal para los íconos (como los hexágonos del fondo del canal) */
+.m-hex { position: relative; width: 36px; height: 40px; flex: 0 0 36px; display: grid; place-items: center;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: linear-gradient(160deg, var(--rojo-claro), var(--rojo-oscuro)); }
+.m-hex::before { content: ""; position: absolute; inset: 2px; clip-path: inherit; background: radial-gradient(circle at 50% 35%, #2a0a0c, #0b0b0d 75%); }
+.m-hex > .ic { position: relative; z-index: 1; width: 26px; height: 26px; }
+.m-hex.grande { width: 46px; height: 52px; flex-basis: 46px; }
+.m-hex.grande > .ic { width: 32px; height: 32px; }
+
+/* Etiqueta de monto: paralelogramo rojo */
+.m-monto { display: inline-block; font-family: var(--f-texto); font-weight: 800; font-size: 15px; letter-spacing: .4px; color: #fff;
+  background: linear-gradient(90deg, var(--rojo), var(--rojo-oscuro)); padding: 1px 9px 0; transform: skewX(-14deg); box-shadow: 0 2px 6px rgba(0,0,0,.6); white-space: nowrap; }
+.m-monto > span { display: inline-block; transform: skewX(14deg); }
+
+/* Etiqueta chica de categoría (DONACIÓN, REY SUBS...): grande y nítida para leerse en el stream */
+.m-cat { font-family: var(--f-texto); font-weight: 800; font-size: 15px; line-height: 1.05; letter-spacing: 1.1px; text-transform: uppercase; color: var(--rojo-claro); text-shadow: var(--contorno-duro); white-space: nowrap; }
+
+/* Corona dorada (lo único dorado: el #1) */
+.m-corona { font-size: 16px; line-height: 1; filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 4px rgba(255,200,58,.6)); }
+
+@keyframes m-bajar { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+@keyframes m-abrir { from { opacity: 0; transform: skewX(-20deg) scaleX(0); } to { opacity: 1; transform: skewX(-20deg) scaleX(1); } }
+@keyframes m-deslizar { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes m-pop { 40% { transform: skewX(-14deg) scale(1.3); } }
+@keyframes m-flotar { 50% { transform: translateY(-3px); } }
+@keyframes m-rebote { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px) scale(1.12); } }

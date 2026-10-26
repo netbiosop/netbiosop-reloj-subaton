@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tren del hype · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#ff7a1a;--good:#3ddc97;--bad:#ff5d73;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  header .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;padding:16px 20px 40px;max-width:1300px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  input,select,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input[type=text],select{width:100%}
+  input[type=checkbox]{accent-color:var(--accent);transform:scale(1.15)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  button,.btn{cursor:pointer;background:var(--card2);text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  .prim{background:var(--accent);border-color:var(--accent);color:#1a0a00;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .check{display:flex;align-items:center;gap:8px;margin:9px 0;color:var(--text);font-size:13px;cursor:pointer}
+  .fila{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+  .fila>*{flex:1;min-width:120px}
+  .pruebas{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .pruebas button{justify-content:center;padding:12px 8px;font-weight:600}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .nota.ok{color:var(--good)} .nota.mal{color:var(--bad)}
+  .estado{display:flex;gap:18px;flex-wrap:wrap;font-size:15px}
+  .estado b{font-family:'Bebas Neue';font-size:30px;letter-spacing:1px;display:block;line-height:1}
+  .niveles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+  .niv{background:var(--card2);border-radius:10px;padding:8px 10px;border-left:4px solid var(--c)}
+  .niv b{color:var(--c)} .niv div{font-size:12px;color:var(--muted)}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#ffc59a}
+  .url{display:flex;gap:8px;align-items:center;background:var(--card2);border-radius:10px;padding:8px 10px}
+  .url code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  ul{margin:6px 0 0;padding-left:18px} li{margin:3px 0}
+  @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .pruebas,.niveles{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚂 Tren del hype</h1>
+  <span class="sp"></span>
+  <span class="nota" id="notaG" style="margin:0"></span>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card ancho">
+    <h2>🧪 Probar (se ve en el overlay de OBS)</h2>
+    <div class="pruebas">
+      <button data-p="inicio">🚂 Empieza el tren</button>
+      <button data-p="progreso">➕ Suma puntos</button>
+      <button data-p="nivel">⬆️ Sube de nivel</button>
+      <button data-p="fin">🏁 Termina</button>
+    </div>
+    <div class="nota" id="notaP">Las pruebas no cuentan para nada: solo muestran las animaciones y la música.</div>
+  </section>
+
+  <section class="card">
+    <h2>⚙️ Ajustes</h2>
+    <label class="check"><input type="checkbox" id="on"> Mostrar el tren del hype en el overlay</label>
+    <label class="check"><input type="checkbox" id="musica"> Música de fondo mientras dura (más rápida en cada nivel)</label>
+    <label class="check"><input type="checkbox" id="efectos"> Efectos de sonido (interruptor general)</label>
+    <div style="margin-left:26px">
+      <label class="check"><input type="checkbox" id="sInicio"> Sonido de inicio (bocina o tu <code>hype-inicio.mp3</code>)</label>
+      <label class="check"><input type="checkbox" id="sNivel"> Fanfarria al subir de nivel</label>
+      <label class="check"><input type="checkbox" id="sChicos"> Sonidos chicos (puntos que se suman, fuegos artificiales)</label>
+      <label class="check"><input type="checkbox" id="sFin"> Sonido al terminar</label>
+    </div>
+    <label class="check"><input type="checkbox" id="silenciarConInicio"> Mientras suena mi sonido de inicio, que no suene nada más (la música empieza cuando termina)</label>
+    <label class="check"><input type="checkbox" id="mostrarTop"> Mostrar los 3 que más aportaron</label>
+    <label>Volumen: <span id="volTxt"></span>%</label><input type="range" id="volumen" min="0" max="100">
+    <div class="fila">
+      <div><label>Barra del tren</label><select id="posicion"><option value="arriba">Arriba al centro</option><option value="abajo">Abajo al centro</option></select></div>
+      <div><label>Título</label><input type="text" id="titulo" maxlength="30"></div>
+    </div>
+    <div class="nota" id="notaA">Se guarda solo.</div>
+  </section>
+
+  <section class="card">
+    <h2>📡 Tren actual</h2>
+    <div class="estado" id="estado">—</div>
+    <h2 style="margin-top:16px">🎆 Qué pasa en cada nivel</h2>
+    <div class="niveles">
+      <div class="niv" style="--c:#e3121b"><b>Nivel 1</b><div>Entrada con la locomotora, bocina y confeti</div></div>
+      <div class="niv" style="--c:#ff6a1a"><b>Nivel 2</b><div>Onda expansiva y chispas</div></div>
+      <div class="niv" style="--c:#ffc83a"><b>Nivel 3</b><div>+ lluvia de confeti</div></div>
+      <div class="niv" style="--c:#2fd2ff"><b>Nivel 4</b><div>+ fuegos artificiales</div></div>
+      <div class="niv" style="--c:#b15cff"><b>Nivel 5</b><div>+ destello, pantalla que tiembla y monedas</div></div>
+      <div class="niv" style="--c:#ff3fa4"><b>Nivel 6+</b><div>Todo junto, número arcoíris</div></div>
+    </div>
+    <div class="nota">Cada nivel suma un vagón al tren, cambia el color y la música sube de ritmo y de tono. Si superas el récord del canal sale "¡NUEVO RÉCORD!".</div>
+  </section>
+
+  <section class="card ancho" id="cancionBox">
+    <h2>🎵 Canción del tren (se sincroniza sola)</h2>
+    <div class="nota" id="cancionEstado" style="font-size:14px"></div>
+    <label class="check"><input type="checkbox" id="cOn"> Usar una canción sincronizada: el tren entra en el golpe fuerte, todo late al ritmo, los festejos caen en el golpe y en los drops sale OVERDRIVE</label>
+    <div class="fila" style="margin-top:6px">
+      <div style="flex:2;min-width:240px"><label>Canción (de tu carpeta <code>sonidos</code>)</label><select id="cSel"></select></div>
+      <label class="btn" for="cFile" style="padding:8px 12px;flex:0 0 auto">⬆️ Subir canción</label><input type="file" id="cFile" accept=".mp3,.wav,.ogg,.m4a,audio/*" hidden>
+      <button id="cMedir" style="flex:0 0 auto">🔄 Volver a medir</button>
+    </div>
+    <div class="nota" id="cResumen"></div>
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted)">Ajustar los tiempos a mano (opcional)</summary>
+      <div class="fila" style="margin-top:6px">
+        <div><label>BPM</label><input type="text" id="c_bpm"></div><div><label>Primer golpe (s)</label><input type="text" id="c_golpe"></div>
+        <div><label>Entra el tren (s)</label><input type="text" id="c_entrada"></div><div><label>Aparece la barra (s)</label><input type="text" id="c_barra"></div>
+      </div>
+      <div class="fila">
+        <div><label>Se repite desde (s)</label><input type="text" id="c_loopDesde"></div><div><label>hasta (s)</label><input type="text" id="c_loopHasta"></div>
+        <div><label>Drops / OVERDRIVE (s, separados por ;)</label><input type="text" id="c_drop"></div><div><label>Final desde (s)</label><input type="text" id="c_finDesde"></div>
+      </div>
+      <div class="fila" style="margin-top:8px"><button id="cGuardar">Guardar estos tiempos</button></div>
+      <div class="nota">Mientras dura el tren, la canción suena desde el principio y después repite la parte "desde–hasta" sin cortes. Al terminar el tren salta al "final desde" para cerrar con la canción.</div>
+    </details>
+  </section>
+
+  <section class="card ancho">
+    <h2>🎥 OBS y sonidos propios</h2>
+    <div class="url"><b>Tren del hype</b><code id="url"></code><span class="nota" style="margin:0">1920 × 1080</span><button class="sm" id="copiar">Copiar</button></div>
+    <ul>
+      <li>Ponla <b>arriba de todo</b> en la escena, con el tamaño de la pantalla completa.</li>
+      <li>Marca <b>"Controlar audio a través de OBS"</b> en la fuente para que la música y los efectos salgan en el stream.</li>
+      <li>Twitch: si conectaste antes de esta versión, en <b>Configuración → Conexiones</b> pulsa <b>Desconectar</b> y vuelve a <b>Conectar con Twitch</b> para dar el permiso del tren del hype.</li>
+      <li>¿Música propia? Pon los archivos en la carpeta <code>sonidos</code>: <code>hype-musica.mp3</code> (de fondo, se repite), <code>hype-inicio.mp3</code>, <code>hype-nivel.mp3</code> o uno por nivel (<code>hype-nivel2.mp3</code>, <code>hype-nivel3.mp3</code>…) y <code>hype-fin.mp3</code>. Si no hay archivo, se usa la música generada.</li>
+    </ul>
+    <div class="nota" id="archivos"></div>
+  </section>
+</main>
+<script src="hype-analisis.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+function nota(el, txt, cls=''){ el.textContent = txt; el.className = 'nota '+cls; }
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function pintarConfig(c){
+  for (const k of ['on','musica','efectos','mostrarTop','sInicio','sNivel','sChicos','sFin','silenciarConInicio']) $(k).checked = c[k] !== false;
+  $('cOn').checked = c.cancion ? c.cancion.on : false;
+  for (const k of ['bpm','golpe','entrada','barra','loopDesde','loopHasta','drop','finDesde']) $('c_'+k).value = c.cancion ? [].concat(c.cancion[k]).join('; ') : '';
+  $('volumen').value = c.volumen; $('volTxt').textContent = c.volumen; $('posicion').value = c.posicion; $('titulo').value = c.titulo;
+}
+function pintarEstado(j){
+  const e = j.estado, ahora = Date.now() + ((j.ahora||Date.now()) - Date.now());
+  if (!e) { $('estado').innerHTML = '<span class="nota">No hay ningún tren todavía.</span>'; return; }
+  const activo = e.fase !== 'fin' && e.expira > ahora;
+  $('estado').innerHTML = `<div><span class="nota">Estado</span><b>${activo ? '🟢 En marcha' : '🏁 Terminado'}</b></div>
+    <div><span class="nota">Nivel</span><b>${e.nivel}</b></div>
+    <div><span class="nota">Progreso</span><b>${e.progreso} / ${e.meta}</b></div>
+    <div><span class="nota">Total</span><b>${e.total}</b></div>
+    ${e.top && e.top[0] ? `<div><span class="nota">Más aportó</span><b>${esc(e.top[0].nombre)}</b></div>` : ''}`;
+}
+let timerGuardar = null;
+function guardar(){
+  clearTimeout(timerGuardar);
+  timerGuardar = setTimeout(async ()=>{
+    try { await api('/api/hype/config','POST',{ on:$('on').checked, musica:$('musica').checked, efectos:$('efectos').checked, mostrarTop:$('mostrarTop').checked,
+      sInicio:$('sInicio').checked, sNivel:$('sNivel').checked, sChicos:$('sChicos').checked, sFin:$('sFin').checked, silenciarConInicio:$('silenciarConInicio').checked,
+      cancion: { on: $('cOn').checked },
+      volumen:+$('volumen').value, posicion:$('posicion').value, titulo:$('titulo').value }); nota($('notaA'),'✔ Guardado','ok'); }
+    catch(e){ nota($('notaA'), e.message, 'mal'); }
+  }, 350);
+}
+document.querySelectorAll('section input, section select').forEach((el)=>!el.closest('#cancionBox') && el.addEventListener('input', ()=>{ $('volTxt').textContent = $('volumen').value; guardar(); }));
+document.querySelectorAll('[data-p]').forEach((b)=>b.onclick = async ()=>{
+  try { const r = await api('/api/hype/probar','POST',{accion:b.dataset.p}); const e = r.result.estado;
+    nota($('notaP'), b.dataset.p==='fin' ? '🏁 Tren terminado (prueba)' : r.result.subio ? `⬆️ ¡Nivel ${e.nivel}!` : e.fase==='inicio' ? '🚂 Arrancó el tren (prueba)' : `➕ ${e.progreso} / ${e.meta}`, 'ok');
+    cargar(); }
+  catch(e){ nota($('notaP'), e.message, 'mal'); }
+});
+async function cargar(){
+  const j = await api('/api/hype'); pintarEstado(j);
+  pintarCancion(j);
+  $('archivos').textContent = j.archivos && j.archivos.length ? 'Archivos propios encontrados: ' + j.archivos.join(', ') : 'Sin archivos propios: se usa la música generada.';
+  return j;
+}
+// ---------- Canción: elegir, subir y medir sola ----------
+const T = (v) => String(Math.round(v * 10) / 10).replace('.', ',') + ' s';
+let midiendo = false, perfilVisto = '', ultimoJ = null;
+function pintarCancion(j){
+  ultimoJ = j; const c = j.config.cancion || {}, k = j.cancion || {};
+  $('cOn').checked = !!c.on;
+  const opts = (j.canciones || []).map((x) => `<option value="${esc(x.nombre)}" ${x.nombre === c.archivo ? 'selected' : ''}>${esc(x.nombre)} · ${(x.bytes / 1048576).toFixed(1)} MB</option>`);
+  if (!(j.canciones || []).some((x) => x.nombre === c.archivo)) opts.unshift(`<option selected value="${esc(c.archivo || '')}">${esc(c.archivo || '(ninguna)')} — no está en la carpeta</option>`);
+  if (document.activeElement !== $('cSel')) $('cSel').innerHTML = opts.join('');
+  if (!c.on) $('cancionEstado').innerHTML = 'Canción sincronizada apagada: se usa la música generada.';
+  else if (!k.existe) $('cancionEstado').innerHTML = `⚠️ No encuentro <b>${esc(c.archivo)}</b> en la carpeta sonidos. Elige otra o súbela.`;
+  else if (midiendo) $('cancionEstado').innerHTML = `⏳ Midiendo <b>${esc(c.archivo)}</b>…`;
+  else if (!k.medida){ $('cancionEstado').innerHTML = `⏳ Midiendo <b>${esc(c.archivo)}</b>…`; medir(); }
+  else $('cancionEstado').innerHTML = `✅ <b>${esc(c.archivo)}</b> lista · ${c.bpm} BPM · el tren va al ritmo.`;
+  if (k.medida) $('cResumen').innerHTML = `Entra el tren a los ${T(c.entrada)} · aparece la barra a los ${T(c.barra)} · OVERDRIVE en ${[].concat(c.drop).map(T).join(', ')} · se repite de ${T(c.loopDesde)} a ${T(c.loopHasta)} · final desde ${T(c.finDesde)}`;
+  else $('cResumen').textContent = '';
+  const firma = JSON.stringify([c.archivo, c.bpm, c.golpe, c.entrada, c.barra, c.loopDesde, c.loopHasta, c.drop, c.finDesde]);
+  if (firma !== perfilVisto){ perfilVisto = firma; for (const x of ['bpm','golpe','entrada','barra','loopDesde','loopHasta','drop','finDesde']) $('c_'+x).value = [].concat(c[x] ?? '').join('; '); }
+}
+async function medir(){
+  if (midiendo || !ultimoJ) return; midiendo = true;
+  const c = ultimoJ.config.cancion, k = ultimoJ.cancion;
+  $('cancionEstado').innerHTML = `⏳ Midiendo <b>${esc(c.archivo)}</b> (ritmo, golpes fuertes, drops y final)…`;
+  try {
+    const a = await (await fetch('/sonidos/' + encodeURIComponent(c.archivo), { cache: 'no-store' })).arrayBuffer();
+    const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+    const buf = await ctx.decodeAudioData(a);
+    const perfil = HypeAnalisis.analizar(buf);
+    await api('/api/hype/cancion/perfil','POST',{ archivo: c.archivo, bytes: k.bytes, perfil });
+    midiendo = false; perfilVisto = ''; await cargar();
+  } catch(e){ midiendo = false; $('cancionEstado').innerHTML = '⚠️ No se pudo medir la canción: ' + esc(e.message); }
+}
+$('cOn').onchange = async ()=>{ await api('/api/hype/config','POST',{ cancion: { on: $('cOn').checked } }).catch(()=>{}); cargar(); };
+$('cSel').onchange = async ()=>{ await api('/api/hype/config','POST',{ cancion: { archivo: $('cSel').value } }).catch((e)=>nota($('cResumen'), e.message, 'mal')); $('cSel').blur(); cargar(); };
+$('cMedir').onclick = async ()=>{ await api('/api/hype/config','POST',{ cancion: { remedir: true } }).catch(()=>{}); cargar(); };
+$('cFile').onchange = async ()=>{
+  const f = $('cFile').files[0]; if (!f) return;
+  $('cancionEstado').innerHTML = `⬆️ Subiendo <b>${esc(f.name)}</b>…`;
+  try {
+    const r = await fetch('/api/hype/subir', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'x-nombre': encodeURIComponent(f.name) }, body: f });
+    const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || 'Error ' + r.status);
+    await api('/api/hype/config','POST',{ cancion: { on: true, archivo: j.nombre } });
+    $('cFile').value = ''; cargar();
+  } catch(e){ $('cancionEstado').innerHTML = '⚠️ ' + esc(e.message); }
+};
+$('cGuardar').onclick = async ()=>{
+  try { await api('/api/hype/config','POST',{ cancion: Object.assign({ drop: String($('c_drop').value).split(';').map((v)=>parseFloat(v.replace(',','.'))).filter((v)=>!isNaN(v)) },
+      ...['bpm','golpe','entrada','barra','loopDesde','loopHasta','finDesde'].map((k)=>({ [k]: parseFloat(String($('c_'+k).value).replace(',','.')) }))) });
+    perfilVisto = ''; cargar(); nota($('cResumen'), '✔ Tiempos guardados', 'ok'); } catch(e){ nota($('cResumen'), e.message, 'mal'); }
+};
+
+(async ()=>{
+  const j = await cargar(); pintarConfig(j.config);
+  const u = location.origin.replace(/\/\/[^:/]+/, '//localhost') + '/hype'; $('url').textContent = u;
+  $('copiar').onclick = ()=> navigator.clipboard?.writeText(u).then(()=>{ $('copiar').textContent='✔ Copiado'; setTimeout(()=>$('copiar').textContent='Copiar',1200); });
+  setInterval(cargar, 5000);
+})();
+</script>
+</body>
+</html>

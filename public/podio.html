@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Podio del mes</title>
+<link rel="stylesheet" href="marca.css">
+<style>
+  #wrap{width:306px;padding:4px 6px;transform-origin:top left}
+  .card{transition:opacity .45s ease, transform .45s ease}
+  .card.oculto{opacity:0;transform:translateY(10px)}
+  .m-titulo{font-size:27px}
+  .m-cab .m-hex{width:30px;height:34px;flex-basis:30px}
+  .m-cab .m-hex > .ic{width:22px;height:22px}
+  .sub{display:flex;align-items:center;gap:8px;margin-top:3px}
+  .sub .m-linea{flex:1;margin:0}
+  .podio{display:flex;align-items:flex-end;justify-content:center;gap:5px;height:136px;margin-top:4px}
+  .puesto{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+  .nombre{font-weight:800;font-size:19px;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;text-shadow:var(--contorno-duro);letter-spacing:.2px;padding:0 1px}
+  .monto{font-weight:800;font-size:16px;line-height:1.15;color:#e4e7ec;margin:0 0 4px;white-space:nowrap;text-shadow:var(--contorno-duro)}
+  .bloque{position:relative;width:100%;display:flex;justify-content:center;padding-top:3px;font-family:var(--f-titulo);font-size:24px;line-height:1;
+          transform-origin:bottom;box-shadow:0 3px 8px rgba(0,0,0,.6);animation:subir .8s cubic-bezier(.2,.9,.3,1.15) both;
+          clip-path:polygon(8% 0,100% 0,92% 100%,0 100%)}
+  /* textura de hexágonos sutil en cada bloque */
+  .bloque::after{content:"";position:absolute;inset:0;opacity:.18;background:
+     radial-gradient(circle at 0 0,transparent 6px,rgba(255,255,255,.5) 7px,transparent 8px) 0 0/14px 12px}
+  .p1 .bloque{height:50px;background:linear-gradient(180deg,var(--rojo-claro),var(--rojo) 40%,var(--rojo-oscuro));color:#fff;text-shadow:0 2px 0 #4a0408}
+  .p2 .bloque{height:37px;background:linear-gradient(180deg,#e6e8ec,#9aa0aa 55%,#5d636d);color:#2a2d33;animation-delay:.12s}
+  .p3 .bloque{height:28px;background:linear-gradient(180deg,#a3242b,var(--vino) 70%);color:#ffd2d4;animation-delay:.24s}
+  .p1{flex:1.3}
+  .p1 .nombre{font-size:22px}
+  .p1 .monto{color:#fff}
+  .vacio .nombre,.vacio .monto{opacity:.4}
+  @keyframes subir{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+</style>
+</head>
+<body>
+<div id="wrap"><div class="card" id="card"></div></div>
+<script src="iconos.js"></script>
+<script>
+// Podio del mes (estilo BYTEDEMOND): rota Donadores → Subs regaladas → Bits.
+// Opciones en la URL:  ?cat=dinero|subs|bits (fija una categoría)   ?escala=1.3
+const CATS = {
+  dinero:{fmt:v=>'$'+Number(v).toFixed(2)},
+  subs:  {fmt:v=>v+(v===1?' sub':' subs')},
+  bits:  {fmt:v=>Number(v).toLocaleString('es')+' bits'}
+};
+const ORDEN = ['dinero','subs','bits'];
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const params = new URLSearchParams(location.search);
+const catFija = params.get('cat');
+const escala = parseFloat(params.get('escala'));
+if(escala>0) document.getElementById('wrap').style.transform = `scale(${escala})`;
+const cardEl = document.getElementById('card');
+let data = null, firma = '', idx = 0, timer = null, segActual = null;
+
+function listaCats(){
+  if(!data) return [];
+  if(CATS[catFija]) return [catFija];
+  const m = data.config.modo;
+  if(CATS[m]) return [m];
+  return ORDEN.filter(c=>data.config.mostrar[c]);
+}
+// "Top Donadores" → "Top" en blanco y "Donadores" en rojo
+function titulo(t){ const [a,...b] = String(t||'').split(' '); return esc(a) + (b.length ? ' <em>'+esc(b.join(' '))+'</em>' : ''); }
+function htmlCard(cat){
+  const top = data.actual[cat] || [];
+  const puestos = [1,0,2].map(i=>{
+    const d = top[i];
+    return `<div class="puesto p${i+1} ${d?'':'vacio'}">
+      ${i===0?'<div class="m-corona">👑</div>':''}
+      <div class="nombre">${d?esc(d.name):'—'}</div>
+      <div class="monto">${d?CATS[cat].fmt(d.total):'&nbsp;'}</div>
+      <div class="bloque">${i+1}</div>
+    </div>`;
+  }).join('');
+  return `<div class="m-cab"><span class="m-hex">${Iconos.svg(cat)}</span><span class="m-titulo">${titulo(data.config.titulos[cat])}</span></div>
+          <div class="sub"><span class="m-tag"><span>${esc(data.mes.label)}</span></span><span class="m-linea"></span></div>
+          <div class="podio">${puestos}</div>`;
+}
+// Achica el nombre solo si no entra en su columna (así se ve completo y lo más grande posible)
+function encajar(el, max, min){
+  let t = max; el.style.fontSize = t+'px';
+  while(t>min && el.scrollWidth > el.clientWidth + 1){ t -= 1; el.style.fontSize = t+'px'; }
+}
+function encajarNombres(){ cardEl.querySelectorAll('.puesto').forEach(p=>encajar(p.querySelector('.nombre'), p.classList.contains('p1')?22:19, 13)); }
+function animarIcono(cat, ms){
+  if(cat==='subs') setTimeout(()=>Iconos.abrir(cardEl), ms);
+  if(cat==='dinero') setTimeout(()=>Iconos.contar(cardEl), ms);
+}
+function pintar(conFade){
+  const cats = listaCats();
+  if(!cats.length){ cardEl.style.display='none'; return; }
+  cardEl.style.display='';
+  if(idx>=cats.length) idx=0;
+  const cat = cats[idx];
+  if(!conFade){ cardEl.innerHTML = htmlCard(cat); encajarNombres(); animarIcono(cat, 900); return; }
+  cardEl.classList.add('oculto');
+  setTimeout(()=>{ cardEl.innerHTML = htmlCard(cat); encajarNombres(); cardEl.classList.remove('oculto'); animarIcono(cat, 700); },450);
+}
+function programar(){
+  const seg = Math.max(3, Number(data.config.segundos)||10);
+  if(seg===segActual && timer) return;
+  segActual = seg; clearInterval(timer);
+  timer = setInterval(()=>{ const n = listaCats().length; if(n>1){ idx=(idx+1)%n; pintar(true); } }, seg*1000);
+}
+async function cargar(){
+  try{
+    const j = await (await fetch('/api/podio',{cache:'no-store'})).json();
+    const f = JSON.stringify([j.mes, j.actual, j.config]);
+    if(f===firma) return;
+    data = j; firma = f;
+    pintar(false); programar();
+  }catch(e){ /* reloj apagado: queda lo último */ }
+}
+cargar(); setInterval(cargar, 2000);
+document.fonts.ready.then(()=>{ if(data) encajarNombres(); });
+Iconos.auto(cardEl);
+</script>
+</body>
+</html>

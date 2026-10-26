@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menú · Centro de control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#a77bff;
+        --good:#3ddc97;--warn:#ffb547;--bad:#ff5d73;--oro:#FFD54A;--r:16px}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,rgba(167,123,255,.12),transparent 60%),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif;min-height:100vh}
+  a{color:inherit}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{margin:0;font:400 32px/1 'Bebas Neue',sans-serif;letter-spacing:1.5px}
+  .brand small{color:var(--muted);font-size:12px}
+  .sp{flex:1}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600}
+  .chip i{width:8px;height:8px;border-radius:50%;background:#555}
+  .chip.ok i{background:var(--good);box-shadow:0 0 8px var(--good)} .chip.err i{background:var(--bad)} .chip.wait i{background:var(--warn)}
+  .chip.vivo{border-color:rgba(255,93,115,.5)} .chip.vivo i{background:#ff2d55;box-shadow:0 0 8px #ff2d55;animation:latir 1.2s infinite}
+  main{max-width:1280px;margin:0 auto;padding:22px 24px 50px;display:grid;gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+  h2{margin:0 0 12px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+  button{font:inherit;color:var(--text);cursor:pointer;border-radius:11px;border:1px solid var(--line);background:var(--card2);padding:9px 14px}
+  button:hover{border-color:var(--accent)}
+  .sm{padding:5px 10px;font-size:12px;border-radius:8px}
+
+  /* ----- Estado + botón principal ----- */
+  .estado{display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;position:relative;overflow:hidden}
+  .estado::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,rgba(61,220,151,.10),transparent 55%);pointer-events:none;transition:background .5s}
+  .estado.descanso::before{background:linear-gradient(110deg,rgba(255,181,71,.14),transparent 55%)}
+  .radar{position:relative;width:86px;height:86px;display:grid;place-items:center}
+  .radar .n{font-size:38px;position:relative;z-index:2}
+  .radar span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--good);opacity:0}
+  .estado.activo .radar span{animation:onda 2.6s ease-out infinite}
+  .estado.activo .radar span:nth-child(2){animation-delay:.85s} .estado.activo .radar span:nth-child(3){animation-delay:1.7s}
+  .estado.descanso .radar span{border-color:var(--warn);animation:onda 3.4s ease-out infinite}
+  .estado.descanso .radar span:nth-child(2){animation-delay:1.1s} .estado.descanso .radar span:nth-child(3){animation-delay:2.2s}
+  .titulo-estado{font:400 34px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  .sub-estado{color:var(--muted);margin-top:4px;max-width:560px}
+  .reloj{display:flex;align-items:baseline;gap:10px;margin-top:10px}
+  .reloj b{font:400 40px/1 'Bebas Neue',sans-serif;letter-spacing:2px}
+  .reloj span{font-size:12px;color:var(--muted)}
+  .acciones{display:flex;flex-direction:column;gap:10px;align-items:stretch;min-width:250px;position:relative}
+  .gran{font-size:17px;font-weight:800;padding:16px 20px;border-radius:14px;border:0;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .15s,filter .15s}
+  .gran:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .gran.pausar{background:linear-gradient(135deg,#ffb547,#ff8a3d);color:#2a1300;box-shadow:0 8px 24px rgba(255,138,61,.25)}
+  .gran.reanudar{background:linear-gradient(135deg,#3ddc97,#1fb57a);color:#04220f;box-shadow:0 8px 24px rgba(61,220,151,.25)}
+  .opcion{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);cursor:pointer}
+  .opcion input{margin-top:2px;accent-color:var(--warn)}
+  .apagar{background:transparent;border-color:transparent;color:var(--muted);font-size:12px;text-decoration:underline;padding:2px}
+  .apagar:hover{color:var(--bad)}
+
+  .fila2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  /* ----- Metas mini ----- */
+  .meta{margin-top:12px}
+  .meta .top{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+  .meta .top b{font-weight:800}
+  .meta .bar{height:9px;border-radius:9px;background:#0b0a10;border:1px solid var(--line);margin-top:5px;overflow:hidden}
+  .meta .bar i{display:block;height:100%;width:0;border-radius:9px;background:var(--c);box-shadow:0 0 10px var(--c);transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+  .m-subs{--c:#ff6fae} .m-bits{--c:#a77bff} .m-dinero{--c:#3ecf8e}
+  /* ----- Últimos aportes ----- */
+  .ult{list-style:none;margin:0;padding:0}
+  .ult li{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .ult li:last-child{border:0}
+  .ult .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--card2);flex:0 0 28px}
+  .ult .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ult small{color:var(--muted)}
+  .tag{font-size:10px;padding:1px 6px;border-radius:6px;background:var(--card2);color:var(--muted);margin-left:4px}
+  .vacio{color:var(--muted);font-size:13px;padding:6px 0}
+
+  /* ----- Módulos ----- */
+  .modulos{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .mod{position:relative;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s}
+  .mod::before{content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--c)}
+  .mod::after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;background:var(--c);opacity:.07;filter:blur(10px)}
+  .mod:hover{transform:translateY(-3px);border-color:var(--c);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .mod .cab{display:flex;align-items:center;gap:12px}
+  .mod .ico{font-size:30px;width:52px;height:52px;border-radius:14px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line)}
+  .mod h3{margin:0;font-size:17px}
+  .mod p{color:var(--muted);margin:10px 0 12px;font-size:13px;flex:1}
+  .mod .abrir{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;font-weight:700;padding:10px 14px;border-radius:11px;background:var(--c);color:#120c1f}
+  .mod .abrir:hover{filter:brightness(1.1)}
+  .ovs{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  .ovs .o{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+  .ovs .o span{flex:1;min-width:0}
+  .ovs .o code{color:var(--muted);font-size:11px}
+  .mod.nuevo{border-style:dashed;align-items:center;justify-content:center;text-align:center;color:var(--muted);min-height:200px}
+  .mod.nuevo::before,.mod.nuevo::after{display:none}
+  .mod.nuevo .mas{font-size:34px;width:60px;height:60px;border-radius:50%;display:grid;place-items:center;border:2px dashed var(--line);margin-bottom:10px}
+  .mod.pronto{opacity:.55}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);opacity:0;background:var(--card2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;transition:.3s;font-weight:600;z-index:9}
+  .toast.ver{opacity:1;transform:translateX(-50%)}
+  @keyframes onda{0%{transform:scale(.55);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+  @keyframes latir{50%{opacity:.4}}
+  #actCard .act-fila{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+  #actCard .act-gris{color:var(--muted,#9a96ab);font-size:13px}
+  #actCard .act-botones{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  #actCard button{font:inherit;cursor:pointer;border-radius:10px;padding:8px 14px;border:1px solid #2b2737;background:#1e1b27;color:inherit}
+  #actCard button:hover{border-color:#3ddc97}
+  #actInstalar{background:#3ddc97!important;color:#06210f!important;font-weight:700;border-color:#3ddc97!important}
+  .act-aviso{background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.4);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+  .act-aviso pre{white-space:pre-wrap;font:13px/1.45 inherit;margin:6px 0 0;color:#cfd3da}
+  @media (max-width:860px){ .estado{grid-template-columns:1fr;text-align:center} .radar{margin:0 auto} .reloj{justify-content:center} .sub-estado{margin:4px auto 0} .fila2{grid-template-columns:1fr} header,main{padding-left:16px;padding-right:16px} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><h1>🎛️ Centro de control</h1><small id="version"></small></div>
+  <span class="sp"></span>
+  <div class="chips" id="chips"></div>
+</header>
+
+<main>
+  <!-- ESTADO -->
+  <section class="card estado activo" id="estado">
+    <div class="radar"><span></span><span></span><span></span><div class="n" id="estadoIco">🟢</div></div>
+    <div>
+      <div class="titulo-estado" id="estadoTit">Todo activo</div>
+      <div class="sub-estado" id="estadoSub"></div>
+      <div class="reloj"><b id="tiempo">--:--:--</b><span id="tiempoTxt"></span></div>
+    </div>
+    <div class="acciones">
+      <button class="gran pausar" id="btnDescanso">⏸ Pausar todo</button>
+      <label class="opcion"><input type="checkbox" id="sumaTiempo"> <span>Lo que entre mientras está en pausa suma tiempo al reloj (queda guardado para el próximo stream)</span></label>
+      <button class="apagar" id="btnApagar">Apagar por completo (deja de escuchar)</button>
+    </div>
+  </section>
+
+  <div class="fila2">
+    <section class="card">
+      <h2>🎯 Metas de <span id="mes"></span></h2>
+      <div id="metas"></div>
+    </section>
+    <section class="card">
+      <h2>Últimos aportes</h2>
+      <ul class="ult" id="ultimos"></ul>
+    </section>
+  </div>
+
+  <section>
+    <h2 style="margin-left:2px">Módulos</h2>
+    <div class="modulos" id="modulos"></div>
+  </section>
+
+  <section class="card" id="actCard">
+    <h2>🔄 Actualizaciones</h2>
+    <div id="actAviso"></div>
+    <div class="act-fila">
+      <div><b id="actVersion"></b> <span class="act-gris" id="actEstado"></span></div>
+      <label class="opcion" style="margin:0"><input type="checkbox" id="actAuto"> <span>Actualizar solo al abrir el reloj (nunca en medio de un stream). Tus datos no se tocan.</span></label>
+      <div class="act-botones"><button id="actBuscar">Buscar ahora</button><button id="actInstalar" hidden>⬆️ Instalar ahora</button></div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ICO = { paypal:'💵', mercadopago:'💳', bits:'💎', subs:'🎁' };
+let M = null, base = null;
+
+function fmt(ms){
+  const s = Math.max(0, Math.round(ms/1000)), h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return `${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`;
+}
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('ver'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('ver'),2200); }
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  if(r.status===401){ location.href='/login'; return; }
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.error) throw new Error(j.error||('Error '+r.status));
+  return j;
+}
+
+async function cargar(){
+  try{ M = await api('/api/menu'); base = { at: Date.now(), ...M.timer }; pintar(); }
+  catch(e){ $('estadoTit').textContent = 'Sin conexión con el reloj'; $('estadoSub').textContent = 'El reloj está apagado. Ábrelo con iniciar.bat.'; }
+}
+
+function pintar(){
+  $('version').textContent = 'v'+M.version;
+  // chips de conexión + en vivo
+  $('chips').innerHTML = (M.live?'<span class="chip vivo"><i></i>EN VIVO</span>':'<span class="chip"><i></i>Fuera de stream</span>') +
+    M.conexiones.map(c=>`<span class="chip ${c.estado}" title="${esc(c.detalle)}"><i></i>${esc(c.nombre)}</span>`).join('');
+
+  // estado
+  const desc = M.descanso, est = $('estado');
+  est.classList.toggle('descanso', desc); est.classList.toggle('activo', !desc);
+  $('estadoIco').textContent = desc ? '😴' : '🟢';
+  $('estadoTit').textContent = desc ? 'En pausa · escuchando' : 'Todo activo';
+  const escuchando = M.conexiones.filter(c=>c.estado==='ok').map(c=>c.nombre);
+  $('estadoSub').textContent = desc
+    ? `El reloj está detenido, pero sigue escuchando ${escuchando.length?escuchando.join(', '):'(no hay conexiones activas)'}: cada sub, bit o donación cuenta para el podio y las metas${M.descansoSumaTiempo?' y suma tiempo para el próximo stream':''}. Puedes cerrar esta ventana.`
+    : `El reloj y los overlays están funcionando${M.live?' y estás en vivo':''}. "Pausar todo" detiene el reloj, pero sigue recibiendo subs, bits y donaciones.`;
+  const b = $('btnDescanso');
+  b.className = 'gran ' + (desc ? 'reanudar' : 'pausar');
+  b.textContent = desc ? '▶ Reanudar' : '⏸ Pausar todo';
+  $('sumaTiempo').checked = M.descansoSumaTiempo;
+
+  // metas
+  $('mes').textContent = M.mes.label;
+  const ic = { subs:'🎁', bits:'💎', dinero:'💸' };
+  $('metas').innerHTML = M.metas.items.map(it=>{
+    const pct = it.meta>0 ? Math.min(100, it.actual/it.meta*100) : 0;
+    const v = it.cat==='dinero' ? `$${Number(it.actual).toFixed(2)} / $${it.meta}` : `${Number(it.actual).toLocaleString('es')} / ${Number(it.meta).toLocaleString('es')}`;
+    return `<div class="meta m-${it.cat}"><div class="top"><span>${ic[it.cat]} ${esc(it.label)}</span><b>${v} · ${Math.floor(pct)}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).join('') || '<div class="vacio">No hay metas activas.</div>';
+
+  // últimos aportes
+  $('ultimos').innerHTML = M.ultimos.map(e=>{
+    const h = new Date(e.at).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const extra = e.test ? '<span class="tag">prueba</span>' : /descanso/i.test(e.note||'') ? '<span class="tag">en pausa</span>' : '';
+    return `<li><span class="ic">${ICO[e.source]||'•'}</span><span class="t">${esc(e.text)}${extra}<br><small>${h}${e.seconds>0?' · +'+fmt(e.seconds*1000):''}</small></span></li>`;
+  }).join('') || '<div class="vacio">Todavía no hay aportes.</div>';
+
+  // módulos
+  if(!$('modulos').dataset.v){
+    const origin = location.origin;
+    $('modulos').innerHTML = M.modulos.map(m=>`
+      <article class="mod ${m.proximamente?'pronto':''}" style="--c:${esc(m.color||'#a77bff')}">
+        <div class="cab"><div class="ico">${m.icono||'🧩'}</div><h3>${esc(m.nombre)}</h3></div>
+        <p>${esc(m.desc||'')}</p>
+        ${m.proximamente ? '<button disabled>Próximamente</button>' : `<a class="abrir" href="${esc(m.panel)}" target="${esc('panel-'+m.id)}" rel="noopener">Abrir ↗</a>`}
+        ${(m.overlays||[]).length ? `<div class="ovs">${m.overlays.map(o=>`<div class="o"><span>${esc(o.nombre)} <code>${esc(o.tam||'')}</code></span>
+          <button class="sm" data-copy="${esc(origin+o.url)}">Copiar URL</button><a class="sm" href="${esc(o.url)}" target="_blank" style="text-decoration:none;opacity:.8">Ver</a></div>`).join('')}</div>` : ''}
+      </article>`).join('') + `
+      <article class="mod nuevo"><div class="mas">＋</div><b>Más módulos</b><p style="margin:6px 0 0">Para sumar uno nuevo se agrega en <code>src/modulos.js</code> y aparece aquí.</p></article>`;
+    $('modulos').dataset.v = 1;
+  }
+}
+
+// reloj en vivo
+setInterval(()=>{
+  if(!base) return;
+  const ms = base.running ? Math.max(0, base.remainingMs - (Date.now()-base.at)) : base.remainingMs;
+  $('tiempo').textContent = fmt(ms);
+  $('tiempoTxt').textContent = M.descanso ? 'en pausa (descanso)' : base.running ? 'corriendo' : base.ended ? 'terminado' : 'en pausa';
+}, 250);
+
+$('btnDescanso').onclick = async ()=>{
+  try{
+    const on = !M.descanso;
+    await api('/api/descanso','POST',{on});
+    toast(on ? '⏸ Todo en pausa · sigue escuchando aportes' : '▶ Reanudado');
+    cargar();
+  }catch(e){ toast(e.message); }
+};
+$('sumaTiempo').onchange = async ()=>{
+  try{ await api('/api/descanso','POST',{sumaTiempo:$('sumaTiempo').checked}); cargar(); }catch(e){ toast(e.message); }
+};
+$('btnApagar').onclick = async ()=>{
+  if(!confirm('¿Apagar el reloj por completo?\n\nDeja de escuchar subs, bits y donaciones hasta que lo vuelvas a abrir con iniciar.bat.\n\nSi solo quieres parar todo pero seguir recibiendo aportes, usa "Pausar todo".')) return;
+  try{ await api('/api/shutdown','POST',{}); }catch(e){}
+  document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;text-align:center;color:#9a96ab;font:16px Inter,sans-serif"><div><div style="font-size:48px">⏹</div><p>Reloj apagado. Para volver a abrirlo usa <b>iniciar.bat</b>.</p></div></div>';
+};
+document.addEventListener('click', (ev)=>{
+  const b = ev.target.closest('[data-copy]'); if(!b) return;
+  navigator.clipboard?.writeText(b.dataset.copy).then(()=>toast('✔ URL copiada: '+b.dataset.copy));
+});
+
+// eventos en vivo del reloj (y mantiene el reloj encendido mientras el menú está abierto)
+try{
+  const es = new EventSource('/events');
+  es.onmessage = (ev)=>{
+    const m = JSON.parse(ev.data);
+    if(m.type==='shutdown'){ es.close(); $('estadoTit').textContent='Reloj apagado'; return; }
+    if(m.type==='state'){ base = { at: Date.now(), ...m.payload }; if(M && m.payload.descanso!==M.descanso) cargar(); }
+    if(m.type==='log' || m.type==='connections' || m.type==='reset') cargar();
+  };
+}catch(e){}
+cargar();
+setInterval(cargar, 10000);
+
+// ---------- Actualizaciones ----------
+let ACT = null, nueva = null;
+async function cargarAct(){
+  try { ACT = await api('/api/actualizar'); } catch(e){ return; }
+  $('actVersion').textContent = 'Versión ' + ACT.version;
+  $('actAuto').checked = ACT.auto;
+  const m = ACT.marca;
+  $('actAviso').innerHTML = m && !m.visto ? `<div class="act-aviso">✅ <b>Se actualizó de la versión ${esc(m.de)} a la ${esc(m.a)}.</b> Tus datos quedaron igual.${m.notas ? `<pre>${esc(m.notas)}</pre>` : ''}<div style="margin-top:8px"><button id="actVisto">Entendido</button></div></div>` : '';
+  if ($('actVisto')) $('actVisto').onclick = async ()=>{ await api('/api/actualizar/visto','POST',{}).catch(()=>{}); cargarAct(); };
+  if (!nueva) $('actEstado').textContent = ACT.ultima ? (ACT.ultima.nueva ? '' : '· estás al día') : '';
+}
+$('actAuto').onchange = async ()=>{ try { await api('/api/actualizar/config','POST',{ auto: $('actAuto').checked }); toast($('actAuto').checked ? '✔ Se actualiza solo al abrir' : 'Actualización automática apagada'); } catch(e){ toast(e.message); } };
+$('actBuscar').onclick = async ()=>{
+  $('actEstado').textContent = '· buscando…';
+  try {
+    const r = (await api('/api/actualizar/buscar','POST',{})).result;
+    nueva = r && r.nueva ? r : null;
+    $('actEstado').innerHTML = nueva ? `· <b style="color:#3ddc97">hay una versión nueva: ${esc(nueva.version)}</b>${ACT && ACT.auto ? ' (se instala sola la próxima vez que abras el reloj)' : ''}` : '· estás al día';
+    $('actInstalar').hidden = !nueva;
+  } catch(e){ $('actEstado').textContent = '· ' + e.message; }
+};
+$('actInstalar').onclick = async ()=>{
+  const enVivo = M && M.live;
+  if (!confirm(enVivo ? '⚠️ Estás EN VIVO.\n\nActualizar ahora cierra el reloj unos segundos (el tiempo queda guardado y los datos no se tocan).\n¿Seguro?' : '¿Instalar la versión ' + nueva.version + ' ahora?\n\nEl reloj se cierra unos segundos y vuelve a abrir solo. El tiempo y tus datos quedan igual.')) return;
+  try { await api('/api/actualizar/ahora','POST',{ aunEnVivo: !!enVivo }); toast('🔄 Actualizando… el reloj vuelve en unos segundos'); $('actEstado').textContent = '· actualizando…'; setTimeout(()=>location.reload(), 15000); }
+  catch(e){ toast(e.message); }
+};
+cargarAct();
+</script>
+</body>
+</html>

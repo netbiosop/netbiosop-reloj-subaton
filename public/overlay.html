@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reloj Subatón – Overlay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Opciones por URL (ejemplo: /overlay?theme=glass&accent=ff4fa3&recent=1):
+
+  ESTILO
+    theme=bytedemond (por defecto) | default | glass | neon | minimal
+    align=left       alinea el reloj a la izquierda (por defecto va centrado)
+    pops=right       los "+tiempo" salen a la DERECHA del reloj (por defecto salen arriba)
+    color=ffffff     color de los números (hex sin #)
+    accent=b48cff    color del multiplicador, brillos y popups
+    size=140         tamaño de los números en px
+    font=Bebas Neue  cualquier fuente de Google Fonts
+    bg=000000        fondo (por defecto transparente)
+
+  ANIMACIONES (encendidas por defecto, =0 para apagar)
+    roll=0           los números suben "rodando" cuando entra tiempo
+    popups=0         los "+5:00" cuando entra tiempo
+    names=0          el nombre de quien aportó en el popup
+    confetti=0       confeti en los aportes grandes
+    mult=0           el indicador de multiplicador
+    status=0         los carteles EN PAUSA / VOLVEMOS PRONTO
+    big=600          desde cuántos segundos sumados un aporte es "grande" (600 = 10 min)
+    warn=600         últimos N segundos en rojo y latiendo (0 = nunca)
+
+  EXTRAS (apagados por defecto, =1 para mostrar)
+    recent=1         últimos 3 aportes debajo del reloj
+    total=1          "La comunidad sumó X en este stream"
+    bar=1            barra de progreso hasta el tiempo máximo (si configuraste uno)
+
+    end=texto        texto al terminar (por defecto ¡SUBATÓN TERMINADO!)
+
+  SONIDO
+    sound=0          silencia este overlay (los sonidos se configuran en el panel → Sonidos)
+-->
+<style>
+  :root {
+    --color: #ffffff;
+    --accent: #b48cff;
+    --size: 140px;
+    --font: 'Bebas Neue';
+    --bg: transparent;
+    --warn: #ff4d5e;
+    --c-paypal: #4aa3ff;
+    --c-mercadopago: #2fd0f0;
+    --c-bits: #b06cff;
+    --c-subs: #ff5fb8;
+    --c-manual: var(--accent);
+  }
+  html, body { margin: 0; background: var(--bg); overflow: hidden; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    font-family: var(--font), 'Arial Narrow', Impact, sans-serif;
+    color: var(--color);
+  }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+  .wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: calc(var(--size) * .07); }
+
+  /* ---------- tarjeta y números ---------- */
+  .card { position: relative; display: flex; flex-direction: column; align-items: center; transition: transform .3s ease; }
+  .card.shake { animation: shake .55s ease; }
+  @keyframes shake {
+    15% { transform: translate(-6px, 2px) rotate(-1deg); } 30% { transform: translate(5px, -2px) rotate(1deg); }
+    45% { transform: translate(-4px, 1px); } 60% { transform: translate(3px, -1px); } 80% { transform: translate(-1px, 0); }
+  }
+  .time {
+    display: flex; align-items: baseline;
+    font-size: var(--size); line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    text-shadow: 0 .04em 0 rgba(0,0,0,.55), 0 0 .25em rgba(0,0,0,.45);
+    white-space: nowrap;
+    transition: color .4s ease, opacity .4s ease, transform .25s ease;
+  }
+  .time .d { display: inline-block; position: relative; } /* ancho natural: la fuente ya usa números de ancho fijo */
+  .time .d b { display: block; font-weight: inherit; }
+  .time .d b.in { animation: digitIn .32s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes digitIn { from { transform: translateY(-55%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .time .c { display: inline-block; margin: 0 .03em; opacity: .85; transform: translateY(-.04em); }
+  .time.paused { opacity: .62; }
+  .time.bump { transform: scale(1.06); }
+  .time.ended { font-size: calc(var(--size) * .55); letter-spacing: .04em; }
+
+  /* urgencia */
+  .time.warn { color: var(--warn); animation: warnPulse 2s ease-in-out infinite; }
+  .time.crit { color: var(--warn); animation: heartbeat 1s ease-in-out infinite; }
+  @keyframes warnPulse { 50% { text-shadow: 0 .04em 0 rgba(0,0,0,.55), 0 0 .35em color-mix(in srgb, var(--warn) 70%, transparent); } }
+  @keyframes heartbeat { 0%, 40%, 100% { transform: scale(1); } 15% { transform: scale(1.08); } 28% { transform: scale(1.02); } }
+
+  /* multiplicador activo: el reloj brilla */
+  .wrap.mult-on .time:not(.warn):not(.crit) { animation: multGlow 1.8s ease-in-out infinite; }
+  @keyframes multGlow {
+    0%, 100% { text-shadow: 0 .04em 0 rgba(0,0,0,.55), 0 0 .18em color-mix(in srgb, var(--accent) 55%, transparent); }
+    50% { text-shadow: 0 .04em 0 rgba(0,0,0,.55), 0 0 .45em color-mix(in srgb, var(--accent) 90%, transparent), 0 0 .9em color-mix(in srgb, var(--accent) 45%, transparent); }
+  }
+
+  /* barra de progreso hasta el tiempo máximo */
+  .bar { display: none; width: 100%; height: calc(var(--size) * .055); margin-top: calc(var(--size) * .06); border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  .bar.show { display: block; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent)); transition: width .8s ease; }
+
+  /* cartel de estado */
+  .status {
+    display: none; font-size: calc(var(--size) * .17); letter-spacing: .12em;
+    padding: .25em .8em .2em; border-radius: 999px;
+    background: rgba(10,8,16,.7); border: 1px solid rgba(255,255,255,.18);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  .status.show { display: inline-block; animation: fadeIn .4s ease; }
+  .status.offline { border-color: color-mix(in srgb, var(--accent) 60%, transparent); color: color-mix(in srgb, var(--accent) 40%, #fff); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } }
+
+  /* indicador de multiplicador con anillo de tiempo */
+  .mult {
+    display: none; align-items: center; gap: .45em;
+    font-size: calc(var(--size) * .2);
+    padding: .18em .7em .14em .25em; border-radius: 999px;
+    background: var(--accent); color: #0d0a14; letter-spacing: .05em;
+    box-shadow: 0 0 .9em color-mix(in srgb, var(--accent) 70%, transparent);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .mult.show { display: inline-flex; }
+  .mult .ring { width: 1.7em; height: 1.7em; position: relative; display: grid; place-items: center; }
+  .mult .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .mult .ring circle { fill: none; stroke-width: 3.2; }
+  .mult .ring .bg { stroke: rgba(13,10,20,.22); }
+  .mult .ring .fg { stroke: #0d0a14; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .mult .ring b { font-size: .78em; line-height: 1; margin-top: .08em; }
+  .mult .left { opacity: .75; font-variant-numeric: tabular-nums; }
+  @keyframes pulse { 50% { box-shadow: 0 0 1.6em color-mix(in srgb, var(--accent) 90%, transparent); } }
+
+  /* extras */
+  .total { display: none; font-size: calc(var(--size) * .15); letter-spacing: .05em; opacity: .9; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+  .total b { color: color-mix(in srgb, var(--accent) 55%, #fff); font-weight: inherit; }
+  .total.show { display: block; }
+  .recent { display: none; gap: .5em; font-size: calc(var(--size) * .14); flex-wrap: wrap; justify-content: center; max-width: 90vw; }
+  .recent.show { display: flex; }
+  .recent span { display: inline-flex; align-items: center; gap: .35em; padding: .2em .6em .15em; border-radius: 999px; background: rgba(10,8,16,.6); border: 1px solid rgba(255,255,255,.12); letter-spacing: .04em; white-space: nowrap; animation: fadeIn .4s ease; }
+  .recent span i { width: .55em; height: .55em; border-radius: 50%; background: var(--src); box-shadow: 0 0 .5em var(--src); }
+  .recent span em { font-style: normal; color: var(--src); }
+
+  /* ---------- popups "+tiempo" ---------- */
+  /* los popups salen ARRIBA del reloj y suben, así nunca tapan los números */
+  .pops { position: absolute; bottom: 100%; left: 50%; width: 220%; height: 0; transform: translateX(-50%); z-index: 4; }
+  .card .pops { bottom: calc(100% + var(--size) * .04); }
+  .pop {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; white-space: nowrap;
+    animation: rise 3.4s ease-out forwards;
+    --src: var(--accent);
+  }
+  .pop .row1 { display: flex; align-items: center; gap: .3em; font-size: calc(var(--size) * .3); color: var(--src); text-shadow: 0 .05em 0 rgba(0,0,0,.6), 0 0 .35em color-mix(in srgb, var(--src) 60%, transparent); }
+  .pop .ico { width: .8em; height: .8em; filter: drop-shadow(0 0 .25em var(--src)); }
+  .pop .ico path, .pop .ico polygon { fill: var(--src); }
+  .pop .xm { font-size: .6em; padding: .05em .35em; border-radius: .3em; background: var(--src); color: #0d0a14; text-shadow: none; }
+  .pop .who { display: flex; align-items: center; gap: .4em; font-size: calc(var(--size) * .15); color: var(--color); text-shadow: 0 2px 6px rgba(0,0,0,.7); letter-spacing: .03em; }
+  .pop .tag { font-size: .72em; padding: .12em .45em .08em; border-radius: .35em; background: var(--src); color: #0d0a14; letter-spacing: .08em; }
+  .pop.big .row1 { font-size: calc(var(--size) * .38); }
+  .pop.big .who { font-size: calc(var(--size) * .17); }
+  .pop.huge .row1 { font-size: calc(var(--size) * .46); }
+  .pop.out { animation: popOut .35s ease forwards; }
+  @keyframes popOut { to { opacity: 0; transform: translate(-50%, -60%) scale(.9); } }
+  @keyframes rise {
+    0% { opacity: 0; transform: translate(-50%, 40%) scale(.6); }
+    10% { opacity: 1; transform: translate(-50%, 0) scale(1.12); }
+    18% { transform: translate(-50%, 0) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -45%); }
+  }
+
+  /* ---------- tema BYTEDEMOND (rojo/negro de la marca) ---------- */
+  .theme-bytedemond .time { color: #fff; text-shadow: 0 .045em 0 #5a0006, 0 0 .03em #000, 0 0 .22em rgba(227,18,27,.55), 0 0 .5em rgba(0,0,0,.55); }
+  .theme-bytedemond .card::after { content: ""; display: block; align-self: stretch; height: calc(var(--size) * .045); margin-top: calc(var(--size) * .03);
+    background: linear-gradient(90deg, #e3121b 0%, #e3121b 55%, transparent); box-shadow: 0 0 .5em rgba(227,18,27,.55); transform: skewX(-20deg); transform-origin: left; }
+  .theme-bytedemond .time.warn, .theme-bytedemond .time.crit { color: #ff3b47; }
+  .theme-bytedemond .pop .xm, .theme-bytedemond .pop .tag { color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.5); }
+  .theme-bytedemond.src-light .pop .tag { color: #1a0002; }
+
+  /* ---------- alineado a la izquierda y popups a la derecha ---------- */
+  body.align-left { justify-content: flex-start; padding-left: 6px; }
+  body.align-left .wrap, body.align-left .card { align-items: flex-start; }
+  .pops-right .card .pops { bottom: auto; top: 50%; left: 100%; width: auto; height: 0; transform: none; margin-left: calc(var(--size) * .3); }
+  .pops-right .pop { left: 0; bottom: auto; top: 0; align-items: flex-start; animation-name: riseR; }
+  .pops-right .pop.out { animation: popOutR .35s ease forwards; }
+  @keyframes riseR {
+    0% { opacity: 0; transform: translate(-30%, -50%) scale(.6); }
+    10% { opacity: 1; transform: translate(0, -50%) scale(1.12); }
+    18% { transform: translate(0, -50%) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translate(40%, -50%); }
+  }
+  @keyframes popOutR { to { opacity: 0; transform: translate(30%, -50%) scale(.9); } }
+
+  /* ---------- temas ---------- */
+  .theme-glass .card {
+    padding: calc(var(--size) * .1) calc(var(--size) * .28) calc(var(--size) * .12);
+    border-radius: calc(var(--size) * .22);
+    background: linear-gradient(160deg, rgba(30,24,48,.62), rgba(12,10,20,.5));
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 10px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    backdrop-filter: blur(12px);
+  }
+  .theme-glass.mult-on .card { border-color: color-mix(in srgb, var(--accent) 70%, transparent); box-shadow: 0 10px 40px rgba(0,0,0,.45), 0 0 30px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.12); }
+  .theme-neon .time { color: #fff; text-shadow: 0 0 .06em #fff, 0 0 .14em var(--accent), 0 0 .32em var(--accent), 0 0 .6em color-mix(in srgb, var(--accent) 60%, transparent); }
+  .theme-neon .time.warn, .theme-neon .time.crit { text-shadow: 0 0 .06em #fff, 0 0 .14em var(--warn), 0 0 .32em var(--warn); color: #fff; }
+  .theme-minimal .time { font-weight: 300; text-shadow: none; letter-spacing: -.01em; }
+  .theme-minimal .mult { box-shadow: none; animation: none; }
+  .theme-minimal .status { background: transparent; border-color: rgba(255,255,255,.35); box-shadow: none; }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="wrap" id="wrap">
+  <div class="status" id="status"></div>
+  <div class="card" id="card">
+    <div class="time" id="time"></div>
+    <div class="bar" id="bar"><i></i></div>
+    <div class="pops" id="pops"></div>
+  </div>
+  <div class="mult" id="mult">
+    <span class="ring"><svg viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="16"/><circle class="fg" id="ringFg" cx="20" cy="20" r="16" stroke-dasharray="100.53" stroke-dashoffset="0"/></svg><b id="multVal">x2</b></span>
+    <span id="multSrc"></span><span class="left" id="multLeft"></span>
+  </div>
+  <div class="total" id="total"></div>
+  <div class="recent" id="recent"></div>
+</div>
+<script src="/sounds.js"></script>
+<script>
+  // ---------- opciones ----------
+  const q = new URLSearchParams(location.search);
+  const on = (k, def) => (q.has(k) ? q.get(k) !== '0' : def);
+  const num = (k, def) => (q.has(k) && Number.isFinite(Number(q.get(k))) ? Number(q.get(k)) : def);
+  const root = document.documentElement.style;
+  const hex = (v) => (/^[0-9a-f]{3,8}$/i.test(v || '') ? '#' + v : null);
+  const theme = ['default', 'glass', 'neon', 'minimal', 'bytedemond'].includes(q.get('theme')) ? q.get('theme') : 'bytedemond';
+  if (theme === 'bytedemond') {
+    // Colores de la marca: blanco y rojos (cada fuente con su tono para distinguirlas)
+    for (const [k, v] of Object.entries({ '--accent': '#e3121b', '--c-paypal': '#ffffff', '--c-mercadopago': '#ffc7cb', '--c-bits': '#ff4757', '--c-subs': '#ff2a36', '--warn': '#ff3b47' })) root.setProperty(k, v);
+  }
+  if (q.get('align') === 'left') document.body.classList.add('align-left');
+  if (hex(q.get('color'))) root.setProperty('--color', hex(q.get('color')));
+  if (hex(q.get('accent'))) root.setProperty('--accent', hex(q.get('accent')));
+  if (hex(q.get('bg'))) root.setProperty('--bg', hex(q.get('bg')));
+  if (num('size', 0) > 0) root.setProperty('--size', num('size', 140) + 'px');
+  const defaultFont = { neon: 'Orbitron', minimal: 'Inter' }[theme] || 'Bebas Neue';
+  const font = q.get('font') || defaultFont;
+  root.setProperty('--font', `'${font.replace(/'/g, '')}'`);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(font).replace(/%20/g, '+') + (theme === 'minimal' && !q.get('font') ? ':wght@300;600' : '') + '&display=swap';
+  document.head.appendChild(link);
+
+  const opt = {
+    roll: on('roll', true), popups: on('popups', true), names: on('names', true), confetti: on('confetti', true),
+    mult: on('mult', true), status: on('status', true), recent: on('recent', false), total: on('total', false), bar: on('bar', false),
+    big: num('big', 600), warn: num('warn', 600), end: q.get('end') || '¡SUBATÓN TERMINADO!',
+    sound: on('sound', true),
+  };
+
+  // ---------- sonidos (se configuran en el panel) ----------
+  let soundCfg = null;
+  function sound(event, extra = {}, cfg = soundCfg) {
+    if (!opt.sound || !cfg || !window.SubSounds) return;
+    if (!extra.test && (!cfg.enabled || !cfg.events?.[event])) return;
+    SubSounds.play(event, { volume: cfg.volume, custom: cfg.custom, ...extra });
+  }
+  const $ = (id) => document.getElementById(id);
+  const wrap = $('wrap'), $time = $('time'), $card = $('card');
+  if (theme !== 'default') wrap.classList.add('theme-' + theme);
+  if (q.get('pops') === 'right') wrap.classList.add('pops-right');
+
+  const SRC = {
+    paypal: { label: 'PAYPAL', color: 'var(--c-paypal)', raw: '#4aa3ff' },
+    mercadopago: { label: 'MERCADO PAGO', color: 'var(--c-mercadopago)', raw: '#2fd0f0' },
+    bits: { label: 'BITS', color: 'var(--c-bits)', raw: '#b06cff' },
+    subs: { label: 'SUB', color: 'var(--c-subs)', raw: '#ff5fb8' },
+    manual: { label: '', color: 'var(--c-manual)', raw: null },
+  };
+  const ICONS = {
+    bits: '<polygon points="12,1 22,9 12,23 2,9"/>',
+    subs: '<polygon points="12,1.5 15.1,8.3 22.5,9.1 17,14.1 18.5,21.5 12,17.8 5.5,21.5 7,14.1 1.5,9.1 8.9,8.3"/>',
+    paypal: '<path d="M12 21.6 10.6 20.3C5.4 15.6 2 12.5 2 8.7 2 5.6 4.4 3.2 7.5 3.2c1.7 0 3.4.8 4.5 2.1 1.1-1.3 2.8-2.1 4.5-2.1 3.1 0 5.5 2.4 5.5 5.5 0 3.8-3.4 6.9-8.6 11.6z"/>',
+    manual: '<path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/>',
+  };
+  ICONS.mercadopago = ICONS.paypal;
+  const accentRaw = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#b48cff';
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmtShort = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`; };
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- números con dígitos animados ----------
+  let digitEls = [], lastStr = '';
+  function setClock(ms, animate) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const str = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+    if (str === lastStr) return;
+    if (str.length !== lastStr.length || $time.classList.contains('ended')) {
+      $time.classList.remove('ended');
+      $time.innerHTML = '';
+      digitEls = [...str].map((ch) => {
+        const el = document.createElement('span');
+        el.className = ch === ':' ? 'c' : 'd';
+        el.innerHTML = ch === ':' ? ':' : `<b>${ch}</b>`;
+        $time.appendChild(el);
+        return el;
+      });
+    } else {
+      [...str].forEach((ch, i) => {
+        if (ch !== lastStr[i] && ch !== ':') {
+          const b = document.createElement('b');
+          b.textContent = ch;
+          if (animate) b.className = 'in';
+          digitEls[i].replaceChildren(b);
+        }
+      });
+    }
+    lastStr = str;
+  }
+
+  // ---------- estado ----------
+  let state = null, receivedAt = 0, offset = 0, shown = 0, anim = null, lastTick = null;
+  const target = () => (!state ? 0 : state.running ? state.remainingMs - (Date.now() - receivedAt) : state.remainingMs);
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+
+  function onState(p) {
+    const before = state ? target() : null;
+    soundCfg = p.sounds || soundCfg;
+    if (state) {
+      const was = state.multiplier?.value || 1, now = p.multiplier?.value || 1;
+      if (now > 1 && now > was) sound('multiplicador');
+      if (p.ended && !state.ended) sound('fin');
+    }
+    state = p;
+    receivedAt = Date.now();
+    offset = p.serverNow - Date.now();
+    const after = target();
+    // Si entró tiempo, los números suben "rodando" hasta el nuevo valor
+    if (opt.roll && before !== null && after - before > 1500) {
+      anim = { from: shown, start: Date.now(), dur: Math.min(1800, 700 + (after - before) / 1000 * 4) };
+    } else if (before === null || after < before - 1500) {
+      anim = null;
+    }
+    renderExtras();
+  }
+
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!state) return;
+    const t = target();
+    if (anim) {
+      const k = Math.min(1, (Date.now() - anim.start) / anim.dur);
+      shown = anim.from + (t - anim.from) * ease(k);
+      if (k >= 1) anim = null;
+    } else shown = t;
+
+    if (state.ended && t <= 0 && !anim) {
+      if (!$time.classList.contains('ended')) { $time.classList.add('ended'); $time.textContent = opt.end; lastStr = ''; }
+    } else setClock(shown, !anim);
+
+    const secs = t / 1000;
+    const live = state.running && !state.ended;
+    // tic-tac en los últimos 10 segundos
+    const whole = Math.ceil(secs);
+    if (live && whole <= 10 && whole >= 1 && whole !== lastTick) { lastTick = whole; sound('final', { last: whole <= 3 }); }
+    if (whole > 10) lastTick = null;
+    $time.classList.toggle('paused', !state.running && !state.ended);
+    $time.classList.toggle('crit', opt.warn > 0 && live && secs <= 60);
+    $time.classList.toggle('warn', opt.warn > 0 && live && secs > 60 && secs <= opt.warn);
+
+    // estado
+    const st = $('status');
+    const show = opt.status && !state.running && !state.ended && state.remainingMs > 0;
+    const offline = state.stream && state.stream.live === false;
+    st.classList.toggle('show', show);
+    st.classList.toggle('offline', show && offline);
+    const txt = offline ? 'VOLVEMOS PRONTO' : 'EN PAUSA';
+    if (st.textContent !== txt) st.textContent = txt;
+
+    // multiplicador
+    const m = state.multiplier;
+    const active = m && m.value > 1;
+    wrap.classList.toggle('mult-on', !!active);
+    $('mult').classList.toggle('show', !!(opt.mult && active));
+    if (opt.mult && active) {
+      $('multVal').textContent = 'x' + m.value;
+      $('multSrc').textContent = m.labels.length === 4 ? 'TODO' : m.labels.join(' · ').toUpperCase();
+      const now = Date.now() + offset;
+      $('multLeft').textContent = m.until ? fmtShort((m.until - now) / 1000) : '';
+      const frac = m.until && m.since && m.until > m.since ? Math.max(0, Math.min(1, (m.until - now) / (m.until - m.since))) : 1;
+      $('ringFg').style.strokeDashoffset = String(100.53 * (1 - frac));
+    }
+  }
+  requestAnimationFrame(frame);
+
+  function renderExtras() {
+    const bar = $('bar');
+    const max = state.maxSeconds || 0;
+    bar.classList.toggle('show', opt.bar && max > 0);
+    if (opt.bar && max > 0) bar.firstElementChild.style.width = Math.min(100, (target() / 1000 / max) * 100) + '%';
+
+    const tot = $('total');
+    tot.classList.toggle('show', opt.total && state.addedThisStream > 0);
+    if (opt.total) tot.innerHTML = `La comunidad sumó <b>${fmtShort(state.addedThisStream || 0)}</b> en este stream`;
+
+    const rec = $('recent');
+    const items = state.recent || [];
+    rec.classList.toggle('show', opt.recent && items.length > 0);
+    if (opt.recent) {
+      const html = items.map((r) => `<span style="--src:${(SRC[r.source] || SRC.manual).color}"><i></i>${esc(r.user)} <em>+${fmtShort(r.seconds)}</em></span>`).join('');
+      if (rec.dataset.html !== html) { rec.innerHTML = html; rec.dataset.html = html; }
+    }
+  }
+  setInterval(() => state && renderExtras(), 1000);
+
+  // ---------- popups y confeti ----------
+  function popup(p) {
+    if (!opt.popups) return;
+    const src = SRC[p.source] || SRC.manual;
+    const big = opt.big > 0 && p.seconds >= opt.big;
+    const huge = big && p.seconds >= opt.big * 3;
+    $time.classList.add('bump');
+    setTimeout(() => $time.classList.remove('bump'), 260);
+    if (big) { $card.classList.remove('shake'); void $card.offsetWidth; $card.classList.add('shake'); }
+
+    const el = document.createElement('div');
+    el.className = 'pop' + (big ? ' big' : '') + (huge ? ' huge' : '');
+    el.style.setProperty('--src', src.color);
+    const ico = `<svg class="ico" viewBox="0 0 24 24">${ICONS[p.source] || ICONS.manual}</svg>`;
+    let html = `<div class="row1">${ico}<span>+${fmtShort(p.seconds)}</span>${p.multiplier > 1 ? `<span class="xm">x${p.multiplier}</span>` : ''}</div>`;
+    if (src.label || (opt.names && p.text)) {
+      html += `<div class="who">${src.label ? `<span class="tag">${src.label}</span>` : ''}${opt.names && p.text ? `<span>${esc(p.text)}</span>` : ''}</div>`;
+    }
+    el.innerHTML = html;
+    // el popup anterior se va rápido para que no se encimen
+    for (const old of $('pops').children) old.classList.add('out');
+    $('pops').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+    if (big && opt.confetti) confetti(huge ? 200 : 90, src.raw || accentRaw());
+  }
+  function popupSound(p) {
+    if (p.seconds <= 0) return;
+    const big = opt.big > 0 && p.seconds >= opt.big;
+    sound(big ? 'grande' : p.source === 'subs' ? 'sub' : p.source === 'manual' ? 'manual' : p.source);
+  }
+
+  const cv = $('fx'), ctx = cv.getContext('2d');
+  let parts = [], running = false;
+  function resize() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
+  addEventListener('resize', resize); resize();
+  function confetti(n, color) {
+    if (cv.width !== innerWidth * devicePixelRatio || cv.height !== innerHeight * devicePixelRatio) resize();
+    const r = $card.getBoundingClientRect();
+    const cx = (r.left + r.width / 2) * devicePixelRatio, cy = (r.top + r.height / 2) * devicePixelRatio;
+    const colors = [color, accentRaw(), '#ffffff', '#ffd54a'];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = (4 + Math.random() * 9) * devicePixelRatio;
+      parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 6 * devicePixelRatio, w: (5 + Math.random() * 6) * devicePixelRatio, h: (3 + Math.random() * 4) * devicePixelRatio, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, c: colors[i % colors.length], life: 0 });
+    }
+    if (!running) { running = true; requestAnimationFrame(stepFx); }
+  }
+  function stepFx() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    parts = parts.filter((p) => p.life < 150 && p.y < cv.height + 40);
+    for (const p of parts) {
+      p.life++; p.vy += .28 * devicePixelRatio; p.vx *= .985; p.vy *= .985; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - p.life / 150); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+    }
+    if (parts.length) requestAnimationFrame(stepFx); else { running = false; ctx.clearRect(0, 0, cv.width, cv.height); }
+  }
+
+  // ---------- eventos en vivo ----------
+  // Si el reloj se apaga o se corta la conexión, los números se congelan (no siguen bajando solos)
+  // y se reconecta automáticamente cuando el reloj vuelve a encenderse
+  function freeze() {
+    if (state && state.running) { state = { ...state, remainingMs: Math.max(0, target()), running: false }; receivedAt = Date.now(); anim = null; }
+  }
+  let es;
+  function connectEvents() {
+    es = new EventSource('/events?overlay=1');
+    es.onerror = () => {
+      freeze();
+      if (es.readyState === 2) setTimeout(connectEvents, 3000); // conexión cerrada del todo: abrir una nueva
+    };
+    es.onmessage = onEvent;
+  }
+  function onEvent(e) {
+    const { type, payload } = JSON.parse(e.data);
+    if (type === 'shutdown') { freeze(); return; }
+    if (type === 'state') onState(payload);
+    if (type === 'added') { popup(payload); popupSound(payload); }
+    if (type === 'sound') sound(payload.event, { test: true, last: true }, payload.sounds);
+  }
+  connectEvents();
+</script>
+</body>
+</html>

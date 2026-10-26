@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cinta de noticias</title>
+<link rel="stylesheet" href="marca.css">
+<style>
+  /* Fuente de navegador: 1920 × 60, pegada abajo de la pantalla. Aparece cada X minutos (se configura en /codigo-panel) */
+  html,body{width:100%;height:100%}
+  .cinta{position:absolute;left:0;right:0;bottom:6px;height:48px;display:flex;align-items:stretch;transform:translateY(80px);opacity:0;
+         transition:transform .7s cubic-bezier(.2,.9,.3,1),opacity .4s}
+  .cinta.on{transform:none;opacity:1}
+  .pin{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 26px 0 16px;background:linear-gradient(90deg,var(--rojo-oscuro),var(--rojo));clip-path:polygon(0 0,100% 0,90% 100%,0 100%);z-index:2;
+       font-family:var(--f-titulo);font-size:30px;letter-spacing:1.2px;text-shadow:0 2px 0 #3a0003;text-transform:uppercase}
+  /* estilo noticiero: luz roja que titila y destello al entrar */
+  .luz{width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 12px #fff;animation:titila 1s steps(1) infinite}
+  .pin{letter-spacing:2px}
+  .cinta.on .pin{animation:alerta .45s ease 3 .5s}
+  @keyframes titila{50%{opacity:.15;box-shadow:none}}
+  @keyframes alerta{50%{background:#fff;color:var(--rojo);text-shadow:none}}
+  .via{flex:1;overflow:hidden;margin-left:-18px;background:linear-gradient(180deg,rgba(14,3,5,.88),rgba(6,6,8,.92));box-shadow:inset 0 2px 0 var(--rojo),inset 0 -1px 0 rgba(227,18,27,.5);display:flex;align-items:center}
+  .tira{display:flex;white-space:nowrap;will-change:transform}
+  .bloque{display:flex;align-items:center;gap:30px;padding-right:30px;flex:0 0 auto}
+  .bloque:first-child{padding-left:40px}
+  .it{display:flex;align-items:center;gap:10px;font-weight:800;font-size:23px;letter-spacing:.6px;text-transform:uppercase;text-shadow:var(--contorno-duro)}
+  .it em{font-style:normal;font-family:var(--f-titulo);font-weight:400;font-size:31px;letter-spacing:2px;color:#fff;background:var(--rojo);padding:1px 10px 0;transform:skewX(-12deg);display:inline-block;text-shadow:0 2px 0 #3a0003}
+  .it.chico{font-size:18px;color:#d6d9df;text-transform:none;font-weight:700}
+  .sep{color:var(--rojo-claro);font-size:20px;text-shadow:0 0 8px var(--rojo)}
+  @keyframes latido{50%{transform:scale(1.12) rotate(8deg)}}
+</style>
+</head>
+<body>
+<div class="cinta" id="cinta">
+  <div class="pin" id="pin"><span class="luz"></span><span id="etiqueta">Urgente</span></div>
+  <div class="via" id="via"><div class="tira" id="tira"></div></div>
+</div>
+<script>
+// Cinta de noticias: pasa el código de creador de cada plataforma y tus mensajes.
+// En los mensajes, lo que va entre *asteriscos* sale resaltado en rojo.  ?demo=1 la deja siempre visible.
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const resaltar = (s) => esc(s).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+let cfg = null, anim = null, timerFin = null;
+
+function items(){
+  const c = cfg.cinta, out = [];
+  const plats = (cfg.plataformas || []).filter((p) => p.on !== false && (p.codigo || p.juego));
+  if (c.conPlataformas) for (const p of plats)
+    out.push(`<span class="it">${esc(p.juego)}${p.tienda ? ' en ' + esc(p.tienda) : ''} · código <em>${esc(p.codigo)}</em></span>`);
+  for (const m of c.mensajes || []) out.push(`<span class="it">${resaltar(m)}</span>`);
+  if (c.conPlataformas) for (const a of [...new Set(plats.map((p) => p.aviso).filter(Boolean))]) out.push(`<span class="it chico">${esc(a)}</span>`);
+  return out.join('<span class="sep">◆</span>') + '<span class="sep">◆</span>';
+}
+function armar(){
+  $('etiqueta').textContent = cfg.cinta.etiqueta || 'Urgente';
+  const tira = $('tira'), via = $('via');
+  tira.innerHTML = `<div class="bloque">${items()}</div>`;
+  const b = tira.firstElementChild, ancho = b.offsetWidth;
+  const copias = Math.max(2, Math.ceil(via.offsetWidth / ancho) + 1);
+  for (let i = 1; i < copias; i++) tira.appendChild(b.cloneNode(true));
+  if (anim) anim.cancel();
+  const seg = ancho / (Number(cfg.cinta.velocidad) || 55);
+  anim = tira.animate([{ transform: 'translateX(0)' }, { transform: `translateX(-${ancho}px)` }], { duration: seg * 1000, iterations: Infinity });
+}
+function mostrar(durSeg){
+  if (!cfg) return;
+  armar();
+  $('cinta').classList.add('on');
+  clearTimeout(timerFin);
+  if (durSeg) timerFin = setTimeout(() => $('cinta').classList.remove('on'), durSeg * 1000);
+}
+async function cargar(){
+  try { cfg = (await (await fetch('/api/codigo', { cache: 'no-store' })).json()).config; } catch (e) {}
+}
+cargar(); setInterval(cargar, 15000);
+const es = new EventSource('/events?overlay=1');
+es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'codigo' && m.payload.que === 'cinta'){ cfg = m.payload.config; document.fonts.ready.then(() => mostrar(m.payload.dur)); } } catch (e) {} };
+if (params.get('demo')) document.fonts.ready.then(async () => { await cargar(); mostrar(0); });
+</script>
+</body>
+</html>

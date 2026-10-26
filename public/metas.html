@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Metas del mes</title>
+<link rel="stylesheet" href="marca.css">
+<style>
+  #wrap{width:306px;padding:4px 6px;transform-origin:top left;position:relative}
+  .fila{position:relative;display:flex;align-items:center;gap:8px;margin-top:8px}
+  .cuerpo{flex:1;min-width:0}
+  .arriba{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+  .l{font-weight:800;font-size:19px;line-height:1;letter-spacing:.8px;text-transform:uppercase;text-shadow:var(--contorno-duro)}
+  .v{margin-left:auto;font-family:var(--f-titulo);font-size:27px;line-height:1;letter-spacing:.5px;text-shadow:var(--contorno-duro)}
+  .v small{font-family:var(--f-texto);font-weight:800;font-size:16px;color:#e4e7ec;letter-spacing:.2px}
+  .pct{font-size:14px;padding:0 6px;min-width:40px;text-align:center}
+  .barra{position:relative;height:11px;margin-top:5px;background:rgba(0,0,0,.6);transform:skewX(-20deg);box-shadow:0 0 0 1px rgba(227,18,27,.35),inset 0 1px 3px rgba(0,0,0,.8);overflow:hidden}
+  .barra i{position:absolute;inset:0 auto 0 0;width:0;overflow:hidden;
+           background:linear-gradient(90deg,var(--rojo-oscuro),var(--rojo) 70%,var(--rojo-claro));box-shadow:0 0 10px rgba(227,18,27,.8);
+           transition:width 1.6s cubic-bezier(.2,.8,.2,1)}
+  .barra i::before{content:"";position:absolute;inset:0;opacity:.3;background:repeating-linear-gradient(-45deg,rgba(255,255,255,.6) 0 4px,transparent 4px 9px);background-size:13px 13px;animation:correr .8s linear infinite}
+  .barra i::after{content:"";position:absolute;top:0;left:-40%;width:35%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:brillo 3.2s ease-in-out infinite}
+  .barra b{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-3px;background:#fff;box-shadow:0 0 8px var(--rojo-claro),0 0 3px #fff;left:0;transition:left 1.6s cubic-bezier(.2,.8,.2,1);animation:punta 1.4s ease-in-out infinite}
+  /* al sumar */
+  .fila.sube .v{animation:pop .7s ease}
+  .fila.sube .m-hex{animation:salto .7s ease}
+  .mas{position:absolute;right:0;top:-18px;font-family:var(--f-titulo);font-size:24px;color:var(--rojo-claro);text-shadow:var(--contorno-rojo);pointer-events:none;animation:subirMas 1.8s ease-out forwards}
+  /* meta cumplida */
+  .fila.lista .barra i{background:linear-gradient(90deg,#a87400,var(--oro),#fff2b8);box-shadow:0 0 12px var(--oro)}
+  .fila.lista .barra b{box-shadow:0 0 10px var(--oro),0 0 3px #fff}
+  .fila.lista .l{color:var(--oro)}
+  .fila.lista .pct{display:none}
+  .badge{display:none;font-size:13px}
+  .fila.lista .badge{display:inline-block;animation:latir 1.6s ease-in-out infinite}
+  .confeti{position:absolute;left:50%;top:50%;width:6px;height:9px;pointer-events:none;z-index:5}
+  /* entrada */
+  .entra .m-cab{animation:m-bajar .6s both}
+  .entra .m-linea{animation:m-abrir .7s .2s both}
+  .entra .fila{animation:m-deslizar .6s cubic-bezier(.2,.9,.3,1.2) both}
+  @keyframes correr{to{background-position:13px 0}}
+  @keyframes brillo{0%,55%{left:-40%}100%{left:130%}}
+  @keyframes punta{50%{opacity:.35;transform:scaleY(.7)}}
+  @keyframes pop{40%{transform:scale(1.25);color:var(--rojo-claro)}}
+  @keyframes salto{40%{transform:translateY(-6px) scale(1.15)}}
+  @keyframes subirMas{0%{opacity:0;transform:translateY(8px)}15%{opacity:1}100%{opacity:0;transform:translateY(-22px)}}
+  @keyframes latir{50%{transform:skewX(-14deg) scale(1.1)}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="m-cab"><span class="m-titulo" id="titulo">Metas <em>del mes</em></span><span class="m-tag"><span id="mes"></span></span></div>
+  <div class="m-linea"></div>
+  <div id="filas"></div>
+</div>
+<script src="iconos.js"></script>
+<script>
+// Metas del mes (estilo BYTEDEMOND): se llenan solas con los aportes del reloj.
+// Opciones en la URL:  ?escala=1.2   ?regalo=segundos (cada cuánto se abre el regalo; por defecto 300)
+const fmt = (cat,v) => cat==='dinero' ? '$'+(Number.isInteger(v)?v:(Math.round(v*100)/100).toFixed(2)) : Math.round(v).toLocaleString('es');
+const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+const params = new URLSearchParams(location.search);
+const escala = parseFloat(params.get('escala'));
+if(escala>0) document.getElementById('wrap').style.transform = `scale(${escala})`;
+const wrap = document.getElementById('wrap'), filasEl = document.getElementById('filas');
+let filas = {}, valores = {}, firma = '', primera = true;
+
+// Título: la primera palabra en blanco y el resto en rojo ("Metas" + "del mes")
+function pintarTitulo(t){
+  const [a, ...b] = String(t).split(' ');
+  const el = document.getElementById('titulo'); el.textContent = a + (b.length ? ' ' : '');
+  if(b.length){ const em = document.createElement('em'); em.textContent = b.join(' '); el.appendChild(em); }
+}
+function texto(f, v, it){
+  const pct = it.meta>0 ? Math.floor(v/it.meta*100) : 0;
+  f.querySelector('.v').innerHTML = `${fmt(it.cat,v)}<small> / ${fmt(it.cat,it.meta)}</small>`;
+  f.querySelector('.pct span').textContent = it.meta>0 ? pct+'%' : '';
+}
+function correr(f, desde, it){
+  const t0 = performance.now(), dur = 1200;
+  const paso = (t)=>{ const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3); texto(f, desde+(it.actual-desde)*e, it); if(k<1) requestAnimationFrame(paso); };
+  requestAnimationFrame(paso);
+}
+function llenar(f, ancho, desdeCero){
+  const i = f.querySelector('.barra i'), b = f.querySelector('.barra b');
+  if(desdeCero){
+    i.style.transition = b.style.transition = 'none'; i.style.width = '0%'; b.style.left = '0%'; void i.offsetWidth;
+    i.style.transition = b.style.transition = '';
+    const d = parseFloat(f.style.animationDelay)||0;
+    setTimeout(()=>{ i.style.width = ancho; b.style.left = ancho; }, (d+0.35)*1000);
+  } else { i.style.width = ancho; b.style.left = ancho; }
+}
+function confeti(f){
+  const colores = ['#e3121b','#ff4a52','#ffffff','#ffc83a','#8e0a10'];
+  for(let i=0;i<26;i++){
+    const s = document.createElement('span'); s.className='confeti'; s.style.background = colores[i%5]; f.appendChild(s);
+    const a = Math.random()*Math.PI*2, d = 40+Math.random()*80;
+    s.animate([{transform:'translate(-50%,-50%)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d+40}px) rotate(${Math.random()*720}deg)`,opacity:0}],
+      {duration:1200+Math.random()*600,easing:'cubic-bezier(.2,.7,.4,1)'}).onfinish=()=>s.remove();
+  }
+}
+function render(j){
+  const m = j.metas;
+  pintarTitulo(m.titulo);
+  document.getElementById('mes').textContent = j.mes.label;
+  const claves = m.items.map(i=>i.cat).join();
+  let nuevas = false;
+  if(claves !== Object.keys(filas).join()){
+    filasEl.innerHTML=''; filas={}; valores={};
+    m.items.forEach((it,i)=>{
+      const f = document.createElement('div');
+      f.className = 'fila c-'+it.cat; f.style.animationDelay = (0.25+i*0.15)+'s';
+      f.innerHTML = `<span class="m-hex">${Iconos.svg(it.cat)}</span><div class="cuerpo">
+        <div class="arriba"><span class="l"></span><span class="m-monto badge"><span>¡CUMPLIDA!</span></span><span class="v"></span><span class="m-monto pct"><span></span></span></div>
+        <div class="barra"><i></i><b></b></div></div>`;
+      filasEl.appendChild(f); filas[it.cat]=f;
+    });
+    replay(wrap,'entra'); nuevas = true;
+  }
+  m.items.forEach(it=>{
+    const f = filas[it.cat], antes = valores[it.cat];
+    f.querySelector('.l').textContent = it.label;
+    llenar(f, (it.meta>0 ? Math.min(100, it.actual/it.meta*100) : 0)+'%', nuevas);
+    const estabaLista = f.classList.contains('lista');
+    const lista = it.meta>0 && it.actual>=it.meta;
+    f.classList.toggle('lista', lista);
+    if(!primera && antes!=null && it.actual>antes){
+      correr(f, antes, it); replay(f,'sube');
+      const mas = document.createElement('span'); mas.className='mas'; mas.textContent = '+'+fmt(it.cat, it.actual-antes);
+      f.appendChild(mas); setTimeout(()=>mas.remove(), 1900);
+      if(it.cat==='subs') Iconos.abrir(f);
+      if(it.cat==='dinero') Iconos.contar(f);
+      if(lista && !estabaLista) setTimeout(()=>confeti(f), 500);
+    } else texto(f, it.actual, it);
+    valores[it.cat] = it.actual;
+  });
+  primera = false;
+}
+async function cargar(){
+  try{
+    const j = await (await fetch('/api/podio',{cache:'no-store'})).json();
+    const f = JSON.stringify([j.mes.key, j.metas]); if(f===firma) return; firma=f;
+    render(j);
+  }catch(e){ /* reloj apagado: queda lo último */ }
+}
+cargar(); setInterval(cargar, 2000);
+Iconos.auto(filasEl);
+const repetir = parseFloat(params.get('repetir'));
+if(repetir>=10) setInterval(()=>replay(wrap,'entra'), repetir*1000);
+</script>
+</body>
+</html>
