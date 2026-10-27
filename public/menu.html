@@ -284,7 +284,7 @@ async function cargarAct(){
   $('actAuto').checked = ACT.auto;
   const m = ACT.marca;
   $('actAviso').innerHTML = m && !m.visto ? `<div class="act-aviso">✅ <b>Se actualizó de la versión ${esc(m.de)} a la ${esc(m.a)}.</b> Tus datos quedaron igual.${m.notas ? `<pre>${esc(m.notas)}</pre>` : ''}<div style="margin-top:8px"><button id="actVisto">Entendido</button></div></div>` : '';
-  if ($('actVisto')) $('actVisto').onclick = async ()=>{ await api('/api/actualizar/visto','POST',{}).catch(()=>{}); cargarAct(); };
+  if ($('actVisto')) $('actVisto').onclick = async ()=>{ await api('/api/actualizar/visto','POST',{}).catch((e)=>console.warn('[Actualización]', e)); cargarAct(); };
   if (!nueva) $('actEstado').textContent = ACT.ultima ? (ACT.ultima.nueva ? '' : '· estás al día') : '';
 }
 $('actAuto').onchange = async ()=>{ try { await api('/api/actualizar/config','POST',{ auto: $('actAuto').checked }); toast($('actAuto').checked ? '✔ Se actualiza solo al abrir' : 'Actualización automática apagada'); } catch(e){ toast(e.message); } };

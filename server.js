@@ -41,12 +41,15 @@ const REMOTE = !!(d.settings.remoteAccess && auth.hasAnyLogin());
 const HOST = process.env.HOST || (REMOTE ? '0.0.0.0' : '127.0.0.1');
 const HOOKS_HOST = process.env.HOST || '127.0.0.1';
 
-// Abre una carpeta en el explorador o una URL en el navegador.
-// Sin manejo de error: explorer.exe devuelve código 1 aunque haya abierto bien.
-function abrirEnSistema(destino) {
-  const win = /^https?:/.test(destino) ? `start "" "${destino}"` : `explorer "${destino}"`;
-  exec(process.platform === 'win32' ? win : process.platform === 'darwin' ? `open "${destino}"` : `xdg-open "${destino}"`, () => {});
+// Hacer algo sin frenar lo que sigue: si falla, queda anotado en el log
+function intentar(que, fn) {
+  try { return fn(); } catch (err) { console.error(`[${que}]`, err.message); }
 }
+
+// Sin manejo de error: explorer.exe devuelve código 1 aunque haya abierto bien.
+const abrir = (win, otro) => exec(process.platform === 'win32' ? win : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} ${otro}`, () => {});
+const abrirCarpeta = (dir) => abrir(`explorer "${dir}"`, `"${dir}"`);
+const abrirNavegador = (url) => abrir(`start "" "${url}"`, `"${url}"`);
 
 // ---------- Tiempo real ----------
 const live = createLive();
@@ -107,21 +110,23 @@ const SOUNDS_DIR = path.join(__dirname, 'sonidos');
 const SOUND_EXT = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4' };
 const SOUND_EVENTS = ['sub', 'bits', 'paypal', 'mercadopago', 'grande', 'multiplicador', 'final', 'fin', 'manual'];
 let customSounds = {};
+// archivos de audio de la carpeta "sonidos"
+function listarSonidos() {
+  try { return fs.readdirSync(SOUNDS_DIR).filter((f) => SOUND_EXT[path.extname(f).toLowerCase()]); }
+  catch (err) { if (err.code !== 'ENOENT') console.error('[Sonidos]', err.message); return []; }
+}
 function scanSounds() {
-  try {
+  intentar('Sonidos', () => {
     fs.mkdirSync(SOUNDS_DIR, { recursive: true });
     const readme = path.join(SOUNDS_DIR, 'LEEME.txt');
     if (!fs.existsSync(readme)) fs.writeFileSync(readme, 'Pon aqui tus propios sonidos (mp3, wav, ogg o m4a) con estos nombres para reemplazar los que trae el reloj:\r\n\r\n' + SOUND_EVENTS.map((e) => `  ${e}.mp3`).join('\r\n') + '\r\n\r\nSi no hay archivo, se usa el sonido incluido.\r\n');
-    const found = {};
-    for (const f of fs.readdirSync(SOUNDS_DIR)) {
-      const ext = path.extname(f).toLowerCase();
-      const name = path.basename(f, path.extname(f)).toLowerCase();
-      if (SOUND_EXT[ext] && SOUND_EVENTS.includes(name)) found[name] = f;
-    }
-    customSounds = found;
-  } catch (err) {
-    console.error('[Sonidos]', err.message);
+  });
+  const found = {};
+  for (const f of listarSonidos()) {
+    const name = path.basename(f, path.extname(f)).toLowerCase();
+    if (SOUND_EVENTS.includes(name)) found[name] = f;
   }
+  customSounds = found;
 }
 scanSounds();
 setInterval(scanSounds, 30000);
@@ -166,12 +171,12 @@ const podio = createPodio({ store });
 // Cada aporte real (no las pruebas) también entra al podio del mes
 const onContribution = (ev) => {
   const entry = engine.contribute(ev);
-  try { podio.record(entry); } catch (err) { console.error('[Podio]', err.message); }
+  intentar('Podio', () => podio.record(entry));
   // copia de seguridad apenas entra una donación, sub o bits (las pruebas no cuentan)
   if (entry && !entry.duplicate && !entry.test) respaldo.alAporte();
   // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas
   if (entry && !entry.duplicate && (entry.source === 'paypal' || entry.source === 'mercadopago')) {
-    const usd = intentar('Podio', () => podio.toUsd(entry.amount, entry.currency));
+    const usd = podio.toUsd(entry.amount, entry.currency);
     broadcast('aporte', { id: entry.id, user: entry.user, usd: usd ?? 1, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
   }
   return entry;
@@ -205,7 +210,7 @@ function onStream(isLive, initial) {
     }
     newSession();
     console.log(initial ? '🔴 El stream ya estaba en vivo al abrir el reloj' : '🔴 ¡Stream en vivo!');
-    try { if (podio.patitosStream(true)) broadcast('aporte', { vaciar: true }); } catch (err) { console.error('[Patitos]', err.message); }
+    if (intentar('Patitos', () => podio.patitosStream(true))) broadcast('aporte', { vaciar: true });
     if (d.settings.descanso) {
       d.settings.descanso = false;
       store.save();
@@ -227,8 +232,8 @@ function onStream(isLive, initial) {
       console.log(`⚫ Stream terminado · quedan ${left()}`);
     }
     sumarHorasDiarias('al terminar el stream');
-    try { podio.patitosStream(false); } catch (err) { console.error('[Patitos]', err.message); }
-    setTimeout(() => { try { podio.saveNow(); respaldo.respaldar('fin del stream', true); } catch (err) { console.error('[Respaldo]', err.message); } }, 2000);
+    intentar('Patitos', () => podio.patitosStream(false));
+    setTimeout(() => intentar('Respaldo', () => respaldo.respaldar('fin del stream', true)), 2000);
     logger.close(['Resumen del stream:', ...sessionSummary()]);
     newSession();
     // Si el panel se cerró durante el stream, ahora sí se apaga
@@ -407,7 +412,7 @@ app.post('/api/sounds/test', (req, res) => {
 });
 app.post('/api/sounds/open-folder', (req, res) => {
   scanSounds();
-  abrirEnSistema(SOUNDS_DIR);
+  abrirCarpeta(SOUNDS_DIR);
   ok(res, { sounds: soundsMsg() });
 });
 
@@ -517,7 +522,7 @@ app.get('/api/logs/current', (req, res) => {
   fs.readFile(file, 'utf8', (err, text) => res.send(err ? 'No se pudo leer el registro.' : `${path.basename(file)}\n\n${text}`, 200, 'text/plain; charset=utf-8'));
 });
 app.post('/api/logs/open-folder', (req, res) => {
-  abrirEnSistema(logger.dir);
+  abrirCarpeta(logger.dir);
   ok(res, { dir: logger.dir });
 });
 
@@ -814,23 +819,22 @@ app.get('/api/codigo', (req, res) => res.json(codigo.publicData()));
 app.get('/api/codigo/estado', (req, res) => res.json({ ...codigo.publicData(), proximas: codigo.proximas(codigoCtx()), live: !!stream.live, descanso: !!d.settings.descanso }));
 app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
-setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { console.error('[Código]', e.message); } }, 5000);
+setInterval(() => intentar('Código', () => codigo.tick(broadcast, codigoCtx())), 5000);
 
 // ---------- Tren del hype ----------
 const hype = require('./src/hype');
 // ¿La canción sincronizada es el mismo archivo que se midió? (si cambias el mp3, vuelve al modo normal)
 function hypeCancion() {
   const c = hype.getConfig().cancion;
-  try { const st = fs.statSync(path.join(SOUNDS_DIR, c.archivo)); hype.perfilPorTamano(st.size); const ok = st.size === hype.getConfig().cancion.bytes; return { ok: !!c.on && ok, medida: ok, existe: true, bytes: st.size, archivo: c.archivo }; }
-  catch { return { ok: false, medida: false, existe: false, archivo: c.archivo }; }
+  const st = c.archivo && fs.statSync(path.join(SOUNDS_DIR, c.archivo), { throwIfNoEntry: false });
+  if (!st) return { ok: false, medida: false, existe: false, archivo: c.archivo };
+  hype.perfilPorTamano(st.size);
+  const ok = st.size === hype.getConfig().cancion.bytes;
+  return { ok: !!c.on && ok, medida: ok, existe: true, bytes: st.size, archivo: c.archivo };
 }
 // todas las canciones de la carpeta "sonidos" (para elegir en el panel)
-function hypeCanciones() {
-  try { return fs.readdirSync(SOUNDS_DIR).filter((f) => SOUND_EXT[path.extname(f).toLowerCase()]).map((f) => ({ nombre: f, bytes: fs.statSync(path.join(SOUNDS_DIR, f)).size })); } catch { return []; }
-}
-function hypeArchivos() {
-  try { return fs.readdirSync(SOUNDS_DIR).filter((f) => /^hype-/i.test(f) && SOUND_EXT[path.extname(f).toLowerCase()]); } catch { return []; }
-}
+const hypeCanciones = () => listarSonidos().map((f) => ({ nombre: f, bytes: fs.statSync(path.join(SOUNDS_DIR, f)).size }));
+const hypeArchivos = () => listarSonidos().filter((f) => /^hype-/i.test(f));
 function onHype(fase, e, desfase) {
   try {
     const r = hype.procesar(fase, e, desfase);
@@ -869,20 +873,17 @@ app.post('/api/hype/probar', (req, res) => {
 
 // ---------- Copias de seguridad ----------
 if (RECUPERADOS.length) console.warn('💾 Se recuperaron de la copia de seguridad: ' + RECUPERADOS.join(', '));
-// podio y store guardan con demora; antes de copiar se escriben a disco
-const guardarPendientes = () => { podio.saveNow(); store.saveNow(); };
-respaldo.iniciar(guardarPendientes);
+respaldo.iniciar(guardarTodo);
 app.get('/api/respaldo', (req, res) => res.json(respaldo.info()));
 app.post('/api/respaldo/config', podioRoute((req) => respaldo.setConfig(req.body)));
-app.post('/api/respaldo/ahora', podioRoute(() => { intentar('Respaldo', guardarPendientes); return respaldo.respaldar('a mano', true) && respaldo.info(); }));
+app.post('/api/respaldo/ahora', podioRoute(() => respaldo.respaldar('a mano', true) && respaldo.info()));
 app.post('/api/respaldo/abrir', (req, res) => {
   const dir = respaldo.carpetas()[0];
   intentar('Respaldo', () => fs.mkdirSync(dir, { recursive: true }));
-  abrirEnSistema(dir);
+  abrirCarpeta(dir);
   ok(res);
 });
 app.post('/api/respaldo/restaurar', (req, res) => {
-  guardarTodo();
   try { respaldo.pedirRestaurar(String(req.body.copia || '')); } catch (err) { return res.json({ error: err.message }, 400); }
   console.log(`💾 Restaurando la copia ${req.body.copia}: el reloj se reinicia…`);
   ok(res);
@@ -968,30 +969,38 @@ hookServer = http.createServer(hooks.handle);
 // ---------- Arranque ----------
 function openPanel() {
   if (process.env.NO_OPEN) return;
-  abrirEnSistema(`http://localhost:${PORT}/menu`);
+  abrirNavegador(`http://localhost:${PORT}/menu`);
 }
 
-// Guardar o cerrar algo sin frenar lo que sigue: si falla, queda anotado en el log
-function intentar(que, fn) {
-  try { return fn(); } catch (err) { console.error(`[${que}]`, err.message); }
-}
+// podio, código y hype anotan sus propios errores al guardar; store los lanza
 function guardarTodo() {
   intentar('Datos', () => store.saveNow());
-  intentar('Podio', () => podio.saveNow());
-  intentar('Código', () => codigo.save());
-  intentar('Hype', () => hype.save());
+  podio.saveNow();
+  codigo.save();
+  hype.save();
 }
-const detenerConexiones = () => { for (const c of [twitch, mp, se]) intentar('Conexiones', () => c.stop()); };
 
-// Reinicia el programa (para aplicar el acceso remoto) sin abrir ventanas
-function restart() {
+// Lo que comparten reiniciar y apagar: guardar todo, soltar las conexiones y liberar los puertos
+let shuttingDown = false;
+function prepararCierre() {
   shuttingDown = true;
-  detenerConexiones();
   persistTimer();
-  store.saveNow();
+  guardarTodo();
+  for (const c of [twitch, mp, se]) intentar('Conexiones', () => c.stop());
+}
+function cerrarServidores(alCerrar) {
+  server.close(alCerrar);
+  server.closeAllConnections();
+  hookServer?.close();
+  hookServer?.closeAllConnections?.();
+}
+
+// Reinicia el programa (para aplicar el acceso remoto o restaurar una copia) sin abrir ventanas
+function restart() {
+  prepararCierre();
   console.log('🔄 Reiniciando el reloj…');
   logger.close();
-  server.close(() => {
+  cerrarServidores(() => {
     spawn(process.execPath, [__filename], {
       cwd: __dirname,
       detached: true,
@@ -1001,26 +1010,18 @@ function restart() {
     }).unref();
     process.exit(0);
   });
-  server.closeAllConnections();
-  hookServer.close();
-  hookServer.closeAllConnections?.();
 }
 
 // Apagado limpio: guarda, avisa a paneles y overlay, corta conexiones y libera los puertos
-let shuttingDown = false;
 function shutdown(reason) {
   if (shuttingDown) return;
-  shuttingDown = true;
-  persistTimer();
-  guardarTodo();
+  prepararCierre();
   intentar('Respaldo', () => respaldo.respaldar('al cerrar', true));
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);
   logger.close(stream.live ? ['Resumen hasta el cierre:', ...sessionSummary()] : []);
   intentar('Paneles', () => live.broadcast('shutdown', { reason }));
-  detenerConexiones();
   setTimeout(() => {
-    intentar('Servidor', () => { server.close(); server.closeAllConnections(); });
-    intentar('Webhooks', () => { hookServer?.close(); hookServer?.closeAllConnections?.(); });
+    intentar('Servidores', () => cerrarServidores());
     removePid();
     process.exit(0);
   }, 300);

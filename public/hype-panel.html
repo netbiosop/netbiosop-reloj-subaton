@@ -219,9 +219,9 @@ async function medir(){
     midiendo = false; perfilVisto = ''; await cargar();
   } catch(e){ midiendo = false; $('cancionEstado').innerHTML = '⚠️ No se pudo medir la canción: ' + esc(e.message); }
 }
-$('cOn').onchange = async ()=>{ await api('/api/hype/config','POST',{ cancion: { on: $('cOn').checked } }).catch(()=>{}); cargar(); };
+$('cOn').onchange = async ()=>{ await api('/api/hype/config','POST',{ cancion: { on: $('cOn').checked } }).catch((e)=>console.warn('[Hype]', e)); cargar(); };
 $('cSel').onchange = async ()=>{ await api('/api/hype/config','POST',{ cancion: { archivo: $('cSel').value } }).catch((e)=>nota($('cResumen'), e.message, 'mal')); $('cSel').blur(); cargar(); };
-$('cMedir').onclick = async ()=>{ await api('/api/hype/config','POST',{ cancion: { remedir: true } }).catch(()=>{}); cargar(); };
+$('cMedir').onclick = async ()=>{ await api('/api/hype/config','POST',{ cancion: { remedir: true } }).catch((e)=>console.warn('[Hype]', e)); cargar(); };
 $('cFile').onchange = async ()=>{
   const f = $('cFile').files[0]; if (!f) return;
   $('cancionEstado').innerHTML = `⬆️ Subiendo <b>${esc(f.name)}</b>…`;

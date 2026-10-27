@@ -512,7 +512,7 @@ function showShutdown(reason) {
 $('#btnLogsFolder').onclick = () => api('POST', '/api/logs/open-folder').then(() => toast('Abriendo la carpeta de logs'));
 $('#btnShutdown').onclick = async () => {
   if (!confirm('¿Apagar el reloj?\n\nEl tiempo queda guardado. Para volver a encenderlo abre iniciar.bat.')) return;
-  await api('POST', '/api/shutdown').catch(() => {});
+  await api('POST', '/api/shutdown').catch(() => {}); /* el reloj corta la conexión al apagarse o reiniciarse */
   showShutdown();
 };
 
@@ -651,11 +651,11 @@ $('#modMax').addEventListener('change', () => {
   saveRemote({ modMaxSeconds: Math.max(0, v ?? 0) }, 'Máximo guardado');
 });
 $('#btnLogout').onclick = async () => {
-  await api('POST', '/api/logout').catch(() => {});
+  await api('POST', '/api/logout').catch((err) => console.warn('[Salir]', err));
   location.href = '/login';
 };
 $('#btnRestart').onclick = async () => {
-  await api('POST', '/api/restart').catch(() => {});
+  await api('POST', '/api/restart').catch(() => {}); /* el reloj corta la conexión al apagarse o reiniciarse */
   toast('Reiniciando el reloj…');
   window.__es?.close();
   const t0 = Date.now();
@@ -755,7 +755,7 @@ async function load() {
   fillStream();
   sounds = data.state.sounds;
   renderSounds();
-  loadRemote().catch(() => {});
+  loadRemote().catch((err) => console.warn('[Acceso remoto]', err));
   renderConnections();
   renderSchedules();
   renderLog();

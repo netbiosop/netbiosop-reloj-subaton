@@ -36,7 +36,10 @@ async function killStale() {
   try { pid = Number(fs.readFileSync(PID_FILE, 'utf8').trim()); } catch { return false; }
   if (!pid || pid === process.pid) return false;
   // kill(pid, 0) solo pregunta si el proceso existe; si no existe, el archivo quedó viejo
-  try { process.kill(pid, 0); } catch { fs.rmSync(PID_FILE, { force: true }); return false; }
+  try { process.kill(pid, 0); } catch {
+    try { fs.rmSync(PID_FILE, { force: true }); } catch (e) { console.warn('  (No se pudo borrar ' + PID_FILE + ': ' + e.message + ')'); }
+    return false;
+  }
   if (!(await portBusy())) return false; // el número existe pero no es el reloj: no se toca
   console.log(`  Cerrando un reloj anterior que no respondía (proceso ${pid})…`);
   try { process.kill(pid); } catch { /* ya terminó solo */ }
