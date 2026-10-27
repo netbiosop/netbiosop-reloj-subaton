@@ -7,6 +7,7 @@ logger.install();
 // Antes de cargar los datos: si falta un archivo o está dañado, se recupera de la última copia de seguridad
 const respaldo = require('./src/respaldo');
 const RECUPERADOS = respaldo.alInicio();
+const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
@@ -39,6 +40,13 @@ const auth = createAuth(store);
 const REMOTE = !!(d.settings.remoteAccess && auth.hasAnyLogin());
 const HOST = process.env.HOST || (REMOTE ? '0.0.0.0' : '127.0.0.1');
 const HOOKS_HOST = process.env.HOST || '127.0.0.1';
+
+// Abre una carpeta en el explorador o una URL en el navegador.
+// Sin manejo de error: explorer.exe devuelve código 1 aunque haya abierto bien.
+function abrirEnSistema(destino) {
+  const win = /^https?:/.test(destino) ? `start "" "${destino}"` : `explorer "${destino}"`;
+  exec(process.platform === 'win32' ? win : process.platform === 'darwin' ? `open "${destino}"` : `xdg-open "${destino}"`, () => {});
+}
 
 // ---------- Tiempo real ----------
 const live = createLive();
@@ -100,7 +108,6 @@ const SOUND_EXT = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/og
 const SOUND_EVENTS = ['sub', 'bits', 'paypal', 'mercadopago', 'grande', 'multiplicador', 'final', 'fin', 'manual'];
 let customSounds = {};
 function scanSounds() {
-  const fs = require('fs');
   try {
     fs.mkdirSync(SOUNDS_DIR, { recursive: true });
     const readme = path.join(SOUNDS_DIR, 'LEEME.txt');
@@ -164,8 +171,7 @@ const onContribution = (ev) => {
   if (entry && !entry.duplicate && !entry.test) respaldo.alAporte();
   // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas
   if (entry && !entry.duplicate && (entry.source === 'paypal' || entry.source === 'mercadopago')) {
-    let usd = null;
-    try { usd = podio.toUsd(entry.amount, entry.currency); } catch {}
+    const usd = intentar('Podio', () => podio.toUsd(entry.amount, entry.currency));
     broadcast('aporte', { id: entry.id, user: entry.user, usd: usd ?? 1, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
   }
   return entry;
@@ -283,7 +289,7 @@ const app = createApp({ staticDir: path.join(__dirname, 'public'), guard: auth.g
 app.get('/', (req, res) => res.redirect('/menu'));
 // Configuración: es el mismo panel en su vista de ajustes (stream, acceso remoto, conexiones y chat)
 app.get('/configuracion', (req, res) => {
-  require('fs').readFile(path.join(__dirname, 'public', 'panel.html'), (err, buf) => res.send(err ? 'Error' : buf));
+  fs.readFile(path.join(__dirname, 'public', 'panel.html'), (err, buf) => res.send(err ? 'Error' : buf));
 });
 app.get('/api/version', (req, res) => res.json({ app: 'reloj-subaton', version: require('./package.json').version }));
 app.get('/events', (req, res) => {
@@ -327,7 +333,7 @@ function remoteInfo(req) {
 }
 app.get('/login', (req, res) => {
   if (!REMOTE) return res.send('<meta charset="utf-8"><body style="font-family:sans-serif;background:#0e0d12;color:#ecebf2;padding:40px"><h2>Acceso remoto desactivado</h2><p>Actívalo desde el panel en la PC del reloj (sección Acceso remoto).</p></body>', 403);
-  require('fs').readFile(path.join(__dirname, 'public', 'login.html'), (err, buf) => res.send(err ? 'Error' : buf));
+  fs.readFile(path.join(__dirname, 'public', 'login.html'), (err, buf) => res.send(err ? 'Error' : buf));
 });
 app.post('/api/login', (req, res) => {
   if (!REMOTE) return res.json({ error: 'El acceso remoto está desactivado' }, 403);
@@ -376,7 +382,7 @@ app.get('/sonidos/:file', (req, res) => {
   const file = path.basename(req.params.file);
   const type = SOUND_EXT[path.extname(file).toLowerCase()];
   if (!type) return res.send('No encontrado', 404, 'text/plain');
-  require('fs').readFile(path.join(SOUNDS_DIR, file), (err, buf) => {
+  fs.readFile(path.join(SOUNDS_DIR, file), (err, buf) => {
     if (err) return res.send('No encontrado', 404, 'text/plain');
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
     res.end(buf);
@@ -401,8 +407,7 @@ app.post('/api/sounds/test', (req, res) => {
 });
 app.post('/api/sounds/open-folder', (req, res) => {
   scanSounds();
-  const cmd = process.platform === 'win32' ? `explorer "${SOUNDS_DIR}"` : process.platform === 'darwin' ? `open "${SOUNDS_DIR}"` : `xdg-open "${SOUNDS_DIR}"`;
-  exec(cmd, () => {});
+  abrirEnSistema(SOUNDS_DIR);
   ok(res, { sounds: soundsMsg() });
 });
 
@@ -509,13 +514,11 @@ app.post('/api/stream-settings', (req, res) => {
 app.get('/api/logs/current', (req, res) => {
   const file = logger.latestFile();
   if (!file) return res.send('Todavía no hay registros.', 200, 'text/plain; charset=utf-8');
-  require('fs').readFile(file, 'utf8', (err, text) => res.send(err ? 'No se pudo leer el registro.' : `${path.basename(file)}\n\n${text}`, 200, 'text/plain; charset=utf-8'));
+  fs.readFile(file, 'utf8', (err, text) => res.send(err ? 'No se pudo leer el registro.' : `${path.basename(file)}\n\n${text}`, 200, 'text/plain; charset=utf-8'));
 });
 app.post('/api/logs/open-folder', (req, res) => {
-  const dir = logger.dir;
-  const cmd = process.platform === 'win32' ? `explorer "${dir}"` : process.platform === 'darwin' ? `open "${dir}"` : `xdg-open "${dir}"`;
-  exec(cmd, () => {});
-  ok(res, { dir });
+  abrirEnSistema(logger.dir);
+  ok(res, { dir: logger.dir });
 });
 
 // Apagar el programa (como corre oculto, se apaga desde el panel o con detener.bat)
@@ -818,15 +821,15 @@ const hype = require('./src/hype');
 // ¿La canción sincronizada es el mismo archivo que se midió? (si cambias el mp3, vuelve al modo normal)
 function hypeCancion() {
   const c = hype.getConfig().cancion;
-  try { const st = require('fs').statSync(path.join(SOUNDS_DIR, c.archivo)); hype.perfilPorTamano(st.size); const ok = st.size === hype.getConfig().cancion.bytes; return { ok: !!c.on && ok, medida: ok, existe: true, bytes: st.size, archivo: c.archivo }; }
+  try { const st = fs.statSync(path.join(SOUNDS_DIR, c.archivo)); hype.perfilPorTamano(st.size); const ok = st.size === hype.getConfig().cancion.bytes; return { ok: !!c.on && ok, medida: ok, existe: true, bytes: st.size, archivo: c.archivo }; }
   catch { return { ok: false, medida: false, existe: false, archivo: c.archivo }; }
 }
 // todas las canciones de la carpeta "sonidos" (para elegir en el panel)
 function hypeCanciones() {
-  try { return require('fs').readdirSync(SOUNDS_DIR).filter((f) => SOUND_EXT[path.extname(f).toLowerCase()]).map((f) => ({ nombre: f, bytes: require('fs').statSync(path.join(SOUNDS_DIR, f)).size })); } catch { return []; }
+  try { return fs.readdirSync(SOUNDS_DIR).filter((f) => SOUND_EXT[path.extname(f).toLowerCase()]).map((f) => ({ nombre: f, bytes: fs.statSync(path.join(SOUNDS_DIR, f)).size })); } catch { return []; }
 }
 function hypeArchivos() {
-  try { return require('fs').readdirSync(SOUNDS_DIR).filter((f) => /^hype-/i.test(f) && SOUND_EXT[path.extname(f).toLowerCase()]); } catch { return []; }
+  try { return fs.readdirSync(SOUNDS_DIR).filter((f) => /^hype-/i.test(f) && SOUND_EXT[path.extname(f).toLowerCase()]); } catch { return []; }
 }
 function onHype(fase, e, desfase) {
   try {
@@ -844,11 +847,10 @@ app.get('/api/hype', (req, res) => { const c = hypeCancion(); res.json({ ...hype
 app.post('/api/hype/cancion/perfil', podioRoute((req) => { const r = hype.setPerfil(req.body); broadcast('hype', { config: r, archivos: hypeArchivos(), cancionOk: hypeCancion().ok }); return r; }));
 // subir una canción desde el panel: se guarda en la carpeta "sonidos"
 app.post('/api/hype/subir', (req, res) => {
-  const fs2 = require('fs');
   const nombre = path.basename(decodeURIComponent(String(req.headers['x-nombre'] || 'cancion.mp3'))).replace(/[^\w.\- ()áéíóúñÁÉÍÓÚÑ]/g, '_').slice(0, 80);
   if (!SOUND_EXT[path.extname(nombre).toLowerCase()]) return res.json({ error: 'Tiene que ser .mp3, .wav, .ogg o .m4a' }, 400);
   if (!req.rawBuffer || req.rawBuffer.length < 1000) return res.json({ error: 'El archivo llegó vacío' }, 400);
-  try { fs2.mkdirSync(SOUNDS_DIR, { recursive: true }); fs2.writeFileSync(path.join(SOUNDS_DIR, nombre), req.rawBuffer); }
+  try { fs.mkdirSync(SOUNDS_DIR, { recursive: true }); fs.writeFileSync(path.join(SOUNDS_DIR, nombre), req.rawBuffer); }
   catch (err) { return res.json({ error: 'No se pudo guardar: ' + err.message }, 500); }
   console.log(`[Hype] Canción subida: ${nombre} (${Math.round(req.rawBuffer.length / 1024)} KB)`);
   ok(res, { nombre, bytes: req.rawBuffer.length });
@@ -867,18 +869,20 @@ app.post('/api/hype/probar', (req, res) => {
 
 // ---------- Copias de seguridad ----------
 if (RECUPERADOS.length) console.warn('💾 Se recuperaron de la copia de seguridad: ' + RECUPERADOS.join(', '));
-respaldo.iniciar(() => { podio.saveNow(); store.saveNow(); });
+// podio y store guardan con demora; antes de copiar se escriben a disco
+const guardarPendientes = () => { podio.saveNow(); store.saveNow(); };
+respaldo.iniciar(guardarPendientes);
 app.get('/api/respaldo', (req, res) => res.json(respaldo.info()));
 app.post('/api/respaldo/config', podioRoute((req) => respaldo.setConfig(req.body)));
-app.post('/api/respaldo/ahora', podioRoute(() => { try { podio.saveNow(); store.saveNow(); } catch {} return respaldo.respaldar('a mano', true) && respaldo.info(); }));
+app.post('/api/respaldo/ahora', podioRoute(() => { intentar('Respaldo', guardarPendientes); return respaldo.respaldar('a mano', true) && respaldo.info(); }));
 app.post('/api/respaldo/abrir', (req, res) => {
   const dir = respaldo.carpetas()[0];
-  try { require('fs').mkdirSync(dir, { recursive: true }); } catch {}
-  exec(process.platform === 'win32' ? `explorer "${dir}"` : process.platform === 'darwin' ? `open "${dir}"` : `xdg-open "${dir}"`, () => {});
+  intentar('Respaldo', () => fs.mkdirSync(dir, { recursive: true }));
+  abrirEnSistema(dir);
   ok(res);
 });
 app.post('/api/respaldo/restaurar', (req, res) => {
-  try { podio.saveNow(); store.saveNow(); codigo.save(); hype.save(); } catch {}
+  guardarTodo();
   try { respaldo.pedirRestaurar(String(req.body.copia || '')); } catch (err) { return res.json({ error: err.message }, 400); }
   console.log(`💾 Restaurando la copia ${req.body.copia}: el reloj se reinicia…`);
   ok(res);
@@ -964,15 +968,25 @@ hookServer = http.createServer(hooks.handle);
 // ---------- Arranque ----------
 function openPanel() {
   if (process.env.NO_OPEN) return;
-  const url = `http://localhost:${PORT}/menu`;
-  const cmd = process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
-  exec(cmd, () => {});
+  abrirEnSistema(`http://localhost:${PORT}/menu`);
 }
+
+// Guardar o cerrar algo sin frenar lo que sigue: si falla, queda anotado en el log
+function intentar(que, fn) {
+  try { return fn(); } catch (err) { console.error(`[${que}]`, err.message); }
+}
+function guardarTodo() {
+  intentar('Datos', () => store.saveNow());
+  intentar('Podio', () => podio.saveNow());
+  intentar('Código', () => codigo.save());
+  intentar('Hype', () => hype.save());
+}
+const detenerConexiones = () => { for (const c of [twitch, mp, se]) intentar('Conexiones', () => c.stop()); };
 
 // Reinicia el programa (para aplicar el acceso remoto) sin abrir ventanas
 function restart() {
   shuttingDown = true;
-  for (const c of [twitch, mp, se]) try { c.stop(); } catch {}
+  detenerConexiones();
   persistTimer();
   store.saveNow();
   console.log('🔄 Reiniciando el reloj…');
@@ -998,18 +1012,15 @@ function shutdown(reason) {
   if (shuttingDown) return;
   shuttingDown = true;
   persistTimer();
-  store.saveNow();
-  try { podio.saveNow(); } catch {}
-  try { codigo.save(); } catch {}
-  try { hype.save(); } catch {}
-  try { respaldo.respaldar('al cerrar', true); } catch {}
+  guardarTodo();
+  intentar('Respaldo', () => respaldo.respaldar('al cerrar', true));
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);
   logger.close(stream.live ? ['Resumen hasta el cierre:', ...sessionSummary()] : []);
-  try { live.broadcast('shutdown', { reason }); } catch {}
-  for (const c of [twitch, mp, se]) try { c.stop(); } catch {}
+  intentar('Paneles', () => live.broadcast('shutdown', { reason }));
+  detenerConexiones();
   setTimeout(() => {
-    try { server.close(); server.closeAllConnections(); } catch {}
-    try { hookServer.close(); hookServer.closeAllConnections?.(); } catch {}
+    intentar('Servidor', () => { server.close(); server.closeAllConnections(); });
+    intentar('Webhooks', () => { hookServer?.close(); hookServer?.closeAllConnections?.(); });
     removePid();
     process.exit(0);
   }, 300);
@@ -1019,12 +1030,11 @@ function shutdown(reason) {
 // Archivo con el número de proceso: si alguna vez el reloj se cuelga, iniciar.bat lo puede cerrar
 const PID_FILE = path.join(path.dirname(store.file), 'reloj.pid');
 function writePid() {
-  try { require('fs').writeFileSync(PID_FILE, String(process.pid)); } catch {}
+  intentar('PID', () => fs.writeFileSync(PID_FILE, String(process.pid)));
 }
 function removePid() {
-  try {
-    if (require('fs').readFileSync(PID_FILE, 'utf8').trim() === String(process.pid)) require('fs').unlinkSync(PID_FILE);
-  } catch {}
+  if (!fs.existsSync(PID_FILE)) return;
+  intentar('PID', () => { if (fs.readFileSync(PID_FILE, 'utf8').trim() === String(process.pid)) fs.unlinkSync(PID_FILE); });
 }
 process.on('exit', removePid);
 

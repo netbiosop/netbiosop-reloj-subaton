@@ -407,7 +407,7 @@ $('rank').addEventListener('click', async (ev)=>{
   const de = b.dataset.renom;
   const a = prompt(`Nuevo nombre para "${de}" (se cambia en todos sus aportes de ${D.month.label}).\nSi escribes un nombre que ya está en el ranking, se suman juntos.`, de);
   if(!a || a.trim()===de) return;
-  try{ const r = await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
+  try{ await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
 });
 // Reyes del mes pasado: automáticos, con opción de ponerlos a mano
 let editRey = null;

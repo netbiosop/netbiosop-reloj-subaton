@@ -293,7 +293,7 @@ const sonido = (() => {
     s.onended = () => { if (fuente === s){ fuente = null; } };
   }
   function pararFuente(seg){ if (!fuente) return; const s = fuente, gn = fuenteGain, c = ac(); fuente = null;
-    gn.gain.setValueAtTime(gn.gain.value, c.currentTime); gn.gain.linearRampToValueAtTime(0, c.currentTime + seg); try { s.stop(c.currentTime + seg + .05); } catch (e) {} }
+    gn.gain.setValueAtTime(gn.gain.value, c.currentTime); gn.gain.linearRampToValueAtTime(0, c.currentTime + seg); try { s.stop(c.currentTime + seg + .05); } catch (e) { /* ya estaba detenido */ } }
   return {
     usaCancion, cargar, decodificar,
     // posición en la canción (s), con el loop aplicado
@@ -474,7 +474,7 @@ async function medirSiHaceFalta(j){
     const perfil = HypeAnalisis.analizar(b);
     const r = await fetch('/api/hype/cancion/perfil', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archivo: c.archivo, bytes: c.bytes, perfil }) });
     const k = await r.json(); if (k && k.result){ cfg = k.result; cancionOk = true; }
-  } catch (e) {} finally { midiendo = false; }
+  } catch (e) { console.warn('[Hype] No se pudo medir la canción:', e); } finally { midiendo = false; }
 }
 // Al abrir (o si OBS recarga la fuente) retoma un tren que ya estaba en marcha
 fetch('/api/hype', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
@@ -485,7 +485,7 @@ fetch('/api/hype', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
   if (e && e.fase !== 'fin' && e.expira > Date.now() + desfase){ est = e; mostrarHud(e); if (sonido.usaCancion() && cfg.musica !== false) sonido.empezarCancion().then(() => {}); else sonido.musica(e.nivel); }
 }).catch(() => {});
 const es = new EventSource('/events?overlay=1');
-es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'hype') recibir(m.payload); } catch (e) {} };
+es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'hype') recibir(m.payload); } catch (e) { console.warn('[Hype]', e); } };
 // Por si el tren vence sin aviso de "fin" (se cortó la conexión): se esconde solo
 setInterval(() => { if (est && est.fase !== 'fin' && est.expira && Date.now() + desfase > est.expira + 20000){ est = null; $('hud').classList.remove('on'); sonido.parar(); } }, 5000);
 </script>

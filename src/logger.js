@@ -44,7 +44,10 @@ const logger = {
     if (!clean) return;
     try {
       fs.appendFileSync(this.file, `[${stamp()}] ${tag}${clean}\n`);
-    } catch {}
+    } catch (err) {
+      // No se puede anotar en el archivo: al menos que quede en la consola original
+      this._orig.error?.('[Log] No se pudo escribir en', this.file, '-', err.message);
+    }
   },
 
   // Cierra el archivo actual (fin del stream). El siguiente mensaje abre uno nuevo.

@@ -57,7 +57,7 @@ class StreamElementsClient {
   stop() {
     this.stopped = true;
     clearTimeout(this.retryTimer);
-    try { this.ws?.close(); } catch {}
+    this.ws?.close();
     this.ws = null;
   }
 

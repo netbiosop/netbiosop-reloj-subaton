@@ -105,7 +105,9 @@
       master.gain.value = vol;
       master.connect(c.destination);
       fn(master, opts);
-    } catch {}
+    } catch (e) {
+      console.warn('[Sonidos]', event, e);
+    }
   }
 
   // Dibuja un sonido en cualquier AudioContext (lo usa la vista previa)
@@ -116,5 +118,5 @@
     SYNTH[event](master, opts);
   }
 
-  window.SubSounds = { play, renderTo, EVENTS, unlock: () => { try { ac(); } catch {} } };
+  window.SubSounds = { play, renderTo, EVENTS, unlock: () => { try { ac(); } catch (e) { console.warn('[Sonidos] Audio no disponible:', e); } } };
 })();

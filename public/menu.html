@@ -257,7 +257,7 @@ $('sumaTiempo').onchange = async ()=>{
 };
 $('btnApagar').onclick = async ()=>{
   if(!confirm('¿Apagar el reloj por completo?\n\nDeja de escuchar subs, bits y donaciones hasta que lo vuelvas a abrir con iniciar.bat.\n\nSi solo quieres parar todo pero seguir recibiendo aportes, usa "Pausar todo".')) return;
-  try{ await api('/api/shutdown','POST',{}); }catch(e){}
+  try{ await api('/api/shutdown','POST',{}); }catch(e){ /* el reloj se apaga antes de contestar */ }
   document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;text-align:center;color:#9a96ab;font:16px Inter,sans-serif"><div><div style="font-size:48px">⏹</div><p>Reloj apagado. Para volver a abrirlo usa <b>iniciar.bat</b>.</p></div></div>';
 };
 document.addEventListener('click', (ev)=>{
@@ -266,15 +266,13 @@ document.addEventListener('click', (ev)=>{
 });
 
 // eventos en vivo del reloj (y mantiene el reloj encendido mientras el menú está abierto)
-try{
-  const es = new EventSource('/events');
-  es.onmessage = (ev)=>{
-    const m = JSON.parse(ev.data);
-    if(m.type==='shutdown'){ es.close(); $('estadoTit').textContent='Reloj apagado'; return; }
-    if(m.type==='state'){ base = { at: Date.now(), ...m.payload }; if(M && m.payload.descanso!==M.descanso) cargar(); }
-    if(m.type==='log' || m.type==='connections' || m.type==='reset') cargar();
-  };
-}catch(e){}
+const es = new EventSource('/events');
+es.onmessage = (ev)=>{
+  const m = JSON.parse(ev.data);
+  if(m.type==='shutdown'){ es.close(); $('estadoTit').textContent='Reloj apagado'; return; }
+  if(m.type==='state'){ base = { at: Date.now(), ...m.payload }; if(M && m.payload.descanso!==M.descanso) cargar(); }
+  if(m.type==='log' || m.type==='connections' || m.type==='reset') cargar();
+};
 cargar();
 setInterval(cargar, 10000);
 

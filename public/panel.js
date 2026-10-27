@@ -498,13 +498,13 @@ function showShutdown(reason) {
   document.title = 'Reloj apagado';
   document.body.innerHTML = `<div class="off-page"><div><h1>Reloj apagado</h1><p>${reason ? reason + '. ' : ''}El tiempo quedó guardado.</p><p>Ya puedes cerrar esta pestaña. Para volver a encenderlo abre <b>iniciar.bat</b>: esta página se reconecta sola.</p></div></div>`;
   // Intenta cerrar la pestaña (el navegador lo permite si se abrió desde iniciar.bat y no navegaste)
-  setTimeout(() => { try { window.close(); } catch {} }, 1200);
+  setTimeout(() => window.close(), 1200);
   // Si el reloj vuelve a encenderse, esta pestaña se recarga sola
   const back = async () => {
     try {
       const r = await fetch('/api/version', { cache: 'no-store' });
       if (r.ok) return location.reload();
-    } catch {}
+    } catch { /* sigue apagado: se reintenta */ }
     setTimeout(back, 1500);
   };
   setTimeout(back, 1500);

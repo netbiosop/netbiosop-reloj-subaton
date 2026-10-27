@@ -50,7 +50,6 @@ const CATS = {
   bits:  {nombre:'Bits',           fmt:v=>Number(v).toLocaleString('es')+' bits'}
 };
 const ORDEN = ['dinero','subs','bits'];
-const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 const params = new URLSearchParams(location.search);
 const escala = parseFloat(params.get('escala'));
