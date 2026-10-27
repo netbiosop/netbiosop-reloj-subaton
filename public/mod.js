@@ -255,7 +255,7 @@ function applyPerms() {
   $('#meName').textContent = data.me.name;
 }
 $('#btnLogout').onclick = async () => {
-  await api('POST', '/api/logout').catch(() => {});
+  await api('POST', '/api/logout').catch((err) => console.warn('[Salir]', err));
   location.href = '/login';
 };
 
@@ -296,7 +296,7 @@ function connect() {
       $('#log').prepend(logItem(payload, true));
       if (!payload.test && payload.source !== 'manual') {
         data.totalAdded += payload.seconds || 0;
-        if (data.stats) api('GET', '/api/mod/data').then((r) => { data.stats = r.stats; renderStats(); }).catch(() => {});
+        if (data.stats) api('GET', '/api/mod/data').then((r) => { data.stats = r.stats; renderStats(); }).catch((err) => console.warn('[Estadísticas]', err));
       }
       $('#totalAdded').textContent = fmtDur(data.totalAdded);
     } else if (type === 'multiplier') {
@@ -309,13 +309,13 @@ function connect() {
   // Si el dueño cambió los permisos, la conexión se reinicia: se vuelven a cargar los datos
   let dropped = false;
   es.onopen = () => {
-    if (dropped) load().catch(() => {});
+    if (dropped) load().catch((err) => console.warn('[Recarga]', err));
     dropped = false;
   };
   es.onerror = () => {
     dropped = true;
     // Si el dueño quitó el acceso, la próxima petición lleva a la pantalla de entrada
-    fetch('/api/mod/data', { cache: 'no-store' }).then((r) => r.status === 401 && (location.href = '/login')).catch(() => {});
+    fetch('/api/mod/data', { cache: 'no-store' }).then((r) => r.status === 401 && (location.href = '/login')).catch(() => {}); /* sin conexión: el EventSource reintenta solo */
   };
 }
 load().then(connect).catch((e) => toast('No se pudo cargar: ' + e.message, true));

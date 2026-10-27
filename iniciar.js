@@ -35,15 +35,19 @@ async function killStale() {
   let pid;
   try { pid = Number(fs.readFileSync(PID_FILE, 'utf8').trim()); } catch { return false; }
   if (!pid || pid === process.pid) return false;
-  try { process.kill(pid, 0); } catch { try { fs.unlinkSync(PID_FILE); } catch {} return false; }
+  // kill(pid, 0) solo pregunta si el proceso existe; si no existe, el archivo quedó viejo
+  try { process.kill(pid, 0); } catch {
+    try { fs.rmSync(PID_FILE, { force: true }); } catch (e) { console.warn('  (No se pudo borrar ' + PID_FILE + ': ' + e.message + ')'); }
+    return false;
+  }
   if (!(await portBusy())) return false; // el número existe pero no es el reloj: no se toca
   console.log(`  Cerrando un reloj anterior que no respondía (proceso ${pid})…`);
-  try { process.kill(pid); } catch {}
+  try { process.kill(pid); } catch { /* ya terminó solo */ }
   for (let i = 0; i < 20; i++) {
     await wait(250);
     if (!(await portBusy())) return true;
   }
-  try { process.kill(pid, 'SIGKILL'); } catch {}
+  try { process.kill(pid, 'SIGKILL'); } catch { /* ya terminó solo */ }
   await wait(500);
   return !(await portBusy());
 }
@@ -73,7 +77,7 @@ async function probe() {
 async function shutdown() {
   try {
     await fetch(BASE + '/api/shutdown', { method: 'POST', signal: AbortSignal.timeout(3000) });
-  } catch {}
+  } catch { /* el reloj corta la conexión al apagarse; abajo se confirma que cerró */ }
   for (let i = 0; i < 40; i++) {
     if (!(await probe())) return true;
     await wait(250);

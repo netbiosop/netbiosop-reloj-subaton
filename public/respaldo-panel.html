@@ -107,7 +107,7 @@ async function cargar(){ try { pintar(await api('/api/respaldo')); } catch(e){ n
 $('ahora').onclick = async ()=>{ try { const j = await api('/api/respaldo/ahora','POST',{}); pintar(j.result); nota($('nota'),'✔ Copia guardada','ok'); } catch(e){ nota($('nota'), e.message, 'mal'); } };
 $('on').onchange = async ()=>{ try { pintar((await api('/api/respaldo/config','POST',{ on: $('on').checked })).result); nota($('nota'), $('on').checked ? '✔ Copias automáticas activadas' : 'Copias automáticas apagadas', $('on').checked ? 'ok' : 'mal'); } catch(e){ nota($('nota'), e.message, 'mal'); } };
 $('guardar').onclick = async ()=>{ try { pintar((await api('/api/respaldo/config','POST',{ carpeta: $('carpeta').value, extra: $('extra').value })).result); nota($('notaC'),'✔ Carpetas guardadas','ok'); } catch(e){ nota($('notaC'), e.message, 'mal'); } };
-$('abrir').onclick = ()=> api('/api/respaldo/abrir','POST',{}).catch(()=>{});
+$('abrir').onclick = ()=> api('/api/respaldo/abrir','POST',{}).catch((e)=>console.warn('[Respaldo]', e));
 $('lista').onclick = async (e)=>{
   const b = e.target.closest('[data-r]'); if(!b) return;
   if (!confirm('¿Volver a la copia del ' + fecha(b.dataset.r) + '?\nSe reemplazan los datos actuales y el reloj se reinicia.')) return;

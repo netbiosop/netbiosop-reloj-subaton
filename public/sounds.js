@@ -16,7 +16,7 @@
   let ctx = null;
   const ac = () => {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {}); /* el navegador bloquea el audio hasta que hay un clic */
     return ctx;
   };
 
@@ -94,7 +94,7 @@
     if (file) {
       const a = new Audio((opts.base || '/sonidos/') + encodeURIComponent(file));
       a.volume = vol;
-      a.play().catch(() => {});
+      a.play().catch(() => {}); /* el navegador bloquea el audio hasta que hay un clic */
       return;
     }
     const fn = SYNTH[event];
@@ -105,7 +105,9 @@
       master.gain.value = vol;
       master.connect(c.destination);
       fn(master, opts);
-    } catch {}
+    } catch (e) {
+      console.warn('[Sonidos]', event, e);
+    }
   }
 
   // Dibuja un sonido en cualquier AudioContext (lo usa la vista previa)
@@ -116,5 +118,5 @@
     SYNTH[event](master, opts);
   }
 
-  window.SubSounds = { play, renderTo, EVENTS, unlock: () => { try { ac(); } catch {} } };
+  window.SubSounds = { play, renderTo, EVENTS, unlock: () => { try { ac(); } catch (e) { console.warn('[Sonidos] Audio no disponible:', e); } } };
 })();

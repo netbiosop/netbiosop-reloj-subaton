@@ -126,7 +126,10 @@ class MercadoPagoClient {
     this.vistos.add(String(p.id));
     // la búsqueda de pagos a veces viene sin el nombre: se pide el pago completo
     let nombre = this.nombreDe(p);
-    if (!nombre) { try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); nombre = this.nombreDe(full); p = { ...p, ...full }; } catch {} }
+    if (!nombre) {
+      try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); nombre = this.nombreDe(full); p = { ...p, ...full }; }
+      catch (err) { console.warn(`[Mercado Pago] No se pudo pedir el pago ${p.id} completo:`, err.message); }
+    }
     const pk = this.clave(p);
     // si en el motivo de la transferencia escribió su usuario de Twitch (@usuario), se usa ese
     const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/@([A-Za-z0-9_]{3,25})/);
@@ -157,7 +160,7 @@ class MercadoPagoClient {
 
   async handleWebhook(query, headers, rawBody) {
     let body = {};
-    try { body = JSON.parse(rawBody || '{}'); } catch {}
+    try { body = JSON.parse(rawBody || '{}'); } catch { /* Mercado Pago también manda tipo e id en la URL */ }
     const type = body.type || query.type || query.topic;
     const id = query['data.id'] || body.data?.id || query.id;
     if (type !== 'payment' || !id) return { ignored: `Aviso de tipo ${type || '?'} ignorado` };

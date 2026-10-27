@@ -389,8 +389,8 @@
     // Recordar si "Probar" quedó abierto u oculto (cerrado por defecto)
     (function(){
       const d = document.getElementById('simDet');
-      try { d.open = localStorage.getItem('probarAbierto') === '1'; } catch (e) {}
-      d.addEventListener('toggle', () => { try { localStorage.setItem('probarAbierto', d.open ? '1' : '0'); } catch (e) {} });
+      try { d.open = localStorage.getItem('probarAbierto') === '1'; } catch (e) { /* sin localStorage queda cerrado */ }
+      d.addEventListener('toggle', () => { try { localStorage.setItem('probarAbierto', d.open ? '1' : '0'); } catch (e) { /* ídem */ } });
     })();
   </script>
 </main>
