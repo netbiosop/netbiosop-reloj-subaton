@@ -67,10 +67,9 @@ module.exports = [
     nombre: 'Mensajes automáticos',
     icono: '💬',
     color: '#5ab0ff',
-    desc: 'Mensajes con emotes que se escriben solos en tu chat cada X minutos. Se prenden y apagan con un botón.',
+    desc: 'Un mensaje con emotes en tu chat cada 10 minutos. Se prende con "activar bot" en el chat o con el botón del panel.',
     panel: '/automensajes-panel',
     overlays: [],
-    oculto: true, // no sale en el menú: se activa desde el chat ("activar bot") y el panel se abre en /automensajes-panel
   },
   {
     id: 'respaldo',

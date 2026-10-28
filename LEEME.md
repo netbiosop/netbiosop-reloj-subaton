@@ -174,7 +174,7 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 
 ## 💬 Mensajes automáticos en el chat (bot)
 
-No aparece en el menú. Se prende y se apaga **desde el chat de Twitch**:
+Menú → **💬 Mensajes automáticos**. Se prende y se apaga **desde el chat de Twitch** (o con el botón del panel):
 
 - `activar bot` → empieza a mandar un mensaje **cada 10 minutos**, de a uno y en orden (rotando).
 - `desactivar bot` → deja de mandarlos.
@@ -182,7 +182,7 @@ No aparece en el menú. Se prende y se apaga **desde el chat de Twitch**:
 - Solo manda mensajes con el stream en vivo y nunca durante el descanso.
 - Los mensajes salen desde tu cuenta de Twitch. Si no escribe nada, en Configuración pulsa Desconectar y vuelve a Conectar con Twitch.
 
-**Editar los mensajes:** abre a mano la dirección `http://localhost:3000/automensajes-panel` (con el puerto de tu reloj). Ahí agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
+**Editar los mensajes:** en el panel agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
 
 ## 🔄 Actualizaciones automáticas
 
