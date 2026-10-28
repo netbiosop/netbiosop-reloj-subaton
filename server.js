@@ -22,6 +22,7 @@ const { MercadoPagoClient } = require('./src/mercadopago');
 const { StreamElementsClient } = require('./src/streamelements');
 const paypal = require('./src/paypal');
 const { createCommands } = require('./src/commands');
+const automensajes = require('./src/automensajes');
 const { createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
@@ -185,7 +186,7 @@ const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
   onContribution,
-  onChat: (e) => commands.handle(e).catch((err) => console.error('[Chat]', err.message)),
+  onChat: (e) => { automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
   onStream: (isLive, initial) => onStream(isLive, initial),
   onStatus: sendConnections,
   onHype: (fase, e, desfase) => onHype(fase, e, desfase),
@@ -764,7 +765,7 @@ app.get('/api/menu', (req, res) => {
       { nombre: 'PayPal', estado: pp, detalle: c.streamelements.status === 'conectado' ? 'vía StreamElements' : c.paypal.last ? 'avisos directos' : 'sin conectar' },
       { nombre: 'Mercado Pago', estado: okStatus(c.mercadopago.status), detalle: c.mercadopago.status },
     ],
-    modulos: MODULOS,
+    modulos: MODULOS.filter((m) => !m.oculto),
     metas: p.metas,
     mes: p.mes,
     ultimos: d.log.filter((e) => e.source !== 'manual').slice(0, 8).map((e) => ({ at: e.at, source: e.source, text: e.text, seconds: e.seconds, test: !!e.test, note: e.note })),
@@ -820,6 +821,21 @@ app.get('/api/codigo/estado', (req, res) => res.json({ ...codigo.publicData(), p
 app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
 setInterval(() => intentar('Código', () => codigo.tick(broadcast, codigoCtx())), 5000);
+
+// ---------- Mensajes automáticos en el chat ----------
+const autoCtx = () => ({
+  live: !!stream.live, descanso: !!d.settings.descanso,
+  puedeChat: () => !!twitch.chatOk,
+  enviar: (texto, responderA) => twitch.sendChat(texto, responderA),
+  tiempo: () => fmtDuration(timer.remainingMs / 1000),
+  canal: () => d.secrets?.twitch?.login || '',
+});
+app.get('/api/automensajes', (req, res) => res.json(automensajes.estado(autoCtx())));
+app.post('/api/automensajes/config', podioRoute((req) => automensajes.setConfig(req.body)));
+app.post('/api/automensajes/enviar', async (req, res) => {
+  try { ok(res, { result: await automensajes.enviarAhora(String(req.body.id || ''), autoCtx()) }); } catch (err) { res.json({ error: err.message }, 400); }
+});
+setInterval(() => { automensajes.tick(autoCtx()).catch((e) => console.error('[Automensajes]', e.message)); }, 10000);
 
 // ---------- Tren del hype ----------
 const hype = require('./src/hype');
@@ -978,6 +994,7 @@ function guardarTodo() {
   podio.saveNow();
   codigo.save();
   hype.save();
+  automensajes.save();
 }
 
 // Lo que comparten reiniciar y apagar: guardar todo, soltar las conexiones y liberar los puertos

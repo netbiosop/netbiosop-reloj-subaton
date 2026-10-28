@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mensajes automáticos · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#5ab0ff;--ok:#3ddc97;--bad:#ff5d73;--warn:#ffb547;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  header .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;padding:16px 20px 40px;max-width:1200px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  h2 .r{margin-left:auto}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input,button,textarea{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input[type=number]{width:90px}
+  input[type=checkbox]{accent-color:var(--accent);transform:scale(1.15)}
+  textarea{width:100%;resize:vertical;min-height:58px}
+  button,.btn{cursor:pointer;background:var(--card2);text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  .sm{padding:4px 9px;font-size:12px}
+  .check{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--text);font-size:13px;cursor:pointer}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .nota.ok{color:var(--ok)} .nota.mal{color:var(--bad)}
+  .fila{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
+  /* interruptor grande */
+  .switch{display:inline-flex;align-items:center;gap:10px;padding:8px 16px;border-radius:999px;font-weight:700;border:2px solid var(--line);background:#0f0e14}
+  .switch .bola{width:38px;height:22px;border-radius:999px;background:#3a3548;position:relative;transition:.2s}
+  .switch .bola::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+  .switch.on{border-color:var(--ok);color:var(--ok)}
+  .switch.on .bola{background:var(--ok)} .switch.on .bola::after{left:19px}
+  .estado{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:#0f0e14;border:1px solid var(--line);font-weight:600}
+  .estado i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .estado.activo i{background:var(--ok);box-shadow:0 0 8px var(--ok)} .estado.alerta i{background:var(--warn)} .estado.mal i{background:var(--bad)}
+  /* barra de emotes */
+  .emotes{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .emotes button{padding:4px 8px;font-size:13px}
+  .emotes .var{color:#9ff0c8;font-family:ui-monospace,monospace;font-size:12px}
+  /* mensajes */
+  .msg{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2);margin-bottom:10px}
+  .msg.apagado{opacity:.55}
+  .msg .lado{display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:170px}
+  .msg .cada{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+  .msg .cada input{width:70px}
+  .msg .cont{font-size:11px;color:var(--muted);text-align:right}
+  .msg .prox{font-size:12px;color:var(--accent);font-weight:600}
+  .peligro:hover{border-color:var(--bad)}
+  .agregar{width:100%;justify-content:center;border-style:dashed;padding:12px}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
+  ul{margin:6px 0 0;padding-left:18px} li{margin:4px 0}
+  @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .msg{grid-template-columns:auto 1fr} .msg .lado{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center;min-width:0} }
+</style>
+</head>
+<body>
+<header>
+  <h1>💬 Mensajes automáticos</h1>
+  <button class="switch" id="on"><span class="bola"></span><span id="onTxt">Apagado</span></button>
+  <span class="sp"></span>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card">
+    <h2>Estado</h2>
+    <span class="estado" id="estado"><i></i><span id="estadoTxt">…</span></span>
+    <div class="nota" id="estadoNota"></div>
+    <div class="nota" style="margin-top:12px">Se prende y se apaga desde el chat: <code>activar bot</code> · <code>desactivar bot</code></div>
+    <label>Quiénes pueden activarlo (además de ti)</label>
+    <input type="text" id="quienes" style="width:100%" placeholder="nephallems">
+    <div class="fila">
+      <div><label>Un mensaje cada (min)</label><input type="number" id="cadaMin" min="1" max="240"></div>
+      <div><label>Esperar mensajes del chat</label><input type="number" id="minChat" min="0" max="100"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="soloEnVivo"> Solo cuando estoy en vivo</label>
+    <div class="nota">Los mensajes salen de a uno y en orden, rotando. "Esperar mensajes del chat": 0 = salen justo cada X minutos; con un número, esperan a que otras personas escriban esa cantidad. Durante el descanso no sale ninguno.</div>
+  </section>
+
+  <section class="card">
+    <h2>Emotes y datos</h2>
+    <div class="nota" style="margin-top:0">Toca uno y se agrega donde estabas escribiendo.</div>
+    <label>Emojis</label>
+    <div class="emotes" id="emojis"></div>
+    <label>Emotes de Twitch (globales)</label>
+    <div class="emotes" id="globales"></div>
+    <label>Datos que se completan solos</label>
+    <div class="emotes" id="vars"></div>
+    <div class="nota">Tus emotes del canal: escribe su código tal cual, por ejemplo <code>bytedeHype</code>. Para que Twitch los muestre como imagen, deja un espacio antes y después.</div>
+  </section>
+
+  <section class="card ancho">
+    <h2>Mensajes <span class="nota r" id="guardado" style="margin:0"></span></h2>
+    <div id="lista"></div>
+    <button class="agregar" id="agregar">＋ Agregar mensaje</button>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const EMOJIS = ['💜','🔥','🎉','⏱','⭐','🚂','👋','🙏','💸','🎁','💎','😂','😎','🤖','🎮','📢','✅','❤️'];
+const GLOBALES = ['Kappa','PogChamp','LUL','HeyGuys','<3','SeemsGood','Kreygasm','BibleThump','CoolCat','VoteYea','KomodoHype','GlitchCat','TwitchUnity','DinoDance','PopNemo'];
+const VARS = [['{tiempo}','tiempo que queda en el reloj'],['{canal}','tu canal']];
+
+let cfg = null, ultimoCampo = null, timerGuardar = null;
+
+function insertar(txt){
+  const t = ultimoCampo && document.body.contains(ultimoCampo) ? ultimoCampo : document.querySelector('#lista textarea');
+  if (!t) return;
+  const a = t.selectionStart ?? t.value.length, b = t.selectionEnd ?? a;
+  const antes = t.value.slice(0, a), despues = t.value.slice(b);
+  const pre = antes && !/\s$/.test(antes) ? ' ' : '', post = despues && !/^\s/.test(despues) ? ' ' : (despues ? '' : ' ');
+  t.value = antes + pre + txt + post + despues;
+  const pos = (antes + pre + txt + post).length;
+  t.focus(); t.setSelectionRange(pos, pos);
+  t.dispatchEvent(new Event('input', { bubbles: true }));
+}
+$('emojis').innerHTML = EMOJIS.map((e) => `<button type="button" data-ins="${e}">${e}</button>`).join('');
+$('globales').innerHTML = GLOBALES.map((e) => `<button type="button" data-ins="${esc(e)}">${esc(e)}</button>`).join('');
+$('vars').innerHTML = VARS.map(([v, d]) => `<button type="button" data-ins="${v}" title="${d}"><span class="var">${v}</span> ${d}</button>`).join('');
+document.addEventListener('mousedown', (e) => { if (e.target.closest('[data-ins]')) e.preventDefault(); }); // no perder el cursor del texto
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-ins]'); if (b) insertar(b.dataset.ins); });
+document.addEventListener('focusin', (e) => { if (e.target.matches('#lista textarea')) ultimoCampo = e.target; });
+
+const mmss = (s) => s >= 3600 ? `${Math.floor(s/3600)} h ${Math.floor(s%3600/60)} min` : s >= 60 ? `${Math.floor(s/60)} min ${String(s%60).padStart(2,'0')} s` : `${s} s`;
+
+function pintarLista(){
+  $('lista').innerHTML = cfg.mensajes.map((m) => `
+    <div class="msg ${m.on ? '' : 'apagado'}" data-id="${m.id}">
+      <input type="checkbox" data-k="on" ${m.on ? 'checked' : ''} title="Prender o apagar este mensaje" style="margin-top:10px">
+      <div>
+        <textarea data-k="texto" maxlength="450" placeholder="Escribe el mensaje… (puedes usar emotes y {tiempo})">${esc(m.texto)}</textarea>
+        <div class="cont"><span data-cont>${m.texto.length}</span>/450</div>
+      </div>
+      <div class="lado">
+        <div class="prox" data-prox></div>
+        <div style="display:flex;gap:6px">
+          <button class="sm" data-enviar title="Lo manda ya al chat">📤 Enviar ahora</button>
+          <button class="sm peligro" data-borrar title="Borrar este mensaje">🗑</button>
+        </div>
+        <div class="nota" data-nota style="margin:0"></div>
+      </div>
+    </div>`).join('') || '<div class="nota">No hay mensajes. Toca "Agregar mensaje".</div>';
+}
+function pintarGeneral(){
+  $('on').classList.toggle('on', cfg.on); $('onTxt').textContent = cfg.on ? 'Prendido' : 'Apagado';
+  $('soloEnVivo').checked = cfg.soloEnVivo;
+  if (document.activeElement !== $('minChat')) $('minChat').value = cfg.minChat;
+  if (document.activeElement !== $('cadaMin')) $('cadaMin').value = cfg.cadaMin;
+  if (document.activeElement !== $('quienes')) $('quienes').value = cfg.quienes.join(', ');
+}
+function pintarEstado(j){
+  const e = $('estado');
+  e.className = 'estado ' + (j.motivo === 'activo' ? 'activo' : j.motivo === 'sin permiso de chat' ? 'mal' : j.motivo === 'apagado' ? '' : 'alerta');
+  const txt = { activo: 'Funcionando', apagado: 'Apagado', 'sin permiso de chat': 'Sin permiso para escribir en el chat' }[j.motivo] || j.motivo[0].toUpperCase() + j.motivo.slice(1);
+  $('estadoTxt').textContent = txt;
+  $('estadoNota').textContent = j.motivo === 'sin permiso de chat' ? 'Ve a Configuración → Conexiones → Twitch: pulsa Desconectar y vuelve a Conectar.'
+    : j.motivo === 'activo' && j.faltanLineas > 0 ? `Esperando que el chat escriba ${j.faltanLineas} mensaje${j.faltanLineas > 1 ? 's' : ''} más antes del próximo.`
+    : j.motivo === 'activo' ? 'El chat está activo: sale el próximo cuando le toque.' : '';
+  document.querySelectorAll('.msg').forEach((el) => {
+    const s = el.dataset.id === j.proximoId ? j.proximoEnSeg : null;
+    el.querySelector('[data-prox]').textContent = s == null ? '' : s === 0 ? 'listo para salir' : 'es el próximo · sale en ' + mmss(s);
+  });
+}
+
+function leerLista(){
+  return [...document.querySelectorAll('.msg')].map((el) => ({
+    id: el.dataset.id,
+    on: el.querySelector('[data-k=on]').checked,
+    texto: el.querySelector('[data-k=texto]').value,
+  }));
+}
+async function guardar(cambios){
+  try {
+    const j = await api('/api/automensajes/config', 'POST', cambios);
+    const lista = !!cambios.mensajes;
+    cfg = j.result; pintarGeneral();
+    if (lista && cfg.mensajes.length !== document.querySelectorAll('.msg').length) pintarLista();
+    $('guardado').textContent = '✔ Guardado'; $('guardado').className = 'nota r ok';
+    cargarEstado();
+  } catch (e) { $('guardado').textContent = e.message; $('guardado').className = 'nota r mal'; }
+}
+function guardarLuego(){ $('guardado').textContent = 'Guardando…'; $('guardado').className = 'nota r'; clearTimeout(timerGuardar); timerGuardar = setTimeout(() => guardar({ mensajes: leerLista() }), 700); }
+
+$('lista').addEventListener('input', (e) => {
+  const m = e.target.closest('.msg'); if (!m) return;
+  if (e.target.dataset.k === 'texto') m.querySelector('[data-cont]').textContent = e.target.value.length;
+  if (e.target.dataset.k === 'on') m.classList.toggle('apagado', !e.target.checked);
+  guardarLuego();
+});
+$('lista').addEventListener('click', async (e) => {
+  const m = e.target.closest('.msg'); if (!m) return;
+  if (e.target.closest('[data-borrar]')) {
+    if (m.querySelector('textarea').value.trim() && !confirm('¿Borrar este mensaje?')) return;
+    m.remove(); clearTimeout(timerGuardar); await guardar({ mensajes: leerLista() }); if (!cfg.mensajes.length) pintarLista();
+  }
+  const b = e.target.closest('[data-enviar]');
+  if (b) {
+    const nota = m.querySelector('[data-nota]');
+    clearTimeout(timerGuardar); await guardar({ mensajes: leerLista() });
+    b.disabled = true; nota.textContent = 'Enviando…'; nota.className = 'nota';
+    try { await api('/api/automensajes/enviar', 'POST', { id: m.dataset.id }); nota.textContent = '✔ Enviado al chat'; nota.className = 'nota ok'; }
+    catch (err) { nota.textContent = err.message; nota.className = 'nota mal'; }
+    b.disabled = false; cargarEstado();
+  }
+});
+$('agregar').onclick = () => {
+  cfg.mensajes = leerLista();
+  cfg.mensajes.push({ id: 'm' + Date.now().toString(36), texto: '', on: true });
+  pintarLista();
+  const t = [...document.querySelectorAll('#lista textarea')].pop(); t.focus(); ultimoCampo = t;
+};
+$('on').onclick = () => guardar({ on: !cfg.on });
+$('soloEnVivo').onchange = () => guardar({ soloEnVivo: $('soloEnVivo').checked });
+$('minChat').onchange = () => guardar({ minChat: Number($('minChat').value) });
+$('cadaMin').onchange = () => guardar({ cadaMin: Number($('cadaMin').value) });
+$('quienes').onchange = () => guardar({ quienes: $('quienes').value });
+
+async function cargarEstado(){ try { pintarEstado(await api('/api/automensajes')); } catch {} }
+(async () => {
+  const j = await api('/api/automensajes');
+  cfg = j.config; pintarGeneral(); pintarLista(); pintarEstado(j);
+  setInterval(cargarEstado, 5000);
+})();
+</script>
+</body>
+</html>

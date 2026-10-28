@@ -172,6 +172,18 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
+## 💬 Mensajes automáticos en el chat (bot)
+
+No aparece en el menú. Se prende y se apaga **desde el chat de Twitch**:
+
+- `activar bot` → empieza a mandar un mensaje **cada 10 minutos**, de a uno y en orden (rotando).
+- `desactivar bot` → deja de mandarlos.
+- Solo pueden hacerlo **Nephallems** y tú (el dueño del canal). El bot responde en el chat para confirmar.
+- Solo manda mensajes con el stream en vivo y nunca durante el descanso.
+- Los mensajes salen desde tu cuenta de Twitch. Si no escribe nada, en Configuración pulsa Desconectar y vuelve a Conectar con Twitch.
+
+**Editar los mensajes:** abre a mano la dirección `http://localhost:3000/automensajes-panel` (con el puerto de tu reloj). Ahí agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
+
 ## 🔄 Actualizaciones automáticas
 
 El reloj se actualiza solo desde GitHub: [github.com/netbiosop/netbiosop-reloj-subaton](https://github.com/netbiosop/netbiosop-reloj-subaton).

@@ -130,16 +130,20 @@ class TwitchClient {
   }
 
   async sendChat(message, replyTo) {
-    if (!this.chatOk) return;
+    if (!this.chatOk) return false;
     try {
-      await this.helix('POST', '/chat/messages', {
+      const r = await this.helix('POST', '/chat/messages', {
         broadcaster_id: this.s.userId,
         sender_id: this.s.userId,
         message: message.slice(0, 450),
         ...(replyTo ? { reply_parent_message_id: replyTo } : {}),
       });
+      const enviado = r.data?.[0];
+      if (enviado && enviado.is_sent === false) { console.error('[Twitch] El chat no aceptó el mensaje:', enviado.drop_reason?.message || 'sin motivo'); return false; }
+      return true;
     } catch (err) {
-      console.error('[Twitch] No se pudo responder en el chat:', err.message);
+      console.error('[Twitch] No se pudo escribir en el chat:', err.message);
+      return false;
     }
   }
 
