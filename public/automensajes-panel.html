@@ -47,14 +47,11 @@
   .msg{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2);margin-bottom:10px}
   .msg.apagado{opacity:.55}
   .msg .lado{display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:170px}
-  .msg .cada{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
-  .msg .cada input{width:70px}
   .msg .cont{font-size:11px;color:var(--muted);text-align:right}
   .msg .prox{font-size:12px;color:var(--accent);font-weight:600}
   .peligro:hover{border-color:var(--bad)}
   .agregar{width:100%;justify-content:center;border-style:dashed;padding:12px}
   code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
-  ul{margin:6px 0 0;padding-left:18px} li{margin:4px 0}
   @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .msg{grid-template-columns:auto 1fr} .msg .lado{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center;min-width:0} }
 </style>
 </head>
@@ -227,7 +224,10 @@ $('minChat').onchange = () => guardar({ minChat: Number($('minChat').value) });
 $('cadaMin').onchange = () => guardar({ cadaMin: Number($('cadaMin').value) });
 $('quienes').onchange = () => guardar({ quienes: $('quienes').value });
 
-async function cargarEstado(){ try { pintarEstado(await api('/api/automensajes')); } catch {} }
+async function cargarEstado(){
+  try { pintarEstado(await api('/api/automensajes')); }
+  catch (e) { $('estado').className = 'estado mal'; $('estadoTxt').textContent = 'Sin conexión con el reloj'; $('estadoNota').textContent = e.message; }
+}
 (async () => {
   const j = await api('/api/automensajes');
   cfg = j.config; pintarGeneral(); pintarLista(); pintarEstado(j);

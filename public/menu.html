@@ -279,7 +279,7 @@ setInterval(cargar, 10000);
 // ---------- Actualizaciones ----------
 let ACT = null, nueva = null;
 async function cargarAct(){
-  try { ACT = await api('/api/actualizar'); } catch(e){ return; }
+  try { ACT = await api('/api/actualizar'); } catch(e){ $('actEstado').textContent = '· no se pudo revisar'; console.warn('[Actualización]', e); return; }
   $('actVersion').textContent = 'Versión ' + ACT.version;
   $('actAuto').checked = ACT.auto;
   const m = ACT.marca;
