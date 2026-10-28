@@ -40,7 +40,7 @@ const valido = (f) => leeJSON(f) !== null;
 
 function copias(base) {
   try {
-    return fs.readdirSync(base).filter((n) => /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d/.test(n))
+    return fs.readdirSync(base).filter((n) => /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d$/.test(n))
       .filter((n) => stat(path.join(base, n))?.isDirectory())
       .sort().reverse();
   } catch (e) {
