@@ -89,7 +89,7 @@ async function instalar(info, log = console.log) {
     if (LANZADORES.has(rel) && process.platform === 'win32') { lanzadoresPendientes.push(rel); continue; }
     const dest = path.join(RAIZ, rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    try { fs.chmodSync(dest, 0o644); } catch {}
+    if (fs.existsSync(dest)) fs.chmodSync(dest, 0o644); // por si quedó de solo lectura
     fs.copyFileSync(path.join(TMP, rel), dest);
   }
   if (lanzadoresPendientes.length) {
@@ -98,8 +98,10 @@ async function instalar(info, log = console.log) {
     spawn('cmd.exe', ['/c', `ping -n 6 127.0.0.1 >nul & ${cmds}`], { detached: true, windowsHide: true, stdio: 'ignore' }).unref();
   } else fs.rmSync(TMP, { recursive: true, force: true });
 
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MARCA, JSON.stringify({ de, a: info.version, at: Date.now(), notas: info.notas, archivos: cambiados.length, visto: false }, null, 2)); } catch {}
-  try { fs.mkdirSync(path.join(RAIZ, 'logs'), { recursive: true }); fs.appendFileSync(path.join(RAIZ, 'logs', 'actualizaciones.txt'), `[${new Date().toLocaleString('es')}] ${de} → ${info.version} (${cambiados.length} archivos)\r\n${info.notas ? info.notas.replace(/\n/g, '\r\n') + '\r\n' : ''}\r\n`); } catch {}
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MARCA, JSON.stringify({ de, a: info.version, at: Date.now(), notas: info.notas, archivos: cambiados.length, visto: false }, null, 2)); }
+  catch (e) { console.warn('[Actualizador] No se pudo guardar el aviso de la actualización:', e.message); }
+  try { fs.mkdirSync(path.join(RAIZ, 'logs'), { recursive: true }); fs.appendFileSync(path.join(RAIZ, 'logs', 'actualizaciones.txt'), `[${new Date().toLocaleString('es')}] ${de} → ${info.version} (${cambiados.length} archivos)\r\n${info.notas ? info.notas.replace(/\n/g, '\r\n') + '\r\n' : ''}\r\n`); }
+  catch (e) { console.warn('[Actualizador] No se pudo anotar en actualizaciones.txt:', e.message); }
   return { de, a: info.version, archivos: cambiados.length };
 }
 
@@ -111,7 +113,7 @@ async function alAbrir(log = console.log, forzar = false) {
   if (!info || !info.nueva) return null;
   log(`  ⬆️  Hay una versión nueva: ${info.version} (tienes ${versionLocal()}). Actualizando…`);
   // copia de seguridad de los datos antes de actualizar (por las dudas; los datos no se tocan)
-  try { require('./respaldo').respaldar('antes de actualizar', true); } catch {}
+  try { require('./respaldo').respaldar('antes de actualizar', true); } catch (e) { log('  ⚠️ No se pudo hacer la copia de seguridad previa: ' + e.message); }
   try {
     const r = await instalar(info, log);
     log(`  ✅ Actualizado a la versión ${r.a} (${r.archivos} archivos). Tus datos quedaron igual.`);
@@ -124,6 +126,10 @@ async function alAbrir(log = console.log, forzar = false) {
 }
 
 function marca() { try { return JSON.parse(fs.readFileSync(MARCA, 'utf8')); } catch { return null; } }
-function marcarVisto() { const m = marca(); if (m) { m.visto = true; try { fs.writeFileSync(MARCA, JSON.stringify(m, null, 2)); } catch {} } }
+function marcarVisto() {
+  const m = marca(); if (!m) return;
+  m.visto = true;
+  try { fs.writeFileSync(MARCA, JSON.stringify(m, null, 2)); } catch (e) { console.warn('[Actualizador] No se pudo marcar el aviso como visto:', e.message); }
+}
 
 module.exports = { REPO, buscar, instalar, alAbrir, marca, marcarVisto, versionLocal, masNueva, protegido };

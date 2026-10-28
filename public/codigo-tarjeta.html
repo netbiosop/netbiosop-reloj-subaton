@@ -137,11 +137,11 @@ async function mostrar(durSeg){
   card.classList.remove('entra'); replay(card, 'sale');
 }
 async function cargar(){
-  try { cfg = (await (await fetch('/api/codigo', { cache: 'no-store' })).json()).config; } catch (e) {}
+  try { cfg = (await (await fetch('/api/codigo', { cache: 'no-store' })).json()).config; } catch (e) { console.warn('[Código] No se pudo leer la configuración:', e); }
 }
 cargar(); setInterval(cargar, 15000);
 const es = new EventSource('/events?overlay=1');
-es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'codigo' && m.payload.que === 'tarjeta'){ cfg = m.payload.config; mostrar(m.payload.dur); } } catch (e) {} };
+es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'codigo' && m.payload.que === 'tarjeta'){ cfg = m.payload.config; mostrar(m.payload.dur); } } catch (e) { console.warn('[Código]', e); } };
 if (params.get('demo')) document.fonts.ready.then(async () => { await cargar(); const ciclo = () => mostrar(cfg.tarjeta.duracionSeg); ciclo(); setInterval(ciclo, (cfg.tarjeta.duracionSeg + 3) * 1000); });
 </script>
 </body>

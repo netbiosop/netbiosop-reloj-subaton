@@ -115,14 +115,12 @@ document.fonts.ready.then(encajarTodos);
 // Cuando pasa la cinta de noticias del código de creador (que va abajo), los reyes se esconden y vuelven después
 const wrapEl = document.getElementById('wrap'); let timerCinta = null;
 wrapEl.style.transition = 'opacity .5s, transform .5s';
-try {
-  const es = new EventSource('/events?overlay=1');
-  es.onmessage = (ev) => { try { const m = JSON.parse(ev.data);
-    if (m.type === 'codigo' && m.payload.que === 'cinta' && m.payload.config.cinta.ocultarReyes !== false) {
-      wrapEl.style.opacity = 0; wrapEl.style.translate = '0 30px';
-      clearTimeout(timerCinta); timerCinta = setTimeout(() => { wrapEl.style.opacity = ''; wrapEl.style.translate = ''; entrada(); }, (m.payload.dur + 0.8) * 1000);
-    } } catch (e) {} };
-} catch (e) {}
+const es = new EventSource('/events?overlay=1');
+es.onmessage = (ev) => { try { const m = JSON.parse(ev.data);
+  if (m.type === 'codigo' && m.payload.que === 'cinta' && m.payload.config.cinta.ocultarReyes !== false) {
+    wrapEl.style.opacity = 0; wrapEl.style.translate = '0 30px';
+    clearTimeout(timerCinta); timerCinta = setTimeout(() => { wrapEl.style.opacity = ''; wrapEl.style.translate = ''; entrada(); }, (m.payload.dur + 0.8) * 1000);
+  } } catch (e) { console.warn('[Reyes]', e); } };
 const repetir = parseFloat(params.get('repetir'));
 if(repetir>=10) setInterval(entrada, repetir*1000);
 </script>

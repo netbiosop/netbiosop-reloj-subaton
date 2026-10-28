@@ -257,7 +257,7 @@ $('sumaTiempo').onchange = async ()=>{
 };
 $('btnApagar').onclick = async ()=>{
   if(!confirm('¿Apagar el reloj por completo?\n\nDeja de escuchar subs, bits y donaciones hasta que lo vuelvas a abrir con iniciar.bat.\n\nSi solo quieres parar todo pero seguir recibiendo aportes, usa "Pausar todo".')) return;
-  try{ await api('/api/shutdown','POST',{}); }catch(e){}
+  try{ await api('/api/shutdown','POST',{}); }catch(e){ /* el reloj se apaga antes de contestar */ }
   document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;text-align:center;color:#9a96ab;font:16px Inter,sans-serif"><div><div style="font-size:48px">⏹</div><p>Reloj apagado. Para volver a abrirlo usa <b>iniciar.bat</b>.</p></div></div>';
 };
 document.addEventListener('click', (ev)=>{
@@ -266,27 +266,25 @@ document.addEventListener('click', (ev)=>{
 });
 
 // eventos en vivo del reloj (y mantiene el reloj encendido mientras el menú está abierto)
-try{
-  const es = new EventSource('/events');
-  es.onmessage = (ev)=>{
-    const m = JSON.parse(ev.data);
-    if(m.type==='shutdown'){ es.close(); $('estadoTit').textContent='Reloj apagado'; return; }
-    if(m.type==='state'){ base = { at: Date.now(), ...m.payload }; if(M && m.payload.descanso!==M.descanso) cargar(); }
-    if(m.type==='log' || m.type==='connections' || m.type==='reset') cargar();
-  };
-}catch(e){}
+const es = new EventSource('/events');
+es.onmessage = (ev)=>{
+  const m = JSON.parse(ev.data);
+  if(m.type==='shutdown'){ es.close(); $('estadoTit').textContent='Reloj apagado'; return; }
+  if(m.type==='state'){ base = { at: Date.now(), ...m.payload }; if(M && m.payload.descanso!==M.descanso) cargar(); }
+  if(m.type==='log' || m.type==='connections' || m.type==='reset') cargar();
+};
 cargar();
 setInterval(cargar, 10000);
 
 // ---------- Actualizaciones ----------
 let ACT = null, nueva = null;
 async function cargarAct(){
-  try { ACT = await api('/api/actualizar'); } catch(e){ return; }
+  try { ACT = await api('/api/actualizar'); } catch(e){ $('actEstado').textContent = '· no se pudo revisar'; console.warn('[Actualización]', e); return; }
   $('actVersion').textContent = 'Versión ' + ACT.version;
   $('actAuto').checked = ACT.auto;
   const m = ACT.marca;
   $('actAviso').innerHTML = m && !m.visto ? `<div class="act-aviso">✅ <b>Se actualizó de la versión ${esc(m.de)} a la ${esc(m.a)}.</b> Tus datos quedaron igual.${m.notas ? `<pre>${esc(m.notas)}</pre>` : ''}<div style="margin-top:8px"><button id="actVisto">Entendido</button></div></div>` : '';
-  if ($('actVisto')) $('actVisto').onclick = async ()=>{ await api('/api/actualizar/visto','POST',{}).catch(()=>{}); cargarAct(); };
+  if ($('actVisto')) $('actVisto').onclick = async ()=>{ await api('/api/actualizar/visto','POST',{}).catch((e)=>console.warn('[Actualización]', e)); cargarAct(); };
   if (!nueva) $('actEstado').textContent = ACT.ultima ? (ACT.ultima.nueva ? '' : '· estás al día') : '';
 }
 $('actAuto').onchange = async ()=>{ try { await api('/api/actualizar/config','POST',{ auto: $('actAuto').checked }); toast($('actAuto').checked ? '✔ Se actualiza solo al abrir' : 'Actualización automática apagada'); } catch(e){ toast(e.message); } };

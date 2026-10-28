@@ -32,7 +32,7 @@ let config = clone(DEFAULTS);
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   config = { ...clone(DEFAULTS), ...j };
-  if (!Array.isArray(config.mensajes)) config.mensajes = [];
+  config.mensajes = Array.isArray(config.mensajes) ? config.mensajes.filter((m) => m && typeof m.texto === 'string') : [];
   if (!Array.isArray(config.quienes) || !config.quienes.length) config.quienes = clone(DEFAULTS.quienes);
   if (j.version !== 2) { config.on = false; config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); } // la 2.10.0 tenía un tiempo por mensaje
 } catch (err) {
@@ -82,14 +82,11 @@ function armar(texto, ctx) {
 
 async function enviar(m, ctx, manual = false) {
   if (!ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
-  enviando = true;
-  try {
-    const ok = await ctx.enviar(armar(m.texto, ctx));
-    if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
-    if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; }
-    console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
-    return { enviado: m.id };
-  } finally { enviando = false; }
+  const ok = await ctx.enviar(armar(m.texto, ctx));
+  if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
+  if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; }
+  console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
+  return { enviado: m.id };
 }
 
 const activos = () => config.mensajes.filter((m) => m.on && m.texto);
@@ -104,7 +101,9 @@ async function tick(ctx) {
   const lista = activos();
   const m = lista[siguiente % lista.length];
   siguiente = (siguiente + 1) % lista.length;
+  enviando = true; // solo el envío automático: "Enviar ahora" desde el panel no debe soltar este seguro
   try { await enviar(m, ctx); } catch (e) { ultimoEnvio = t; console.error('[Automensajes]', e.message); } // reintenta en el próximo intervalo
+  finally { enviando = false; }
 }
 
 // Cada mensaje del chat: "activar bot" / "desactivar bot", y cuenta para el anti-spam opcional
@@ -123,7 +122,7 @@ function alChat(e, ctx) {
     const aviso = prender
       ? (yaEstaba ? '🤖 El bot ya estaba activado' : '🤖 Bot activado') + `: un mensaje cada ${config.cadaMin} minutos${config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : ''}.`
       : yaEstaba ? '💤 El bot ya estaba desactivado.' : '💤 Bot desactivado.';
-    if (ctx?.puedeChat?.()) ctx.enviar(aviso, e.message_id).catch(() => {});
+    if (ctx?.puedeChat?.()) ctx.enviar(aviso, e.message_id); // sendChat no rechaza: si falla, lo anota en el registro
     return;
   }
   if (e.chatter_user_id !== e.broadcaster_user_id) lineasChat++;
@@ -145,4 +144,4 @@ function estado(ctx) {
   };
 }
 
-module.exports = { setConfig, tick, alChat, enviarAhora, estado, save, getConfig: () => config };
+module.exports = { setConfig, tick, alChat, enviarAhora, estado, save };
