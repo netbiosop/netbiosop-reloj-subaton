@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Copia en GitHub · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#3ddc97;--bad:#ff5d73;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,sans-serif}
+  main{max-width:640px;margin:0 auto;padding:28px 16px 40px}
+  h1{margin:0 0 4px;font:400 30px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-top:16px}
+  h2{margin:0 0 10px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+  input,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  input{width:100%}
+  button{cursor:pointer;background:var(--card2)} button:hover{border-color:var(--accent)} button:disabled{opacity:.5}
+  .prim{background:var(--accent);border-color:var(--accent);color:#06210f;font-weight:700}
+  .fila{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .nota{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px}
+  .ok{color:var(--accent)} .mal{color:var(--bad)}
+  .estado{font-weight:600}
+  ol{margin:6px 0 0;padding-left:20px} li{margin:6px 0}
+  a{color:#9ff0c8}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
+</style>
+</head>
+<body>
+<main>
+  <h1>🔒 Copia en GitHub</h1>
+  <div class="nota" style="margin:0">Página oculta: no sale en el menú. Las copias se suben solas, sin mostrar nada en pantalla.</div>
+
+  <section class="card">
+    <h2>Estado</h2>
+    <div class="estado" id="estado">…</div>
+    <div class="nota" id="detalle"></div>
+    <div class="fila"><button id="ahora">⬆ Subir una copia ahora</button><a id="ver" target="_blank" rel="noopener" style="align-self:center"></a></div>
+  </section>
+
+  <section class="card">
+    <h2>Conectar</h2>
+    <label>Repositorio privado (usuario/nombre)</label>
+    <input id="repo" placeholder="netbiosop/reloj-respaldos" autocomplete="off">
+    <label>Token de GitHub</label>
+    <input id="token" type="password" placeholder="github_pat_…" autocomplete="off">
+    <div class="nota" id="tokenNota">El token se guarda solo en esta PC (archivo respaldo-github.json) y nunca se sube.</div>
+    <div class="fila"><button class="prim" id="guardar">Guardar y probar</button><button id="apagar">Desactivar</button></div>
+    <div class="nota" id="nota"></div>
+  </section>
+
+  <section class="card">
+    <h2>Cómo prepararlo (una sola vez)</h2>
+    <ol>
+      <li>Crea un repositorio <b>privado</b> en <a href="https://github.com/new" target="_blank" rel="noopener">github.com/new</a> (ej. <code>reloj-respaldos</code>, marca <b>Private</b>).</li>
+      <li>Crea un token en <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>:
+        <ul>
+          <li><b>Expiration:</b> la más larga que te deje (o "No expiration").</li>
+          <li><b>Repository access:</b> <i>Only select repositories</i> → elige solo el repositorio privado.</li>
+          <li><b>Permissions → Repository permissions → Contents:</b> <i>Read and write</i>.</li>
+        </ul>
+      </li>
+      <li>Toca <b>Generate token</b>, cópialo y pégalo arriba junto con el nombre del repositorio.</li>
+    </ol>
+    <div class="nota">Se sube: subs, bits, donaciones, podio, metas y ajustes. <b>Nunca</b> se suben tus claves, tokens ni contraseñas. Cada copia queda como una versión en el historial del repositorio.</div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+const nota = (el, t, c='') => { el.textContent = t; el.className = 'nota ' + c; };
+const hace = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : 'hace ' + Math.round(s / 3600) + ' h'; };
+function pintar(i){
+  $('estado').textContent = i.configurado ? '✔ Activa' : 'Sin configurar';
+  $('estado').className = 'estado ' + (i.configurado ? 'ok' : '');
+  nota($('detalle'), i.error ? 'Último error: ' + i.error : i.ultima ? 'Última copia subida ' + hace(i.ultima.at) + ' (' + i.ultima.motivo + ')' : i.configurado ? 'Todavía no subió ninguna copia en esta sesión.' : '', i.error ? 'mal' : '');
+  if (document.activeElement !== $('repo')) $('repo').value = i.repo || '';
+  $('token').placeholder = i.tieneToken ? '•••••••• (guardado; escribe uno nuevo solo para cambiarlo)' : 'github_pat_…';
+  $('ahora').disabled = !i.configurado; $('apagar').disabled = !i.configurado;
+  $('ver').textContent = i.repo ? 'Ver en GitHub ↗' : ''; $('ver').href = i.repo ? 'https://github.com/' + i.repo + '/commits' : '#';
+}
+async function cargar(){ try { pintar(await api('/api/respaldo-github')); } catch(e){ nota($('detalle'), e.message, 'mal'); } }
+$('guardar').onclick = async () => {
+  $('guardar').disabled = true; nota($('nota'), 'Probando con GitHub…');
+  try { const j = await api('/api/respaldo-github/config', 'POST', { repo: $('repo').value, token: $('token').value }); $('token').value = ''; pintar(j.result); nota($('nota'), j.result.error ? 'Conectado, pero la primera copia falló: ' + j.result.error : '✔ Conectado y primera copia subida', j.result.error ? 'mal' : 'ok'); }
+  catch(e){ nota($('nota'), e.message, 'mal'); }
+  $('guardar').disabled = false;
+};
+$('ahora').onclick = async () => {
+  $('ahora').disabled = true;
+  try { pintar((await api('/api/respaldo-github/ahora', 'POST', {})).result); nota($('detalle'), '✔ Listo (si nada cambió desde la última, no se sube otra igual)', 'ok'); }
+  catch(e){ nota($('detalle'), e.message, 'mal'); }
+  $('ahora').disabled = false;
+};
+$('apagar').onclick = async () => {
+  if (!confirm('¿Desactivar la copia en GitHub? Lo que ya está subido queda en GitHub.')) return;
+  try { pintar((await api('/api/respaldo-github/config', 'POST', { desactivar: true })).result); nota($('nota'), 'Desactivada'); } catch(e){ nota($('nota'), e.message, 'mal'); }
+};
+cargar(); setInterval(cargar, 20000);
+</script>
+</body>
+</html>

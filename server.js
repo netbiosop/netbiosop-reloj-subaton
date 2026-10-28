@@ -22,6 +22,7 @@ const { StreamElementsClient } = require('./src/streamelements');
 const paypal = require('./src/paypal');
 const { createCommands } = require('./src/commands');
 const automensajes = require('./src/automensajes');
+const respaldoGithub = require('./src/respaldo-github');
 const { createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
@@ -910,6 +911,17 @@ app.post('/api/respaldo/abrir', (req, res) => {
   exec(process.platform === 'win32' ? `explorer "${dir}"` : process.platform === 'darwin' ? `open "${dir}"` : `xdg-open "${dir}"`, () => {});
   ok(res);
 });
+// Copia oculta en GitHub (privado): solo se configura escribiendo /respaldo-github en el navegador
+app.get('/api/respaldo-github', (req, res) => res.json(respaldoGithub.info()));
+app.post('/api/respaldo-github/config', async (req, res) => {
+  try { ok(res, { result: await respaldoGithub.setConfig(req.body) }); } catch (err) { res.json({ error: err.message }, 400); }
+});
+app.post('/api/respaldo-github/ahora', async (req, res) => {
+  try { podio.saveNow(); store.saveNow(); } catch {}
+  await respaldoGithub.subir('manual');
+  const i = respaldoGithub.info();
+  i.error ? res.json({ error: i.error }, 400) : ok(res, { result: i });
+});
 app.post('/api/respaldo/restaurar', (req, res) => {
   try { podio.saveNow(); store.saveNow(); codigo.save(); hype.save(); automensajes.save(); } catch {}
   try { respaldo.pedirRestaurar(String(req.body.copia || '')); } catch (err) { return res.json({ error: err.message }, 400); }
@@ -1037,17 +1049,18 @@ function shutdown(reason) {
   try { hype.save(); } catch {}
   try { automensajes.save(); } catch {}
   try { respaldo.respaldar('al cerrar', true); } catch {}
+  const subida = Promise.race([respaldoGithub.subir('al cerrar').catch(() => {}), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);
   logger.close(stream.live ? ['Resumen hasta el cierre:', ...sessionSummary()] : []);
   try { live.broadcast('shutdown', { reason }); } catch {}
   for (const c of [twitch, mp, se]) try { c.stop(); } catch {}
-  setTimeout(() => {
+  Promise.all([subida, new Promise((r) => setTimeout(r, 300))]).then(() => {
     try { server.close(); server.closeAllConnections(); } catch {}
     try { hookServer.close(); hookServer.closeAllConnections?.(); } catch {}
     removePid();
     process.exit(0);
-  }, 300);
-  setTimeout(() => process.exit(0), 3000).unref();
+  });
+  setTimeout(() => process.exit(0), 10000).unref();
 }
 
 // Archivo con el número de proceso: si alguna vez el reloj se cuelga, iniciar.bat lo puede cerrar

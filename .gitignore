@@ -5,6 +5,7 @@ videos/
 sonidos/*
 !sonidos/LEEME.txt
 respaldo-config.json
+respaldo-github.json
 .version-anterior/
 .actualizacion/
 node_modules/

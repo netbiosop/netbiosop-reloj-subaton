@@ -21,7 +21,7 @@ const CARPETAS_PROTEGIDAS = new Set(['data', 'logs', 'sonidos', 'videos', 'node_
 const LANZADORES = new Set(['iniciar.bat', 'detener.bat', 'iniciar-con-consola.bat', 'iniciar-silencioso.vbs', 'iniciar.sh']);
 function protegido(rel) {
   const p = rel.replace(/\\/g, '/');
-  return CARPETAS_PROTEGIDAS.has(p.split('/')[0]) || p === 'respaldo-config.json' || p.endsWith('.zip') || p.startsWith('.github/');
+  return CARPETAS_PROTEGIDAS.has(p.split('/')[0]) || p === 'respaldo-config.json' || p === 'respaldo-github.json' || p.endsWith('.zip') || p.startsWith('.github/');
 }
 
 const versionLocal = () => { try { return JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8')).version; } catch { return '0.0.0'; } };

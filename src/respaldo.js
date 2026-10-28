@@ -88,6 +88,7 @@ function huella() {
   return ARCHIVOS.map((f) => { try { const s = fs.statSync(path.join(DATA_DIR, f)); return f + s.size + ':' + s.mtimeMs; } catch { return f + '-'; } }).join('|');
 }
 function respaldar(motivo = 'automática', forzar = false) {
+  try { require('./respaldo-github').pedir(motivo); } catch {} // copia silenciosa en GitHub (si está configurada)
   if (!conf.on && !forzar) return null;
   const h = huella();
   if (!forzar && h === ultimaHuella) return null;
@@ -144,7 +145,7 @@ function iniciar(guardar) {
 }
 // cada donación, sub o bits: espera unos segundos por si llegan más juntos y hace una sola copia
 function alAporte() {
-  if (!conf.on) return;
+  if (!conf.on) { try { antesDeCopiar(); require('./respaldo-github').pedir('aporte nuevo'); } catch {} return; }
   aportesJuntos++;
   clearTimeout(timerAporte);
   timerAporte = setTimeout(() => {
