@@ -16,7 +16,7 @@ const { exec, spawn } = require('child_process');
 
 const store = require('./src/store');
 const { Timer } = require('./src/timer');
-const { createEngine, SOURCES } = require('./src/engine');
+const { createEngine, SOURCES, fmtDuration, LABELS } = require('./src/engine');
 const { TwitchClient } = require('./src/twitch');
 const { MercadoPagoClient } = require('./src/mercadopago');
 const { StreamElementsClient } = require('./src/streamelements');
@@ -26,7 +26,6 @@ const automensajes = require('./src/automensajes');
 const { createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
-const { fmtDuration, LABELS } = require('./src/engine');
 
 if (typeof WebSocket === 'undefined') {
   console.error('\n  ❌ Necesitas Node.js 22 o más nuevo. Descárgalo en https://nodejs.org (versión LTS)\n');

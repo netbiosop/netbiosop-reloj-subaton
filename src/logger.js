@@ -58,11 +58,6 @@ const logger = {
     this.file = null;
   },
 
-  currentText() {
-    if (!this.file) return null;
-    try { return fs.readFileSync(this.file, 'utf8'); } catch { return null; }
-  },
-
   latestFile() {
     if (this.file) return this.file;
     try {
