@@ -175,7 +175,7 @@ const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
   onContribution,
-  onChat: (e) => { automensajes.alChat(e); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
+  onChat: (e) => { automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
   onStream: (isLive, initial) => onStream(isLive, initial),
   onStatus: sendConnections,
   onHype: (fase, e, desfase) => onHype(fase, e, desfase),
@@ -757,7 +757,7 @@ app.get('/api/menu', (req, res) => {
       { nombre: 'PayPal', estado: pp, detalle: c.streamelements.status === 'conectado' ? 'vía StreamElements' : c.paypal.last ? 'avisos directos' : 'sin conectar' },
       { nombre: 'Mercado Pago', estado: okStatus(c.mercadopago.status), detalle: c.mercadopago.status },
     ],
-    modulos: MODULOS,
+    modulos: MODULOS.filter((m) => !m.oculto),
     metas: p.metas,
     mes: p.mes,
     ultimos: d.log.filter((e) => e.source !== 'manual').slice(0, 8).map((e) => ({ at: e.at, source: e.source, text: e.text, seconds: e.seconds, test: !!e.test, note: e.note })),
@@ -818,7 +818,7 @@ setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { con
 const autoCtx = () => ({
   live: !!stream.live, descanso: !!d.settings.descanso,
   puedeChat: () => !!twitch.chatOk,
-  enviar: (texto) => twitch.sendChat(texto),
+  enviar: (texto, responderA) => twitch.sendChat(texto, responderA),
   tiempo: () => fmtDuration(timer.remainingMs / 1000),
   canal: () => d.secrets?.twitch?.login || '',
 });

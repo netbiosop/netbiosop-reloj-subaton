@@ -172,17 +172,17 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
-## 💬 Mensajes automáticos en el chat
+## 💬 Mensajes automáticos en el chat (bot)
 
-Menú → **💬 Mensajes automáticos**. Mensajes que se escriben solos en tu chat cada X minutos, con tu cuenta de Twitch.
+No aparece en el menú. Se prende y se apaga **desde el chat de Twitch**:
 
-- **Prender / apagar todo:** el botón de arriba. Cada mensaje también tiene su casilla para apagarlo solo a él.
-- **Cada cuánto:** cada mensaje tiene su propio tiempo (ej. uno cada 20 min y otro cada 30).
-- **Emotes:** toca un emoji o un emote global de Twitch y se agrega donde estabas escribiendo. Los emotes de tu canal se escriben con su código (ej. `bytedeHype`), con un espacio antes y después.
-- **Datos que se completan solos:** `{tiempo}` (lo que queda en el reloj) y `{canal}`.
-- **Para no hablar solo:** espera a que otras personas escriban algunos mensajes en el chat (3 por defecto) y deja al menos 90 s entre un automensaje y otro. Por defecto solo salen con el stream en vivo, y nunca durante el descanso.
-- **📤 Enviar ahora:** lo manda al chat en el momento, para probarlo.
-- Viene **apagado**: no escribe nada hasta que lo prendas. Necesita el permiso de chat de Twitch (si dice "Sin permiso", en Configuración pulsa Desconectar y vuelve a Conectar con Twitch).
+- `activar bot` → empieza a mandar un mensaje **cada 10 minutos**, de a uno y en orden (rotando).
+- `desactivar bot` → deja de mandarlos.
+- Solo pueden hacerlo **Nephallems** y tú (el dueño del canal). El bot responde en el chat para confirmar.
+- Solo manda mensajes con el stream en vivo y nunca durante el descanso.
+- Los mensajes salen desde tu cuenta de Twitch. Si no escribe nada, en Configuración pulsa Desconectar y vuelve a Conectar con Twitch.
+
+**Editar los mensajes:** abre a mano la dirección `http://localhost:3000/automensajes-panel` (con el puerto de tu reloj). Ahí agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
 
 ## 🔄 Actualizaciones automáticas
 

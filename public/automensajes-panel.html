@@ -70,12 +70,15 @@
     <h2>Estado</h2>
     <span class="estado" id="estado"><i></i><span id="estadoTxt">…</span></span>
     <div class="nota" id="estadoNota"></div>
-    <label class="check"><input type="checkbox" id="soloEnVivo"> Solo cuando estoy en vivo</label>
+    <div class="nota" style="margin-top:12px">Se prende y se apaga desde el chat: <code>activar bot</code> · <code>desactivar bot</code></div>
+    <label>Quiénes pueden activarlo (además de ti)</label>
+    <input type="text" id="quienes" style="width:100%" placeholder="nephallems">
     <div class="fila">
-      <div><label>Esperar mensajes del chat</label><input type="number" id="minChat" min="0" max="100"> </div>
-      <div><label>Mínimo entre automensajes (seg)</label><input type="number" id="separacionSeg" min="30" max="3600"></div>
+      <div><label>Un mensaje cada (min)</label><input type="number" id="cadaMin" min="1" max="240"></div>
+      <div><label>Esperar mensajes del chat</label><input type="number" id="minChat" min="0" max="100"></div>
     </div>
-    <div class="nota">Para no hablar solo: un automensaje sale recién cuando otras personas escribieron esa cantidad de mensajes desde el anterior (0 = no esperar). Durante el descanso no sale ninguno.</div>
+    <label class="check"><input type="checkbox" id="soloEnVivo"> Solo cuando estoy en vivo</label>
+    <div class="nota">Los mensajes salen de a uno y en orden, rotando. "Esperar mensajes del chat": 0 = salen justo cada X minutos; con un número, esperan a que otras personas escriban esa cantidad. Durante el descanso no sale ninguno.</div>
   </section>
 
   <section class="card">
@@ -141,7 +144,6 @@ function pintarLista(){
         <div class="cont"><span data-cont>${m.texto.length}</span>/450</div>
       </div>
       <div class="lado">
-        <div class="cada">cada <input type="number" data-k="cadaMin" min="1" max="600" value="${m.cadaMin}"> min</div>
         <div class="prox" data-prox></div>
         <div style="display:flex;gap:6px">
           <button class="sm" data-enviar title="Lo manda ya al chat">📤 Enviar ahora</button>
@@ -155,7 +157,8 @@ function pintarGeneral(){
   $('on').classList.toggle('on', cfg.on); $('onTxt').textContent = cfg.on ? 'Prendido' : 'Apagado';
   $('soloEnVivo').checked = cfg.soloEnVivo;
   if (document.activeElement !== $('minChat')) $('minChat').value = cfg.minChat;
-  if (document.activeElement !== $('separacionSeg')) $('separacionSeg').value = cfg.separacionSeg;
+  if (document.activeElement !== $('cadaMin')) $('cadaMin').value = cfg.cadaMin;
+  if (document.activeElement !== $('quienes')) $('quienes').value = cfg.quienes.join(', ');
 }
 function pintarEstado(j){
   const e = $('estado');
@@ -166,8 +169,8 @@ function pintarEstado(j){
     : j.motivo === 'activo' && j.faltanLineas > 0 ? `Esperando que el chat escriba ${j.faltanLineas} mensaje${j.faltanLineas > 1 ? 's' : ''} más antes del próximo.`
     : j.motivo === 'activo' ? 'El chat está activo: sale el próximo cuando le toque.' : '';
   document.querySelectorAll('.msg').forEach((el) => {
-    const s = j.proximos[el.dataset.id];
-    el.querySelector('[data-prox]').textContent = s == null ? '' : s === 0 ? 'listo para salir' : 'sale en ' + mmss(s);
+    const s = el.dataset.id === j.proximoId ? j.proximoEnSeg : null;
+    el.querySelector('[data-prox]').textContent = s == null ? '' : s === 0 ? 'listo para salir' : 'es el próximo · sale en ' + mmss(s);
   });
 }
 
@@ -176,7 +179,6 @@ function leerLista(){
     id: el.dataset.id,
     on: el.querySelector('[data-k=on]').checked,
     texto: el.querySelector('[data-k=texto]').value,
-    cadaMin: Number(el.querySelector('[data-k=cadaMin]').value) || 20,
   }));
 }
 async function guardar(cambios){
@@ -215,14 +217,15 @@ $('lista').addEventListener('click', async (e) => {
 });
 $('agregar').onclick = () => {
   cfg.mensajes = leerLista();
-  cfg.mensajes.push({ id: 'm' + Date.now().toString(36), texto: '', cadaMin: 20, on: true });
+  cfg.mensajes.push({ id: 'm' + Date.now().toString(36), texto: '', on: true });
   pintarLista();
   const t = [...document.querySelectorAll('#lista textarea')].pop(); t.focus(); ultimoCampo = t;
 };
 $('on').onclick = () => guardar({ on: !cfg.on });
 $('soloEnVivo').onchange = () => guardar({ soloEnVivo: $('soloEnVivo').checked });
 $('minChat').onchange = () => guardar({ minChat: Number($('minChat').value) });
-$('separacionSeg').onchange = () => guardar({ separacionSeg: Number($('separacionSeg').value) });
+$('cadaMin').onchange = () => guardar({ cadaMin: Number($('cadaMin').value) });
+$('quienes').onchange = () => guardar({ quienes: $('quienes').value });
 
 async function cargarEstado(){ try { pintarEstado(await api('/api/automensajes')); } catch {} }
 (async () => {

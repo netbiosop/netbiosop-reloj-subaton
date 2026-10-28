@@ -1,23 +1,26 @@
-// Mensajes automáticos en el chat de Twitch: cada mensaje sale solo cada X minutos.
-// Se configura desde /automensajes-panel y se guarda en data/automensajes.json.
-//  • Interruptor general para prender o apagar todo, y uno por cada mensaje.
+// Mensajes automáticos en el chat de Twitch: sale un mensaje cada X minutos (10 por defecto), uno detrás de otro.
+// No aparece en el menú: se prende y se apaga desde el chat.
+//  • "activar bot" / "desactivar bot" → solo Nephallems (y el dueño del canal).
+//  • Los mensajes se editan en /automensajes-panel y se guardan en data/automensajes.json.
 //  • Solo con el stream en vivo (opcional) y nunca durante el descanso.
-//  • Anti-spam: espera a que escriban algunos mensajes en el chat y deja un margen entre automensajes.
 const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'automensajes.json');
 const MAX_TEXTO = 450; // límite de Twitch por mensaje (500) con margen
+const ACTIVAR = /^!?\s*activar\s*bot\b/i;
+const DESACTIVAR = /^!?\s*desactivar\s*bot\b/i;
 
 const DEFAULTS = {
-  on: false,          // apagado hasta que lo prendas desde el panel
+  on: false,              // se prende cuando escriben "activar bot" en el chat
+  quienes: ['nephallems'], // quiénes pueden activarlo además del dueño del canal
+  cadaMin: 10,            // sale un mensaje cada 10 minutos, rotando
   soloEnVivo: true,
-  minChat: 3,         // mensajes de otras personas en el chat desde el último automensaje
-  separacionSeg: 90,  // tiempo mínimo entre dos automensajes
+  minChat: 0,             // opcional: esperar N mensajes del chat antes de cada automensaje (0 = no esperar)
   mensajes: [
-    { id: 'm1', texto: '¡Bienvenidos al stream! Si te gusta el contenido, deja tu follow 💜 HeyGuys', cadaMin: 20, on: true },
-    { id: 'm2', texto: '⏱ El subatón sigue: quedan {tiempo} en el reloj. ¡Cada sub, bits o donación suma tiempo! PogChamp', cadaMin: 30, on: true },
+    { id: 'm1', texto: '¡Bienvenidos al stream! Si te gusta el contenido, deja tu follow 💜 HeyGuys', on: true },
+    { id: 'm2', texto: '⏱ El subatón sigue: quedan {tiempo} en el reloj. ¡Cada sub, bits o donación suma tiempo! PogChamp', on: true },
   ],
 };
 
@@ -30,9 +33,12 @@ try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   config = { ...clone(DEFAULTS), ...j };
   if (!Array.isArray(config.mensajes)) config.mensajes = [];
+  if (!Array.isArray(config.quienes) || !config.quienes.length) config.quienes = clone(DEFAULTS.quienes);
+  if (j.version !== 2) { config.on = false; config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); } // la 2.10.0 tenía un tiempo por mensaje
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Automensajes] No se pudo leer', FILE, '-', err.message);
 }
+config.version = 2;
 
 function save() {
   try {
@@ -43,21 +49,24 @@ function save() {
 }
 
 // ---------- Programación ----------
-const ultimo = {};        // id → última vez que salió (o que empezó a contar)
-let ultimoEnvio = 0;      // el último automensaje de cualquier tipo
-let lineasChat = 0;       // mensajes de otras personas desde el último automensaje
+let ultimoEnvio = 0;  // último automensaje (o desde cuándo se cuenta)
+let siguiente = 0;    // índice del próximo mensaje en la rotación
+let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
-const ahora = () => Date.now();
 
 function setConfig(b = {}) {
-  for (const k of ['on', 'soloEnVivo']) if (k in b) config[k] = !!b[k];
+  if ('on' in b) { if (!!b.on && !config.on) ultimoEnvio = Date.now(); config.on = !!b.on; }
+  if ('soloEnVivo' in b) config.soloEnVivo = !!b.soloEnVivo;
+  if ('cadaMin' in b) config.cadaMin = num(b.cadaMin, 1, 240, config.cadaMin);
   if ('minChat' in b) config.minChat = num(b.minChat, 0, 100, config.minChat);
-  if ('separacionSeg' in b) config.separacionSeg = num(b.separacionSeg, 30, 3600, config.separacionSeg);
+  if ('quienes' in b) {
+    const l = (Array.isArray(b.quienes) ? b.quienes : String(b.quienes).split(/[\s,]+/)).map((u) => String(u).replace(/^@/, '').trim().toLowerCase()).filter(Boolean).slice(0, 10);
+    if (l.length) config.quienes = l;
+  }
   if (Array.isArray(b.mensajes)) {
     config.mensajes = b.mensajes.slice(0, 30).map((m, i) => ({
       id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || 'm' + Date.now().toString(36) + i,
       texto: limpiar(m.texto),
-      cadaMin: num(m.cadaMin, 1, 600, 20),
       on: m.on !== false,
     })).filter((m) => m.texto);
   }
@@ -65,7 +74,7 @@ function setConfig(b = {}) {
   return config;
 }
 
-// Reemplaza {tiempo}, {canal}, etc.
+// Reemplaza {tiempo} y {canal}
 function armar(texto, ctx) {
   const vars = { tiempo: ctx.tiempo?.() ?? '', canal: ctx.canal?.() ?? '' };
   return texto.replace(/\{(\w+)\}/g, (todo, k) => (k.toLowerCase() in vars ? vars[k.toLowerCase()] : todo));
@@ -77,37 +86,47 @@ async function enviar(m, ctx, manual = false) {
   try {
     const ok = await ctx.enviar(armar(m.texto, ctx));
     if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
-    ultimo[m.id] = ultimoEnvio = ahora();
-    lineasChat = 0;
+    if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; }
     console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
     return { enviado: m.id };
   } finally { enviando = false; }
 }
 
-function activo(ctx) { return config.on && !ctx.descanso && (!config.soloEnVivo || ctx.live); }
+const activos = () => config.mensajes.filter((m) => m.on && m.texto);
+const motivo = (ctx) => (!config.on ? 'apagado' : ctx.descanso ? 'en pausa (descanso)' : config.soloEnVivo && !ctx.live ? 'esperando que empiece el stream'
+  : !ctx.puedeChat?.() ? 'sin permiso de chat' : !activos().length ? 'sin mensajes' : 'activo');
 
 // Se llama cada pocos segundos. ctx: { live, descanso, puedeChat(), enviar(texto) → bool, tiempo(), canal() }
 async function tick(ctx) {
-  const t = ahora();
-  const lista = config.mensajes.filter((m) => m.on && m.texto);
-  if (!activo(ctx)) { for (const m of config.mensajes) ultimo[m.id] = t; lineasChat = 0; return; } // al activarse, cada uno sale después de su intervalo completo
-  for (const m of lista) if (!ultimo[m.id]) ultimo[m.id] = t;
-  if (enviando || !ctx.puedeChat?.()) return;
-  if (t - ultimoEnvio < config.separacionSeg * 1000) return;
-  if (lineasChat < config.minChat) return;
-  // el que más tiempo lleva esperando
-  const vencidos = lista.filter((m) => t - ultimo[m.id] >= m.cadaMin * 60000)
-    .sort((a, b) => (t - ultimo[b.id] - b.cadaMin * 60000) - (t - ultimo[a.id] - a.cadaMin * 60000));
-  if (vencidos[0]) {
-    try { await enviar(vencidos[0], ctx); }
-    catch (e) { ultimo[vencidos[0].id] = t; console.error('[Automensajes]', e.message); } // reintenta en el próximo intervalo
-  }
+  const t = Date.now();
+  if (motivo(ctx) !== 'activo') { ultimoEnvio = t; lineasChat = 0; return; } // al volver, el primero sale después de un intervalo completo
+  if (enviando || t - ultimoEnvio < config.cadaMin * 60000 || lineasChat < config.minChat) return;
+  const lista = activos();
+  const m = lista[siguiente % lista.length];
+  siguiente = (siguiente + 1) % lista.length;
+  try { await enviar(m, ctx); } catch (e) { ultimoEnvio = t; console.error('[Automensajes]', e.message); } // reintenta en el próximo intervalo
 }
 
-// Cada mensaje del chat (menos los del propio canal) cuenta para el anti-spam
-function alChat(e) {
-  if (!e || e.chatter_user_id === e.broadcaster_user_id) return;
-  lineasChat++;
+// Cada mensaje del chat: "activar bot" / "desactivar bot", y cuenta para el anti-spam opcional
+function alChat(e, ctx) {
+  if (!e) return;
+  const texto = String(e.message?.text || '').trim();
+  const login = String(e.chatter_user_login || '').toLowerCase();
+  const puede = e.chatter_user_id === e.broadcaster_user_id || config.quienes.includes(login);
+  if (puede && (ACTIVAR.test(texto) || DESACTIVAR.test(texto))) {
+    const prender = ACTIVAR.test(texto);
+    const yaEstaba = config.on === prender;
+    setConfig({ on: prender });
+    siguiente = 0;
+    const quien = e.chatter_user_name || login;
+    console.log(`[Automensajes] ${prender ? '🤖 Bot activado' : '💤 Bot desactivado'} por ${quien} desde el chat`);
+    const aviso = prender
+      ? (yaEstaba ? '🤖 El bot ya estaba activado' : '🤖 Bot activado') + `: un mensaje cada ${config.cadaMin} minutos${config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : ''}.`
+      : yaEstaba ? '💤 El bot ya estaba desactivado.' : '💤 Bot desactivado.';
+    if (ctx?.puedeChat?.()) ctx.enviar(aviso, e.message_id).catch(() => {});
+    return;
+  }
+  if (e.chatter_user_id !== e.broadcaster_user_id) lineasChat++;
 }
 
 function enviarAhora(id, ctx) {
@@ -117,12 +136,12 @@ function enviarAhora(id, ctx) {
 }
 
 function estado(ctx) {
-  const t = ahora();
-  const motivo = !config.on ? 'apagado' : ctx.descanso ? 'en pausa (descanso)' : config.soloEnVivo && !ctx.live ? 'esperando que empiece el stream' : !ctx.puedeChat?.() ? 'sin permiso de chat' : 'activo';
+  const mot = motivo(ctx), lista = activos();
   return {
-    config, motivo, activo: motivo === 'activo', lineasChat,
+    config, motivo: mot, activo: mot === 'activo',
     faltanLineas: Math.max(0, config.minChat - lineasChat),
-    proximos: Object.fromEntries(config.mensajes.map((m) => [m.id, m.on && motivo === 'activo' && ultimo[m.id] ? Math.max(0, Math.round((ultimo[m.id] + m.cadaMin * 60000 - t) / 1000)) : null])),
+    proximoEnSeg: mot === 'activo' ? Math.max(0, Math.round((ultimoEnvio + config.cadaMin * 60000 - Date.now()) / 1000)) : null,
+    proximoId: lista.length ? lista[siguiente % lista.length].id : null,
   };
 }
 
