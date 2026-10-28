@@ -178,7 +178,7 @@ Menú → **💬 Mensajes automáticos**. Se prende y se apaga **desde el chat d
 
 - `activar bot` → empieza a mandar un mensaje **cada 10 minutos**, de a uno y en orden (rotando).
 - `desactivar bot` → deja de mandarlos.
-- Solo pueden hacerlo **Nephallems** y tú (el dueño del canal). El bot responde en el chat para confirmar.
+- Pueden hacerlo tú (el dueño del canal) y las personas de la lista del panel (viene con **Nephallems**). Para sumar a alguien: escribe su nombre de Twitch y toca **＋ Agregar**; se revisa en Twitch que la cuenta exista con ese nombre. La ✕ lo quita. El bot responde en el chat para confirmar.
 - Solo manda mensajes con el stream en vivo y nunca durante el descanso.
 - Los mensajes salen desde tu cuenta de Twitch. Si no escribe nada, en Configuración pulsa Desconectar y vuelve a Conectar con Twitch.
 

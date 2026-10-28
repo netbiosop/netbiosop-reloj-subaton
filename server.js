@@ -824,6 +824,23 @@ const autoCtx = () => ({
 });
 app.get('/api/automensajes', (req, res) => res.json(automensajes.estado(autoCtx())));
 app.post('/api/automensajes/config', podioRoute((req) => automensajes.setConfig(req.body)));
+// Agregar a alguien que puede escribir "activar bot": se verifica que exista en Twitch con ese nombre exacto
+app.post('/api/automensajes/quien', async (req, res) => {
+  try {
+    const login = automensajes.normalizar(req.body.login);
+    if (!automensajes.esLogin(login)) throw new Error('Ese no es un nombre de Twitch válido (solo letras, números y _, de 3 a 25)');
+    let nombre = login, verificado = false;
+    if (twitch.s?.accessToken) {
+      const j = await twitch.helix('GET', '/users?login=' + encodeURIComponent(login));
+      const u = j.data?.[0];
+      if (!u) throw new Error(`No existe nadie en Twitch con el nombre "${login}". Revisa que esté escrito igual que en Twitch.`);
+      nombre = u.display_name || u.login; verificado = true;
+    }
+    console.log(`[Automensajes] ${nombre} ahora puede escribir "activar bot"${verificado ? '' : ' (sin verificar: Twitch no está conectado)'}`);
+    ok(res, { result: automensajes.agregarQuien(login, nombre), nombre, verificado });
+  } catch (err) { res.json({ error: err.message }, 400); }
+});
+app.post('/api/automensajes/quitar', podioRoute((req) => automensajes.quitarQuien(req.body.login)));
 app.post('/api/automensajes/enviar', async (req, res) => {
   try { ok(res, { result: await automensajes.enviarAhora(String(req.body.id || ''), autoCtx()) }); } catch (err) { res.json({ error: err.message }, 400); }
 });

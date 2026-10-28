@@ -25,6 +25,8 @@ const DEFAULTS = {
 };
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
+const normalizar = (u) => String(u || '').replace(/^@/, '').trim().toLowerCase();
+const esLogin = (u) => /^[a-z0-9_]{3,25}$/.test(u); // así son los nombres de usuario de Twitch
 const num = (v, min, max, def) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : def; };
 const limpiar = (v) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim().slice(0, MAX_TEXTO);
 
@@ -33,7 +35,8 @@ try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   config = { ...clone(DEFAULTS), ...j };
   if (!Array.isArray(config.mensajes)) config.mensajes = [];
-  if (!Array.isArray(config.quienes) || !config.quienes.length) config.quienes = clone(DEFAULTS.quienes);
+  if (!Array.isArray(config.quienes)) config.quienes = clone(DEFAULTS.quienes);
+  if (!config.nombres || typeof config.nombres !== 'object') config.nombres = {};
   if (j.version !== 2) { config.on = false; config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); } // la 2.10.0 tenía un tiempo por mensaje
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Automensajes] No se pudo leer', FILE, '-', err.message);
@@ -60,8 +63,7 @@ function setConfig(b = {}) {
   if ('cadaMin' in b) config.cadaMin = num(b.cadaMin, 1, 240, config.cadaMin);
   if ('minChat' in b) config.minChat = num(b.minChat, 0, 100, config.minChat);
   if ('quienes' in b) {
-    const l = (Array.isArray(b.quienes) ? b.quienes : String(b.quienes).split(/[\s,]+/)).map((u) => String(u).replace(/^@/, '').trim().toLowerCase()).filter(Boolean).slice(0, 10);
-    if (l.length) config.quienes = l;
+    config.quienes = [...new Set((Array.isArray(b.quienes) ? b.quienes : String(b.quienes).split(/[\s,]+/)).map(normalizar).filter(esLogin))].slice(0, 30);
   }
   if (Array.isArray(b.mensajes)) {
     config.mensajes = b.mensajes.slice(0, 30).map((m, i) => ({
@@ -145,4 +147,21 @@ function estado(ctx) {
   };
 }
 
-module.exports = { setConfig, tick, alChat, enviarAhora, estado, save, getConfig: () => config };
+// Personas que pueden escribir "activar bot" (el nombre ya viene verificado con Twitch desde el servidor)
+function agregarQuien(login, nombre) {
+  login = normalizar(login);
+  if (!esLogin(login)) throw new Error('Ese no es un nombre de Twitch válido (solo letras, números y _, de 3 a 25)');
+  if (!config.quienes.includes(login)) config.quienes.push(login);
+  config.nombres = { ...(config.nombres || {}), [login]: String(nombre || login).slice(0, 25) };
+  save();
+  return config;
+}
+function quitarQuien(login) {
+  login = normalizar(login);
+  config.quienes = config.quienes.filter((u) => u !== login);
+  if (config.nombres) delete config.nombres[login];
+  save();
+  return config;
+}
+
+module.exports = { agregarQuien, quitarQuien, normalizar, esLogin, setConfig, tick, alChat, enviarAhora, estado, save, getConfig: () => config };

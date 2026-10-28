@@ -1,6 +1,6 @@
 {
   "name": "reloj-subaton",
-  "version": "2.10.2",
+  "version": "2.10.3",
   "description": "Reloj de subatón para Twitch: suma tiempo automáticamente por PayPal, Mercado Pago, Bits y Subs",
   "main": "server.js",
   "scripts": {

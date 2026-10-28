@@ -53,6 +53,11 @@
   .msg .prox{font-size:12px;color:var(--accent);font-weight:600}
   .peligro:hover{border-color:var(--bad)}
   .agregar{width:100%;justify-content:center;border-style:dashed;padding:12px}
+  .personas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .persona{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-weight:600}
+  .persona button{padding:1px 7px;border-radius:999px;font-size:11px;background:transparent}
+  .persona button:hover{border-color:var(--bad);color:var(--bad)}
+  .agregarQuien{display:flex;gap:8px} .agregarQuien input{flex:1;min-width:0}
   code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
   ul{margin:6px 0 0;padding-left:18px} li{margin:4px 0}
   @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .msg{grid-template-columns:auto 1fr} .msg .lado{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center;min-width:0} }
@@ -72,7 +77,12 @@
     <div class="nota" id="estadoNota"></div>
     <div class="nota" style="margin-top:12px">Se prende y se apaga desde el chat: <code>activar bot</code> · <code>desactivar bot</code></div>
     <label>Quiénes pueden activarlo (además de ti)</label>
-    <input type="text" id="quienes" style="width:100%" placeholder="nephallems">
+    <div class="personas" id="personas"></div>
+    <div class="agregarQuien">
+      <input type="text" id="nuevoQuien" placeholder="Nombre de Twitch, ej. Nephallems" autocomplete="off" maxlength="26">
+      <button id="btnQuien">＋ Agregar</button>
+    </div>
+    <div class="nota" id="notaQuien">Escríbelo igual que en Twitch: se revisa que la cuenta exista.</div>
     <div class="fila">
       <div><label>Un mensaje cada (min)</label><input type="number" id="cadaMin" min="1" max="240"></div>
       <div><label>Esperar mensajes del chat</label><input type="number" id="minChat" min="0" max="100"></div>
@@ -158,7 +168,7 @@ function pintarGeneral(){
   $('soloEnVivo').checked = cfg.soloEnVivo;
   if (document.activeElement !== $('minChat')) $('minChat').value = cfg.minChat;
   if (document.activeElement !== $('cadaMin')) $('cadaMin').value = cfg.cadaMin;
-  if (document.activeElement !== $('quienes')) $('quienes').value = cfg.quienes.join(', ');
+  pintarPersonas();
 }
 function pintarEstado(j){
   const e = $('estado');
@@ -225,7 +235,31 @@ $('on').onclick = () => guardar({ on: !cfg.on });
 $('soloEnVivo').onchange = () => guardar({ soloEnVivo: $('soloEnVivo').checked });
 $('minChat').onchange = () => guardar({ minChat: Number($('minChat').value) });
 $('cadaMin').onchange = () => guardar({ cadaMin: Number($('cadaMin').value) });
-$('quienes').onchange = () => guardar({ quienes: $('quienes').value });
+function pintarPersonas(){
+  $('personas').innerHTML = cfg.quienes.map((u) => `<span class="persona">👤 ${esc((cfg.nombres || {})[u] || u)}<button title="Quitar" data-quitar="${esc(u)}">✕</button></span>`).join('')
+    || '<span class="nota" style="margin:0">Nadie más: solo tú puedes activarlo.</span>';
+}
+function notaQuien(t, c=''){ $('notaQuien').textContent = t; $('notaQuien').className = 'nota ' + c; }
+async function agregarQuien(){
+  const v = $('nuevoQuien').value.trim().replace(/^@/, '');
+  if (!v) return $('nuevoQuien').focus();
+  if (!/^[A-Za-z0-9_]{3,25}$/.test(v)) return notaQuien('Ese no es un nombre de Twitch válido: solo letras, números y _ (sin espacios).', 'mal');
+  $('btnQuien').disabled = true; notaQuien('Buscando en Twitch…');
+  try {
+    const j = await api('/api/automensajes/quien', 'POST', { login: v });
+    cfg = j.result; pintarPersonas(); $('nuevoQuien').value = '';
+    notaQuien(j.verificado ? `✔ ${j.nombre} ya puede escribir "activar bot"` : `✔ Agregado. No se pudo revisar en Twitch (no está conectado): asegúrate de que esté bien escrito.`, j.verificado ? 'ok' : '');
+  } catch (e) { notaQuien(e.message, 'mal'); }
+  $('btnQuien').disabled = false;
+}
+$('btnQuien').onclick = agregarQuien;
+$('nuevoQuien').onkeydown = (e) => { if (e.key === 'Enter') agregarQuien(); };
+$('personas').onclick = async (e) => {
+  const b = e.target.closest('[data-quitar]'); if (!b) return;
+  const nombre = (cfg.nombres || {})[b.dataset.quitar] || b.dataset.quitar;
+  if (!confirm(`¿Quitar a ${nombre}? Ya no va a poder activar el bot.`)) return;
+  try { cfg = (await api('/api/automensajes/quitar', 'POST', { login: b.dataset.quitar })).result; pintarPersonas(); notaQuien(`${nombre} ya no puede activarlo.`); } catch (err) { notaQuien(err.message, 'mal'); }
+};
 
 async function cargarEstado(){ try { pintarEstado(await api('/api/automensajes')); } catch {} }
 (async () => {
