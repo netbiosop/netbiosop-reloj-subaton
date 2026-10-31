@@ -139,7 +139,7 @@ function createLive() {
     broadcast(type, payload) {
       const msg = `data: ${JSON.stringify({ type, payload })}\n\n`;
       // El overlay solo recibe el reloj y los "+tiempo"; los mods, además, el historial y los multiplicadores
-      const forOverlay = type === 'state' || type === 'added' || type === 'sound' || type === 'shutdown' || type === 'aporte' || type === 'codigo' || type === 'hype';
+      const forOverlay = type === 'state' || type === 'added' || type === 'sound' || type === 'shutdown' || type === 'aporte' || type === 'codigo' || type === 'hype' || type === 'podio';
       const forMod = forOverlay || type === 'log' || type === 'multiplier' || type === 'reset';
       for (const res of clients) {
         if (!(res.mode === 'overlay' ? forOverlay : res.mode === 'mod' ? forMod : true)) continue;

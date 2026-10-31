@@ -75,8 +75,8 @@ function texto(f, v, it){
   f.querySelector('.pct span').textContent = it.meta>0 ? pct+'%' : '';
 }
 function correr(f, desde, it){
-  const t0 = performance.now(), dur = 1200;
-  const paso = (t)=>{ const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3); texto(f, desde+(it.actual-desde)*e, it); if(k<1) requestAnimationFrame(paso); };
+  const t0 = performance.now(), dur = 1200, yo = f._anim = (f._anim||0)+1; // si llega otro cambio, esta animación se corta
+  const paso = (t)=>{ if(f._anim!==yo) return; const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3); texto(f, desde+(it.actual-desde)*e, it); if(k<1) requestAnimationFrame(paso); };
   requestAnimationFrame(paso);
 }
 function llenar(f, ancho, desdeCero){
@@ -129,7 +129,7 @@ function render(j){
       if(it.cat==='subs') Iconos.abrir(f);
       if(it.cat==='dinero') Iconos.contar(f);
       if(lista && !estabaLista) setTimeout(()=>confeti(f), 500);
-    } else texto(f, it.actual, it);
+    } else { f._anim = (f._anim||0)+1; texto(f, it.actual, it); }
     valores[it.cat] = it.actual;
   });
   primera = false;
@@ -141,7 +141,8 @@ async function cargar(){
     render(j);
   }catch(e){ /* reloj apagado: queda lo último */ }
 }
-cargar(); setInterval(cargar, 2000);
+cargar(); setInterval(cargar, 10000); // respaldo: los cambios llegan al instante por /events
+try { new EventSource('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
 Iconos.auto(filasEl);
 const repetir = parseFloat(params.get('repetir'));
 if(repetir>=10) setInterval(()=>replay(wrap,'entra'), repetir*1000);

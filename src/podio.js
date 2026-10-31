@@ -77,9 +77,12 @@ function createPodio({ store }) {
   }
   let version = Date.now();
   let saveTimer = null;
+  let alCambiar = () => {}, avisoTimer = null; // avisa a los overlays apenas cambia algo (podio, metas, top general)
+  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch {} }, 150); };
 
   function save() {
     version++;
+    avisar();
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveNow, 300);
   }
@@ -185,25 +188,34 @@ function createPodio({ store }) {
     const ev = { id: crypto.randomUUID(), at: when, user: name, cat, manual: true, source: 'manual', ref: null };
     if (cat === 'dinero') {
       const a = Number(amount);
-      if (!(a > 0)) throw new Error('Monto inválido');
+      if (!a || !Number.isFinite(a)) throw new Error('Monto inválido');
       ev.amount = a;
       ev.currency = String(currency || 'USD').toUpperCase();
       ev.usd = toUsd(a, ev.currency);
       if (ev.usd == null) throw new Error(`No hay cotización para ${ev.currency}: pon tu tasa en el panel`);
     } else if (cat === 'bits') {
       const a = Math.round(Number(amount));
-      if (!(a > 0)) throw new Error('Cantidad inválida');
+      if (!a || !Number.isFinite(a)) throw new Error('Cantidad inválida');
       ev.amount = a;
     } else {
       const c = Math.round(Number(count ?? amount));
-      if (!(c > 0)) throw new Error('Cantidad inválida');
+      if (!c || !Number.isFinite(c)) throw new Error('Cantidad inválida');
       ev.count = c;
       ev.kind = 'gift';
+    }
+    const valor = (e) => (cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0);
+    if (valor(ev) < 0) {
+      const key = monthKey(when), quien = name.toLowerCase();
+      const tiene = data.events.filter((e) => e.cat === cat && monthKey(e.at) === key && e.user.toLowerCase() === quien).reduce((t, e) => t + valor(e), 0);
+      if (tiene + valor(ev) < -0.001) {
+        const u = cat === 'dinero' ? `$${round2(Math.max(0, tiene))} USD` : cat === 'bits' ? `${Math.max(0, tiene)} bits` : `${Math.max(0, tiene)} subs`;
+        throw new Error(`${name} tiene ${u} en ${monthLabel(key)}: no se le puede restar más que eso`);
+      }
     }
     data.events.push(ev);
     data.events.sort((a, b) => a.at - b.at);
     save();
-    console.log(`[Podio] Agregado a mano: ${describe(ev)}`);
+    console.log(`[Podio] ${(ev.amount ?? ev.count) < 0 ? 'Restado' : 'Agregado'} a mano: ${describe(ev)}`);
     return ev;
   }
   function removeEvent(id) {
@@ -265,7 +277,7 @@ function createPodio({ store }) {
       if (e.cat !== cat || monthKey(e.at) !== key) continue;
       if (cat === 'subs' && e.kind && e.kind !== 'gift') continue; // el podio de subs es solo de regaladas
       const v = cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0;
-      if (v <= 0) continue;
+      if (!v) continue; // los negativos (restado a mano) descuentan
       const k = e.user.toLowerCase();
       const r = m.get(k) || { name: e.user, total: 0, last: 0, auto: false };
       r.total += v;
@@ -276,6 +288,7 @@ function createPodio({ store }) {
     }
     // Empate: gana quien llegó primero a ese total
     return [...m.values()]
+      .filter((r) => r.total > 0.001)
       .sort((a, b) => b.total - a.total || a.last - b.last)
       .slice(0, limit)
       .map((r) => ({ name: r.name, total: cat === 'dinero' ? round2(r.total) : Math.round(r.total) }));
@@ -292,7 +305,7 @@ function createPodio({ store }) {
       else if (e.cat === 'dinero') t.dinero += Number(e.usd) || 0;
     }
     const a = data.config.ajustes[key] || {};
-    for (const k of Object.keys(t)) t[k] += Number(a[k]) || 0;
+    for (const k of Object.keys(t)) t[k] = Math.max(0, t[k] + (Number(a[k]) || 0)); // nunca menos que 0
     t.dinero = round2(t.dinero);
     return t;
   }
@@ -480,6 +493,7 @@ function createPodio({ store }) {
     console.log(`👑 Terminó ${monthLabel(lastMonth)}. Reyes del mes → ${txt}. Empieza el podio de ${monthLabel(now)}.`);
     lastMonth = now;
     version++;
+    avisar();
   }, 30000);
 
   backfill();
@@ -488,7 +502,7 @@ function createPodio({ store }) {
 
   return {
     record, addManual, removeEvent, renameEvent, renamePerson, vincularMP, setRey, setConfig, refreshRates, toUsd, patitosAporte, vaciarPatitos, patitosStream,
-    publicData, adminData, saveNow, version: () => version,
+    publicData, adminData, saveNow, version: () => version, onCambio: (fn) => { alCambiar = fn; },
   };
 }
 

@@ -66,6 +66,12 @@
   .ev .q b:hover{border-bottom-color:var(--muted)}
   .ev small{color:var(--muted)}
   .ev .x{background:transparent;border-color:transparent;color:var(--bad)}
+  .modo{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:4px}
+  .modo button{border:0;border-radius:0;background:#0f0e14;padding:8px;font-weight:600;justify-content:center}
+  .modo button.on.suma{background:var(--good);color:#06210f} .modo button.on.resta{background:var(--bad);color:#2a0009}
+  .prim.resta{background:var(--bad);border-color:var(--bad);color:#2a0009}
+  .ev .neg{color:var(--bad);font-weight:700}
+  .tag.resta{background:rgba(255,93,115,.15);color:var(--bad)}
   .tag{font-size:10px;padding:1px 6px;border-radius:6px;background:var(--card2);color:var(--muted);margin-left:4px}
   .obs{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
   .obs:last-child{border:0}
@@ -121,7 +127,8 @@
 
   <!-- AGREGAR A MANO -->
   <section class="card">
-    <h2>Agregar a mano</h2>
+    <h2>Agregar o restar a mano</h2>
+    <div class="modo"><button type="button" id="modoSumar" class="on suma">➕ Sumar</button><button type="button" id="modoRestar" class="resta">➖ Restar</button></div>
     <div class="fila">
       <div><label>Categoría</label>
         <select id="addCat">
@@ -133,12 +140,12 @@
     </div>
     <datalist id="nombres"></datalist>
     <div class="fila">
-      <div><label id="addAmountLbl">Monto</label><input id="addAmount" type="number" min="0" step="any" placeholder="0"></div>
+      <div><label id="addAmountLbl">Monto</label><input id="addAmount" type="number" step="any" placeholder="0"></div>
       <div id="addCurWrap"><label>Moneda</label><select id="addCur"></select></div>
     </div>
     <label>Fecha (vacío = ahora)</label>
     <input id="addAt" type="datetime-local">
-    <div class="nota" id="addNota">Para transferencias que el reloj no detectó. Solo cuenta para el podio, no suma tiempo al reloj.</div>
+    <div class="nota" id="addNota">Sumar: aportes que el reloj no detectó. Restar: para corregir (descuenta de esa persona y de las metas). Cambia el podio, las metas y el top general al instante; el tiempo del reloj no cambia.</div>
     <button class="prim" id="addBtn" style="width:100%;margin-top:6px">Agregar al podio</button>
   </section>
 
@@ -223,7 +230,7 @@
       <select id="evFiltro" class="r" style="width:auto">
         <option value="">Todos</option><option value="dinero">Donaciones</option><option value="subs">Subs regaladas</option><option value="bits">Bits</option>
       </select></h2>
-    <div class="nota" style="margin-top:-4px">Clic en un nombre para cambiarlo (ej. si Mercado Pago lo trajo como "Juan" y en Twitch es "juancho99", así se suman juntos). ✕ lo quita del podio (no del reloj).</div>
+    <div class="nota" style="margin-top:-4px">Clic en un nombre para cambiarlo (ej. si Mercado Pago lo trajo como "Juan" y en Twitch es "juancho99", así se suman juntos). ✕ lo quita del podio (no del reloj). Para descontar sin borrar, usa "➖ Restar" arriba.</div>
     <div class="lista" id="eventos"></div>
   </section>
 </main>
@@ -330,12 +337,14 @@ function pintar(){
   const filtro = $('evFiltro').value;
   const lista = D.events.filter(e=>!filtro || e.cat===filtro);
   $('eventos').innerHTML = lista.map(e=>{
-    const det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${e.currency}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
-              : e.cat==='bits' ? `${fmtNum(e.amount)} bits` : e.kind==='new' ? 'sub nueva (solo meta)' : e.kind==='resub' ? 'resub (solo meta)' : `${e.count} sub${e.count>1?'s':''} regalada${e.count>1?'s':''}`;
+    const neg = (e.amount ?? e.count) < 0;
+    let det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${e.currency}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
+              : e.cat==='bits' ? `${fmtNum(e.amount)} bits` : e.kind==='new' ? 'sub nueva (solo meta)' : e.kind==='resub' ? 'resub (solo meta)' : `${e.count} sub${Math.abs(e.count)>1?'s':''} regalada${Math.abs(e.count)>1?'s':''}`;
+    if (neg) det = `<span class="neg">${det.replace(/^-/, '−')}</span>`;
     const h = new Date(e.at).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
     return `<div class="ev"><span class="ic">${ICO[e.cat]}</span>
       <div class="q"><b data-ren="${e.id}" title="Cambiar nombre">${esc(e.user)}</b> <small>· ${det}</small><br>
-      <small>${h} · ${SRC[e.source]||e.source}</small>${e.manual?'<span class="tag">a mano</span>':''}</div>
+      <small>${h} · ${SRC[e.source]||e.source}</small>${neg?'<span class="tag resta">restado a mano</span>':e.manual?'<span class="tag">a mano</span>':''}</div>
       <button class="sm x" data-del="${e.id}" title="Quitar del podio">✕</button></div>`;
   }).join('') || '<div class="vacio">Sin aportes en este mes.</div>';
 
@@ -353,6 +362,17 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
 $('verMes').onchange = ()=>{ mesVer = $('verMes').value===D.mes.key ? '' : $('verMes').value; firma=''; cargar(); };
 $('evFiltro').onchange = pintar;
 
+let restar = false;
+function modo(r){
+  restar = r;
+  $('modoSumar').classList.toggle('on', !r); $('modoRestar').classList.toggle('on', r);
+  $('addBtn').classList.toggle('resta', r);
+  $('addBtn').textContent = r ? 'Restar del podio' : 'Agregar al podio';
+}
+$('modoSumar').onclick = () => modo(false);
+$('modoRestar').onclick = () => modo(true);
+// si escriben un número negativo, pasa solo a "Restar"
+$('addAmount').addEventListener('input', () => { const v = Number($('addAmount').value); if (v < 0) { modo(true); $('addAmount').value = String(Math.abs(v)); } });
 function actualizarForm(){
   const c = $('addCat').value;
   $('addCurWrap').style.display = c==='dinero' ? '' : 'none';
@@ -363,8 +383,10 @@ $('addBtn').onclick = async ()=>{
   const n = $('addNota');
   try{
     const at = $('addAt').value ? new Date($('addAt').value).getTime() : undefined;
-    await api('/api/podio/event','POST',{cat:$('addCat').value, user:$('addUser').value, amount:$('addAmount').value, currency:$('addCur').value, at});
-    nota(n, '✔ Agregado: '+$('addUser').value, 'ok');
+    const v = Math.abs(Number($('addAmount').value));
+    if (!v) throw new Error('Pon una cantidad');
+    await api('/api/podio/event','POST',{cat:$('addCat').value, user:$('addUser').value, amount:restar ? -v : v, currency:$('addCur').value, at});
+    nota(n, (restar ? '✔ Restado: ' : '✔ Agregado: ')+$('addUser').value, 'ok');
     $('addUser').value=''; $('addAmount').value=''; $('addAt').value='';
     firma=''; cargar();
   }catch(e){ nota(n, e.message, 'mal'); }
@@ -374,7 +396,7 @@ $('eventos').addEventListener('click', async (ev)=>{
   const del = ev.target.closest('[data-del]'), ren = ev.target.closest('[data-ren]');
   if(del){
     const e = D.events.find(x=>x.id===del.dataset.del);
-    if(!confirm(`¿Quitar del podio el aporte de ${e.user}? (el reloj no cambia)`)) return;
+    if(!confirm((e.amount ?? e.count) < 0 ? `¿Quitar la resta de ${e.user}? (vuelve a contar lo que se había restado)` : `¿Quitar del podio el aporte de ${e.user}? (el reloj no cambia)`)) return;
     try{ await api('/api/podio/event/'+e.id,'DELETE'); firma=''; cargar(); }catch(err){ alert(err.message); }
   }
   if(ren){
@@ -471,7 +493,8 @@ document.addEventListener('click', (ev)=>{
 });
 
 cargar();
-setInterval(cargar, 3000);
+setInterval(cargar, 10000);
+try { new EventSource('/events').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
 </script>
 </body>
 </html>

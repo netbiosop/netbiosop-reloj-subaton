@@ -159,6 +159,8 @@ setInterval(() => broadcast('state', stateMsg()), 10000);
 
 // ---------- Integraciones ----------
 const podio = createPodio({ store });
+// cualquier cambio del podio (aporte, a mano, quitado, nombre, metas) llega al instante a los overlays
+podio.onCambio((v) => broadcast('podio', { v }));
 // Cada aporte real (no las pruebas) también entra al podio del mes
 const onContribution = (ev) => {
   const entry = engine.contribute(ev);
