@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multichat · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--ok:#3ddc97;--bad:#ff5d73;--warn:#ffb547;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;padding:16px 20px 40px;max-width:1240px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0;border-top:3px solid var(--acc,var(--line))}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 10px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  h2 .r{margin-left:auto}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input[type=text],input[type=password]{width:100%}
+  input[type=number]{width:90px}
+  input[type=checkbox]{accent-color:var(--ok);transform:scale(1.15)}
+  button,.btn{cursor:pointer;background:var(--card2);text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .btn{padding:8px 12px;border:1px solid var(--line);border-radius:9px}
+  button:hover,.btn:hover{border-color:#9b7bff}
+  .prim{background:#9b7bff;border-color:#9b7bff;color:#fff;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .fila{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+  .check{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px;cursor:pointer;color:var(--text)}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px}
+  .nota.ok{color:var(--ok)} .nota.mal{color:var(--bad)}
+  .switch{display:inline-flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid var(--line);background:#0f0e14;cursor:pointer}
+  .switch .bola{width:32px;height:18px;border-radius:999px;background:#3a3548;position:relative;transition:.2s}
+  .switch .bola::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s}
+  .switch.on{border-color:var(--ok);color:var(--ok)} .switch.on .bola{background:var(--ok)} .switch.on .bola::after{left:16px}
+  .estado{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:8px 10px;border-radius:10px;background:#0f0e14;border:1px solid var(--line);font-size:13px}
+  .estado i{flex:0 0 9px;height:9px;border-radius:50%;background:#555;margin-top:5px}
+  .estado.conectado i{background:var(--ok);box-shadow:0 0 6px var(--ok)} .estado.conectando i,.estado.esperando i{background:var(--warn)} .estado.error i{background:var(--bad)}
+  .mc-plat{display:inline-block;font:800 10px/1 Inter,sans-serif;letter-spacing:.05em;padding:4px 7px;border-radius:5px}
+  details{margin-top:10px} summary{cursor:pointer;color:var(--muted);font-size:12px}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8;word-break:break-all}
+  .urls{display:grid;gap:8px}
+  .url{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .url b{min-width:190px;font-weight:600}
+  .url code{flex:1}
+  ol{margin:6px 0 0;padding-left:18px} li{margin:3px 0}
+  @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗨️ Multichat</h1>
+  <span class="sp"></span>
+  <a class="btn prim" href="/multichat" target="_blank">📖 Abrir el chat</a>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card" data-p="twitch" style="--acc:#9146ff">
+    <h2><span class="mc-plat" style="background:#9146ff;color:#fff">TWITCH</span> <button class="switch r" data-on="twitch"><span class="bola"></span><span>Apagado</span></button></h2>
+    <div class="nota">Usa la conexión de Twitch que ya tiene el reloj (Configuración → Conexiones). No hay que poner nada más.</div>
+    <div class="estado" data-estado="twitch"><i></i><span>…</span></div>
+    <div class="fila"><button class="sm" data-probar="twitch">💬 Mensaje de prueba</button></div>
+  </section>
+
+  <section class="card" data-p="kick" style="--acc:#53fc18">
+    <h2><span class="mc-plat" style="background:#53fc18;color:#0b0e0f">KICK</span> <button class="switch r" data-on="kick"><span class="bola"></span><span>Apagado</span></button></h2>
+    <label>Tu canal de Kick (como aparece en kick.com/<b>canal</b>)</label>
+    <input type="text" id="kickCanal" placeholder="bytedemond" autocomplete="off">
+    <details id="kickAvanzado">
+      <summary>¿No conecta? Poner el número del chat a mano</summary>
+      <ol class="nota">
+        <li>Abre en tu navegador <a id="kickLink" href="#" target="_blank" style="color:#9ff0c8">kick.com/api/v2/channels/tu-canal</a></li>
+        <li>Busca (Ctrl+F) <code>"chatroom":{"id":</code> y copia el número que sigue.</li>
+        <li>Pégalo aquí:</li>
+      </ol>
+      <input type="text" id="kickChatroom" placeholder="Ej. 12345678" inputmode="numeric" autocomplete="off" style="margin-top:6px">
+    </details>
+    <div class="estado" data-estado="kick"><i></i><span>…</span></div>
+    <div class="fila"><button class="sm" data-reconectar="kick">🔄 Reconectar</button><button class="sm" data-probar="kick">💬 Mensaje de prueba</button></div>
+  </section>
+
+  <section class="card" data-p="youtube" style="--acc:#ff0033">
+    <h2><span class="mc-plat" style="background:#ff0033;color:#fff">YOUTUBE</span> <button class="switch r" data-on="youtube"><span class="bola"></span><span>Apagado</span></button></h2>
+    <label>Tu canal (@usuario) o el enlace del directo</label>
+    <input type="text" id="ytCanal" placeholder="@bytedemond" autocomplete="off">
+    <div class="nota">Con tu @canal encuentra solo el directo cuando sales en vivo y lo revisa cada minuto. No hace falta clave de YouTube.</div>
+    <div class="estado" data-estado="youtube"><i></i><span>…</span></div>
+    <div class="fila"><button class="sm" data-reconectar="youtube">🔄 Reconectar</button><button class="sm" data-probar="youtube">💬 Mensaje de prueba</button></div>
+  </section>
+
+  <section class="card" data-p="tiktok" style="--acc:#25f4ee">
+    <h2><span class="mc-plat" style="background:#fe2c55;color:#fff;box-shadow:inset -3px 0 0 #25f4ee">TIKTOK</span> <button class="switch r" data-on="tiktok"><span class="bola"></span><span>Apagado</span></button></h2>
+    <label>Tu usuario de TikTok</label>
+    <input type="text" id="ttUsuario" placeholder="@bytedemond" autocomplete="off">
+    <label>Clave de Euler Stream</label>
+    <input type="password" id="ttClave" placeholder="Pega tu clave" autocomplete="off">
+    <label class="check"><input type="checkbox" id="ttRegalos"> Mostrar los regalos (🎁 Rosa x5)</label>
+    <details>
+      <summary>¿Por qué pide una clave y cómo la saco?</summary>
+      <div class="nota">TikTok no deja leer el chat de un LIVE de forma oficial. Euler Stream es un servicio que lo hace por ti y tiene un plan gratis.</div>
+      <ol class="nota">
+        <li>Entra a <a href="https://www.eulerstream.com" target="_blank" style="color:#9ff0c8">eulerstream.com</a> y crea una cuenta gratis.</li>
+        <li>En tu panel de Euler Stream copia tu <b>API Key</b>.</li>
+        <li>Pégala arriba. Se guarda solo en esta PC.</li>
+      </ol>
+    </details>
+    <div class="estado" data-estado="tiktok"><i></i><span>…</span></div>
+    <div class="fila"><button class="sm" data-reconectar="tiktok">🔄 Reconectar</button><button class="sm" data-probar="tiktok">💬 Mensaje de prueba</button></div>
+  </section>
+
+  <section class="card">
+    <h2>Qué se muestra</h2>
+    <label class="check"><input type="checkbox" id="ocultarComandos"> Ocultar comandos (mensajes que empiezan con <code>!</code>)</label>
+    <label>No mostrar a estos usuarios (bots), separados por coma</label>
+    <input type="text" id="ocultar" autocomplete="off">
+    <div class="nota" id="notaGuardado"></div>
+  </section>
+
+  <section class="card">
+    <h2>Overlay en OBS</h2>
+    <div class="fila" style="margin-top:0">
+      <div><label>Mensajes en pantalla</label><input type="number" id="ovMax" min="1" max="50"></div>
+      <div><label>Desaparecen a los (seg)</label><input type="number" id="ovDur" min="0" max="600"></div>
+      <div><label>Tamaño de letra (px)</label><input type="number" id="ovTam" min="12" max="60"></div>
+    </div>
+    <div class="nota">0 segundos = no desaparecen (quedan los últimos).</div>
+  </section>
+
+  <section class="card ancho">
+    <h2>Fuentes de navegador para OBS</h2>
+    <div class="nota" style="margin:0 0 10px">En OBS: Fuentes → ＋ → Navegador → pega la dirección. Tamaño sugerido 420 × 600. El fondo es transparente.</div>
+    <div class="urls" id="urls"></div>
+  </section>
+</main>
+<script src="/multichat-comun.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+let cfg = null;
+const TXT = { conectado: 'Conectado', conectando: 'Conectando…', esperando: 'Esperando', error: 'No conecta', apagado: 'Apagado' };
+function pintarEstado(est){
+  for (const [p, e] of Object.entries(est || {})) {
+    const el = document.querySelector(`[data-estado="${p}"]`); if (!el) continue;
+    el.className = 'estado ' + (e.estado || '');
+    el.querySelector('span').textContent = (TXT[e.estado] || e.estado) + (e.detalle ? ' · ' + e.detalle : '');
+  }
+}
+const editando = (el) => document.activeElement === el;
+function pintar(c){
+  cfg = c;
+  for (const p of ['twitch','kick','youtube','tiktok']) {
+    const b = document.querySelector(`[data-on="${p}"]`); b.classList.toggle('on', c[p].on); b.lastElementChild.textContent = c[p].on ? 'Prendido' : 'Apagado';
+  }
+  if (!editando($('kickCanal'))) $('kickCanal').value = c.kick.canal || '';
+  if (!editando($('kickChatroom'))) $('kickChatroom').value = c.kick.chatroomId || '';
+  const slug = c.kick.canal || 'tu-canal'; $('kickLink').href = 'https://kick.com/api/v2/channels/' + slug; $('kickLink').textContent = 'kick.com/api/v2/channels/' + slug;
+  if (!editando($('ytCanal'))) $('ytCanal').value = c.youtube.canal || '';
+  if (!editando($('ttUsuario'))) $('ttUsuario').value = c.tiktok.usuario || '';
+  $('ttClave').placeholder = c.tiktok.tieneClave ? '•••••••• (guardada; pega otra solo para cambiarla)' : 'Pega tu clave';
+  $('ttRegalos').checked = c.tiktok.regalos;
+  $('ocultarComandos').checked = c.ocultarComandos;
+  if (!editando($('ocultar'))) $('ocultar').value = c.ocultar.join(', ');
+  if (!editando($('ovMax'))) $('ovMax').value = c.overlay.max;
+  if (!editando($('ovDur'))) $('ovDur').value = c.overlay.duracionSeg;
+  if (!editando($('ovTam'))) $('ovTam').value = c.overlay.tamano;
+}
+async function guardar(cambios, aviso = '✔ Guardado'){
+  try { const j = await api('/api/multichat/config', 'POST', cambios); pintar(j.result.config); pintarEstado(j.result.estado); $('notaGuardado').textContent = aviso; $('notaGuardado').className = 'nota ok'; }
+  catch(e){ $('notaGuardado').textContent = e.message; $('notaGuardado').className = 'nota mal'; }
+}
+document.querySelectorAll('[data-on]').forEach((b) => b.onclick = () => guardar({ [b.dataset.on]: { on: !cfg[b.dataset.on].on } }));
+document.querySelectorAll('[data-reconectar]').forEach((b) => b.onclick = async () => { try { pintarEstado((await api('/api/multichat/reconectar', 'POST', { plataforma: b.dataset.reconectar })).result.estado); } catch {} });
+document.querySelectorAll('[data-probar]').forEach((b) => b.onclick = () => api('/api/multichat/probar', 'POST', { plataforma: b.dataset.probar }).catch(() => {}));
+$('kickCanal').onchange = () => guardar({ kick: { canal: $('kickCanal').value, on: true } });
+$('kickChatroom').onchange = () => guardar({ kick: { chatroomId: $('kickChatroom').value } });
+$('ytCanal').onchange = () => guardar({ youtube: { canal: $('ytCanal').value, on: true } });
+$('ttUsuario').onchange = () => guardar({ tiktok: { usuario: $('ttUsuario').value, on: true } });
+$('ttClave').onchange = () => { const v = $('ttClave').value.trim(); if (!v) return; $('ttClave').value = ''; guardar({ tiktok: { apiKey: v } }, '✔ Clave guardada'); };
+$('ttRegalos').onchange = () => guardar({ tiktok: { regalos: $('ttRegalos').checked } });
+$('ocultarComandos').onchange = () => guardar({ ocultarComandos: $('ocultarComandos').checked });
+$('ocultar').onchange = () => guardar({ ocultar: $('ocultar').value });
+$('ovMax').onchange = () => guardar({ overlay: { max: $('ovMax').value } });
+$('ovDur').onchange = () => guardar({ overlay: { duracionSeg: $('ovDur').value } });
+$('ovTam').onchange = () => guardar({ overlay: { tamano: $('ovTam').value } });
+
+const base = location.origin;
+$('urls').innerHTML = [['Chat unido (todas)', '/multichat-overlay'], ['Solo Twitch', '/multichat-overlay?solo=twitch'], ['Solo Kick', '/multichat-overlay?solo=kick'], ['Solo YouTube', '/multichat-overlay?solo=youtube'], ['Solo TikTok', '/multichat-overlay?solo=tiktok']]
+  .map(([n, u]) => `<div class="url"><b>${n}</b><code>${base}${u}</code><button class="sm" data-copiar="${base}${u}">📋 Copiar</button></div>`).join('');
+$('urls').onclick = async (e) => { const b = e.target.closest('[data-copiar]'); if (!b) return; try { await navigator.clipboard.writeText(b.dataset.copiar); b.textContent = '✔ Copiado'; setTimeout(() => b.textContent = '📋 Copiar', 1500); } catch {} };
+
+Multichat.conectar({ alConfig: pintar, alEstado: pintarEstado });
+</script>
+</body>
+</html>

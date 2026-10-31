@@ -172,6 +172,18 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
+## 🗨️ Multichat (Twitch, Kick, YouTube y TikTok)
+
+Menú → **🗨️ Multichat**. Junta el chat de todas tus plataformas; cada mensaje dice de cuál viene (TW, KICK, YT, TT).
+
+- **📖 Abrir el chat:** página para leerlo tú (en otra pantalla o en el celular). Arriba eliges **Un solo chat** o **Por plataforma** (una columna por cada una), el tamaño de letra y si se ve la hora. En "Un solo chat", tocando una plataforma arriba la ocultas o la vuelves a mostrar.
+- **Overlay para OBS** (fondo transparente, 420 × 600): `/multichat-overlay` con todas, o `/multichat-overlay?solo=kick` (también `twitch`, `youtube`, `tiktok`) para una ventana por plataforma.
+- **Twitch:** usa la conexión que ya tiene el reloj.
+- **Kick:** pon el nombre de tu canal. Si Kick no deja leerlo, el panel te explica cómo pegar el número del chat a mano (una sola vez).
+- **YouTube:** pon tu @canal; encuentra solo el directo cuando sales en vivo. No pide clave.
+- **TikTok:** TikTok no tiene una forma oficial de leer el chat, así que se usa **Euler Stream** (cuenta gratis en eulerstream.com → copia tu API Key → pégala en el panel). Muestra también los regalos (🎁 Rosa x5).
+- Oculta los comandos (`!algo`) y los bots que pongas en la lista. Con **💬 Mensaje de prueba** acomodas el overlay sin estar en vivo.
+
 ## 💬 Mensajes automáticos en el chat (bot)
 
 Menú → **💬 Mensajes automáticos**. Se prende y se apaga **desde el chat de Twitch** (o con el botón del panel):

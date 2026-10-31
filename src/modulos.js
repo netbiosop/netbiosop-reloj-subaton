@@ -63,6 +63,21 @@ module.exports = [
     overlays: [{ nombre: 'Tren del hype (pantalla completa)', url: '/hype', tam: '1920 × 1080' }],
   },
   {
+    id: 'multichat',
+    nombre: 'Multichat',
+    icono: '🗨️',
+    color: '#53fc18',
+    desc: 'El chat de Twitch, Kick, YouTube y TikTok en uno solo (cada mensaje con su plataforma), o una ventana por plataforma.',
+    panel: '/multichat-panel',
+    overlays: [
+      { nombre: 'Chat unido (todas las plataformas)', url: '/multichat-overlay', tam: '420 × 600' },
+      { nombre: 'Solo Twitch', url: '/multichat-overlay?solo=twitch', tam: '420 × 600' },
+      { nombre: 'Solo Kick', url: '/multichat-overlay?solo=kick', tam: '420 × 600' },
+      { nombre: 'Solo YouTube', url: '/multichat-overlay?solo=youtube', tam: '420 × 600' },
+      { nombre: 'Solo TikTok', url: '/multichat-overlay?solo=tiktok', tam: '420 × 600' },
+    ],
+  },
+  {
     id: 'automensajes',
     nombre: 'Mensajes automáticos',
     icono: '💬',

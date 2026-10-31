@@ -23,6 +23,7 @@ const paypal = require('./src/paypal');
 const { createCommands } = require('./src/commands');
 const automensajes = require('./src/automensajes');
 const respaldoGithub = require('./src/respaldo-github');
+const multichat = require('./src/multichat');
 const { createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
@@ -176,9 +177,9 @@ const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
   onContribution,
-  onChat: (e) => { automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
+  onChat: (e) => { try { multichat.deTwitch(e); } catch (err) { console.error('[Multichat]', err.message); } automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
   onStream: (isLive, initial) => onStream(isLive, initial),
-  onStatus: sendConnections,
+  onStatus: () => { sendConnections(); multichat.estadoTwitch(twitch.chatOk); },
   onHype: (fase, e, desfase) => onHype(fase, e, desfase),
   redirectUri: `http://localhost:${PORT}/auth/twitch/callback`,
 });
@@ -815,6 +816,14 @@ app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
 setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { console.error('[Código]', e.message); } }, 5000);
 
+// ---------- Multichat (Twitch, Kick, YouTube y TikTok en un solo chat) ----------
+app.get('/api/multichat', (req, res) => res.json(multichat.publicData()));
+app.post('/api/multichat/config', podioRoute((req) => multichat.setConfig(req.body)));
+app.post('/api/multichat/reconectar', podioRoute((req) => multichat.reconectar(String(req.body.plataforma || ''))));
+app.post('/api/multichat/probar', podioRoute((req) => multichat.probar(String(req.body.plataforma || ''))));
+multichat.iniciar(broadcast);
+multichat.estadoTwitch(twitch.chatOk);
+
 // ---------- Mensajes automáticos en el chat ----------
 const autoCtx = () => ({
   live: !!stream.live, descanso: !!d.settings.descanso,
@@ -1048,6 +1057,7 @@ function shutdown(reason) {
   try { codigo.save(); } catch {}
   try { hype.save(); } catch {}
   try { automensajes.save(); } catch {}
+  try { multichat.save(); multichat.parar(); } catch {}
   try { respaldo.respaldar('al cerrar', true); } catch {}
   const subida = Promise.race([respaldoGithub.subir('al cerrar').catch(() => {}), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);

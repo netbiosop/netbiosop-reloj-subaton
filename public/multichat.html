@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multichat · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{--bg:#0b0a10;--card:#15131c;--line:#272333;--text:#ecebf2;--muted:#9a96ab;--tam:16px}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:#100e16}
+  header h1{margin:0;font:400 26px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  .sp{flex:1}
+  .grupo{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .grupo button{border:0;border-radius:0;background:#0f0e14;padding:7px 12px}
+  .grupo button.on{background:#2a2540;color:#fff;font-weight:700}
+  button,.btn{font:inherit;color:var(--text);background:#1d1a26;border:1px solid var(--line);border-radius:9px;padding:7px 11px;cursor:pointer;text-decoration:none}
+  .estados{display:flex;gap:6px;flex-wrap:wrap}
+  .est{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 4px;border-radius:999px;background:#0f0e14;border:1px solid var(--line);font-size:12px;cursor:pointer;user-select:none}
+  .est i{width:8px;height:8px;border-radius:50%;background:#555}
+  .est.conectado i{background:#3ddc97;box-shadow:0 0 6px #3ddc97} .est.conectando i,.est.esperando i{background:#ffb547} .est.error i{background:#ff5d73}
+  .est.oculto{opacity:.4;text-decoration:line-through}
+  input[type=range]{accent-color:#9b7bff;width:90px}
+  main{flex:1;min-height:0;display:flex;gap:10px;padding:10px}
+  .col{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
+  .col h2{margin:0;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .col h2 .n{margin-left:auto;color:var(--muted);font-weight:500}
+  .mensajes{flex:1;overflow-y:auto;padding:8px 10px;font-size:var(--tam);line-height:1.4}
+  .mc-msg{padding:4px 6px;border-radius:8px;overflow-wrap:anywhere}
+  .mc-msg:hover{background:rgba(255,255,255,.04)}
+  .mc-plat{display:inline-block;font:800 10px/1 Inter,sans-serif;letter-spacing:.05em;padding:4px 6px;border-radius:5px;vertical-align:2px;min-width:30px;text-align:center}
+  .mc-autor{font-weight:700} .mc-sep{color:var(--muted);margin-right:2px} .mc-rol{margin-right:3px}
+  .mc-emote{height:1.6em;vertical-align:middle;margin:-.25em 1px}
+  .mc-extra{display:inline-block;font-weight:800;background:linear-gradient(90deg,#ffd43b,#ff922b);color:#1b1200;border-radius:6px;padding:0 6px;font-size:.88em}
+  .mc-tipo-regalo,.mc-tipo-superchat,.mc-tipo-miembro{background:rgba(255,212,59,.08)}
+  .hora{color:#5d586c;font-size:11px;margin-right:4px;font-variant-numeric:tabular-nums}
+  .bajar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:none;background:#9b7bff;border-color:#9b7bff;color:#fff;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .vacio{color:var(--muted);text-align:center;margin-top:30%;font-size:14px}
+  .sinhora .hora{display:none}
+  @media(max-width:800px){
+    main.columnas{overflow-x:auto;scroll-snap-type:x mandatory}
+    main.columnas .col{flex:0 0 88%;scroll-snap-align:center}
+    header{gap:8px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗨️ Multichat</h1>
+  <div class="grupo"><button id="vUnido">Un solo chat</button><button id="vCols">Por plataforma</button></div>
+  <div class="estados" id="estados"></div>
+  <span class="sp"></span>
+  <label title="Tamaño de letra" style="display:flex;align-items:center;gap:6px;color:var(--muted)">A<input type="range" id="tam" min="12" max="30"></label>
+  <button id="horas" title="Mostrar u ocultar la hora">🕒</button>
+  <a class="btn" href="/multichat-panel">⚙️ Ajustes</a>
+  <a class="btn" href="/menu">🏠</a>
+</header>
+<main id="main"></main>
+<script src="/multichat-comun.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const { PLAT, etiqueta, elemento } = Multichat;
+const guardado = (() => { try { return JSON.parse(localStorage.getItem('multichat') || '{}'); } catch { return {}; } })();
+const pref = { vista: 'unido', tam: 16, horas: true, ocultas: [], ...guardado };
+const guardar = () => { try { localStorage.setItem('multichat', JSON.stringify(pref)); } catch {} };
+let todos = [], estado = {}, activas = Object.keys(PLAT), cols = {};
+
+function hora(at){ const d = new Date(at); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function fila(m, conPlataforma){ const el = elemento(m, { conPlataforma }); el.insertAdjacentHTML('afterbegin', `<span class="hora">${hora(m.at)}</span>`); return el; }
+
+function armar(){
+  $('vUnido').classList.toggle('on', pref.vista === 'unido'); $('vCols').classList.toggle('on', pref.vista !== 'unido');
+  document.documentElement.style.setProperty('--tam', pref.tam + 'px'); $('tam').value = pref.tam;
+  document.body.classList.toggle('sinhora', !pref.horas);
+  const main = $('main'); main.className = pref.vista === 'unido' ? '' : 'columnas'; main.innerHTML = ''; cols = {};
+  const lista = pref.vista === 'unido' ? [['todas', 'Todas las plataformas']] : activas.map((p) => [p, PLAT[p].nombre]);
+  for (const [id, nombre] of lista) {
+    const col = document.createElement('section'); col.className = 'col';
+    col.innerHTML = `<h2>${id === 'todas' ? '💬' : etiqueta(id)} ${nombre} <span class="n"></span></h2><div class="mensajes"></div><button class="bajar">↓ Mensajes nuevos</button>`;
+    const box = col.querySelector('.mensajes'), bajar = col.querySelector('.bajar');
+    const c = cols[id] = { box, bajar, n: col.querySelector('.n'), pegado: true, cuenta: 0 };
+    box.addEventListener('scroll', () => { c.pegado = box.scrollHeight - box.scrollTop - box.clientHeight < 40; if (c.pegado) bajar.style.display = 'none'; });
+    bajar.onclick = () => { box.scrollTop = box.scrollHeight; };
+    main.appendChild(col);
+  }
+  for (const m of todos) poner(m, false);
+  for (const c of Object.values(cols)) { if (!c.box.children.length) c.box.innerHTML = '<div class="vacio">Todavía no hay mensajes</div>'; c.box.scrollTop = c.box.scrollHeight; }
+}
+function poner(m, vivo = true){
+  const id = pref.vista === 'unido' ? 'todas' : m.plataforma;
+  const c = cols[id]; if (!c) return;
+  if (pref.vista === 'unido' && pref.ocultas.includes(m.plataforma)) return;
+  c.box.querySelector('.vacio')?.remove();
+  c.box.appendChild(fila(m, pref.vista === 'unido'));
+  while (c.box.children.length > 400) c.box.firstElementChild.remove();
+  c.n.textContent = ++c.cuenta;
+  if (!vivo) return;
+  if (c.pegado) c.box.scrollTop = c.box.scrollHeight; else c.bajar.style.display = 'block';
+}
+function pintarEstados(){
+  $('estados').innerHTML = activas.map((p) => {
+    const e = estado[p] || {};
+    const txt = { conectado: 'conectado', conectando: 'conectando…', esperando: 'esperando', error: 'error', apagado: 'apagado' }[e.estado] || '';
+    return `<span class="est ${e.estado || ''} ${pref.ocultas.includes(p) ? 'oculto' : ''}" data-p="${p}" title="${Multichat.esc(e.detalle || txt)}${pref.vista === 'unido' ? ' · clic para mostrar u ocultar' : ''}">${etiqueta(p)}<i></i>${txt}</span>`;
+  }).join('');
+}
+$('estados').onclick = (e) => {
+  const b = e.target.closest('[data-p]'); if (!b || pref.vista !== 'unido') return;
+  const p = b.dataset.p; pref.ocultas = pref.ocultas.includes(p) ? pref.ocultas.filter((x) => x !== p) : [...pref.ocultas, p];
+  guardar(); pintarEstados(); armar();
+};
+$('vUnido').onclick = () => { pref.vista = 'unido'; guardar(); armar(); pintarEstados(); };
+$('vCols').onclick = () => { pref.vista = 'columnas'; guardar(); armar(); pintarEstados(); };
+$('tam').oninput = () => { pref.tam = Number($('tam').value); guardar(); document.documentElement.style.setProperty('--tam', pref.tam + 'px'); };
+$('horas').onclick = () => { pref.horas = !pref.horas; guardar(); document.body.classList.toggle('sinhora', !pref.horas); };
+
+Multichat.conectar({
+  alInicio: (j) => { todos = j.mensajes || []; },
+  alConfig: (c) => {
+    const nuevas = Object.keys(PLAT).filter((p) => c[p]?.on);
+    const cambio = nuevas.join() !== activas.join(); activas = nuevas.length ? nuevas : ['twitch'];
+    if (cambio || !Object.keys(cols).length) armar();
+    pintarEstados();
+  },
+  alEstado: (e) => { estado = e; pintarEstados(); },
+  alMensaje: (m) => { todos.push(m); if (todos.length > 600) todos.shift(); poner(m); },
+});
+</script>
+</body>
+</html>
