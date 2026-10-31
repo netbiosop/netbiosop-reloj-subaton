@@ -1,4 +1,4 @@
-// Lo que comparten el overlay del multichat y la página para leerlo: etiquetas de plataforma, armado de cada mensaje y conexión en vivo.
+// Lo que comparten la página del multichat y sus ajustes: etiquetas de plataforma, armado de cada mensaje y conexión en vivo.
 window.Multichat = (() => {
   const PLAT = {
     twitch: { nombre: 'Twitch', corto: 'TW', color: '#9146ff', texto: '#fff' },
@@ -33,9 +33,9 @@ window.Multichat = (() => {
     return div;
   }
   // Conexión en vivo: llama a alMensaje(m), alEstado(estado), alConfig(config)
-  function conectar({ overlay = false, alMensaje, alEstado, alConfig, alInicio }) {
+  function conectar({ alMensaje, alEstado, alConfig, alInicio }) {
     fetch('/api/multichat').then((r) => r.json()).then((j) => { alInicio?.(j); alEstado?.(j.estado); alConfig?.(j.config); }).catch(() => {});
-    const es = new EventSource('/events' + (overlay ? '?overlay=1' : ''));
+    const es = new EventSource('/events');
     es.onmessage = (ev) => {
       let d; try { d = JSON.parse(ev.data); } catch { return; }
       if (d.type !== 'multichat') return;

@@ -22,9 +22,7 @@ const OPEN_PATHS = new Set(['/overlay', '/overlay.html', '/sounds.js', '/login',
   // Overlays del código de creador
   '/codigo-tarjeta', '/codigo-tarjeta.html', '/codigo-cinta', '/codigo-cinta.html', '/api/codigo',
   // Overlay del tren del hype
-  '/hype', '/hype.html', '/api/hype', '/hype-analisis.js',
-  // Overlay del multichat (el chat ya es público)
-  '/multichat-overlay', '/multichat-overlay.html', '/multichat-comun.js', '/api/multichat']);
+  '/hype', '/hype.html', '/api/hype', '/hype-analisis.js']);
 
 // Lo único que puede usar un moderador
 const MOD_GET = new Set(['/mod', '/mod.html', '/mod.js', '/panel.css', '/api/mod/data', '/events']);

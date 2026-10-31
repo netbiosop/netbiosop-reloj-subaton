@@ -41,19 +41,15 @@
   .mc-plat{display:inline-block;font:800 10px/1 Inter,sans-serif;letter-spacing:.05em;padding:4px 7px;border-radius:5px}
   details{margin-top:10px} summary{cursor:pointer;color:var(--muted);font-size:12px}
   code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8;word-break:break-all}
-  .urls{display:grid;gap:8px}
-  .url{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .url b{min-width:190px;font-weight:600}
-  .url code{flex:1}
   ol{margin:6px 0 0;padding-left:18px} li{margin:3px 0}
   @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} }
 </style>
 </head>
 <body>
 <header>
-  <h1>🗨️ Multichat</h1>
+  <h1>⚙️ Ajustes del multichat</h1>
   <span class="sp"></span>
-  <a class="btn prim" href="/multichat" target="_blank">📖 Abrir el chat</a>
+  <a class="btn prim" href="/multichat">📖 Volver al chat</a>
   <a class="btn sm" href="/menu">🏠 Menú</a>
 </header>
 <main>
@@ -118,21 +114,6 @@
     <div class="nota" id="notaGuardado"></div>
   </section>
 
-  <section class="card">
-    <h2>Overlay en OBS</h2>
-    <div class="fila" style="margin-top:0">
-      <div><label>Mensajes en pantalla</label><input type="number" id="ovMax" min="1" max="50"></div>
-      <div><label>Desaparecen a los (seg)</label><input type="number" id="ovDur" min="0" max="600"></div>
-      <div><label>Tamaño de letra (px)</label><input type="number" id="ovTam" min="12" max="60"></div>
-    </div>
-    <div class="nota">0 segundos = no desaparecen (quedan los últimos).</div>
-  </section>
-
-  <section class="card ancho">
-    <h2>Fuentes de navegador para OBS</h2>
-    <div class="nota" style="margin:0 0 10px">En OBS: Fuentes → ＋ → Navegador → pega la dirección. Tamaño sugerido 420 × 600. El fondo es transparente.</div>
-    <div class="urls" id="urls"></div>
-  </section>
 </main>
 <script src="/multichat-comun.js"></script>
 <script>
@@ -168,9 +149,6 @@ function pintar(c){
   $('ttRegalos').checked = c.tiktok.regalos;
   $('ocultarComandos').checked = c.ocultarComandos;
   if (!editando($('ocultar'))) $('ocultar').value = c.ocultar.join(', ');
-  if (!editando($('ovMax'))) $('ovMax').value = c.overlay.max;
-  if (!editando($('ovDur'))) $('ovDur').value = c.overlay.duracionSeg;
-  if (!editando($('ovTam'))) $('ovTam').value = c.overlay.tamano;
 }
 async function guardar(cambios, aviso = '✔ Guardado'){
   try { const j = await api('/api/multichat/config', 'POST', cambios); pintar(j.result.config); pintarEstado(j.result.estado); $('notaGuardado').textContent = aviso; $('notaGuardado').className = 'nota ok'; }
@@ -187,14 +165,6 @@ $('ttClave').onchange = () => { const v = $('ttClave').value.trim(); if (!v) ret
 $('ttRegalos').onchange = () => guardar({ tiktok: { regalos: $('ttRegalos').checked } });
 $('ocultarComandos').onchange = () => guardar({ ocultarComandos: $('ocultarComandos').checked });
 $('ocultar').onchange = () => guardar({ ocultar: $('ocultar').value });
-$('ovMax').onchange = () => guardar({ overlay: { max: $('ovMax').value } });
-$('ovDur').onchange = () => guardar({ overlay: { duracionSeg: $('ovDur').value } });
-$('ovTam').onchange = () => guardar({ overlay: { tamano: $('ovTam').value } });
-
-const base = location.origin;
-$('urls').innerHTML = [['Chat unido (todas)', '/multichat-overlay'], ['Solo Twitch', '/multichat-overlay?solo=twitch'], ['Solo Kick', '/multichat-overlay?solo=kick'], ['Solo YouTube', '/multichat-overlay?solo=youtube'], ['Solo TikTok', '/multichat-overlay?solo=tiktok']]
-  .map(([n, u]) => `<div class="url"><b>${n}</b><code>${base}${u}</code><button class="sm" data-copiar="${base}${u}">📋 Copiar</button></div>`).join('');
-$('urls').onclick = async (e) => { const b = e.target.closest('[data-copiar]'); if (!b) return; try { await navigator.clipboard.writeText(b.dataset.copiar); b.textContent = '✔ Copiado'; setTimeout(() => b.textContent = '📋 Copiar', 1500); } catch {} };
 
 Multichat.conectar({ alConfig: pintar, alEstado: pintarEstado });
 </script>

@@ -1,6 +1,6 @@
 // Multichat: junta en un solo lugar el chat de Twitch, Kick, YouTube y TikTok.
-// Cada mensaje llega con su plataforma, y los overlays (/multichat-overlay) y la página para leerlo (/multichat)
-// lo reciben en vivo por /events (tipo "multichat"). Se configura en /multichat-panel → data/multichat.json.
+// Es para el streamer (no sale en el stream): cada mensaje llega con su plataforma a la página /multichat
+// en vivo por /events (tipo "multichat"). Se configura en /multichat-panel → data/multichat.json.
 //   • Twitch: usa la conexión que el reloj ya tiene.
 //   • Kick: chat público por WebSocket (Pusher), solo con el nombre del canal.
 //   • YouTube: el chat del directo, sin clave de API (lo mismo que usa la página de YouTube).
@@ -24,7 +24,6 @@ const DEFAULTS = {
   tiktok: { on: false, usuario: '', apiKey: '', regalos: true },
   ocultarComandos: true,                      // no mostrar mensajes que empiezan con !
   ocultar: ['nightbot', 'streamelements', 'moobot', 'fossabot', 'botrix', 'kickbot'], // bots que no se muestran
-  overlay: { max: 10, duracionSeg: 0, tamano: 24 }, // duracionSeg 0 = no desaparecen
 };
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -32,7 +31,8 @@ const txt = (v, max = 120) => String(v ?? '').trim().slice(0, max);
 let config = clone(DEFAULTS);
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  config = { ...clone(DEFAULTS), ...j, overlay: { ...DEFAULTS.overlay, ...j.overlay } };
+  config = { ...clone(DEFAULTS), ...j };
+  delete config.overlay;
   for (const p of PLATAFORMAS) config[p] = { ...DEFAULTS[p], ...(j[p] || {}) };
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Multichat] No se pudo leer', FILE, '-', err.message);
@@ -296,12 +296,6 @@ function setConfig(b = {}) {
   }
   if ('ocultarComandos' in b) config.ocultarComandos = !!b.ocultarComandos;
   if ('ocultar' in b) config.ocultar = (Array.isArray(b.ocultar) ? b.ocultar : String(b.ocultar).split(/[\s,]+/)).map((u) => String(u).replace(/^@/, '').trim().toLowerCase()).filter(Boolean).slice(0, 50);
-  if (b.overlay) {
-    const o = config.overlay, n = (v, a, z, d) => (Number.isFinite(Number(v)) ? Math.min(z, Math.max(a, Math.round(Number(v)))) : d);
-    if ('max' in b.overlay) o.max = n(b.overlay.max, 1, 50, o.max);
-    if ('duracionSeg' in b.overlay) o.duracionSeg = n(b.overlay.duracionSeg, 0, 600, o.duracionSeg);
-    if ('tamano' in b.overlay) o.tamano = n(b.overlay.tamano, 12, 60, o.tamano);
-  }
   save();
   const cambio = (p, ...k) => k.some((x) => JSON.stringify(antes[p][x]) !== JSON.stringify(config[p][x]));
   if (cambio('kick', 'on', 'canal', 'chatroomId')) { kick.intento = 0; conectarKick(); }
@@ -317,7 +311,7 @@ function reconectar(p) {
   else if (p === 'tiktok') { tt.intento = 0; conectarTT(); }
   return publicData();
 }
-// Mensaje de prueba (para acomodar el overlay sin estar en vivo)
+// Mensaje de prueba (para ver cómo se ve sin estar en vivo)
 const PRUEBAS = { twitch: ['nephallems', '¡Vamos con todo! PogChamp'], kick: ['Fevuer', 'saludos desde kick 💚'], youtube: ['Cuervo_88', 'llegué tarde, ¿qué me perdí?'], tiktok: ['tussi.oficial', 'holaaa 🔥🔥'] };
 function probar(p) {
   const [autor, texto] = PRUEBAS[p] || PRUEBAS.twitch;

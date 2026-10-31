@@ -174,15 +174,15 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 
 ## 🗨️ Multichat (Twitch, Kick, YouTube y TikTok)
 
-Menú → **🗨️ Multichat**. Junta el chat de todas tus plataformas; cada mensaje dice de cuál viene (TW, KICK, YT, TT).
+Menú → **🗨️ Multichat**. Es para ti, no sale en el stream: lees en un solo lugar lo que te escriben en todas tus plataformas, y cada mensaje dice de cuál viene (TW, KICK, YT, TT). Ábrelo en otra pantalla o en el celular.
 
-- **📖 Abrir el chat:** página para leerlo tú (en otra pantalla o en el celular). Arriba eliges **Un solo chat** o **Por plataforma** (una columna por cada una), el tamaño de letra y si se ve la hora. En "Un solo chat", tocando una plataforma arriba la ocultas o la vuelves a mostrar.
-- **Overlay para OBS** (fondo transparente, 420 × 600): `/multichat-overlay` con todas, o `/multichat-overlay?solo=kick` (también `twitch`, `youtube`, `tiktok`) para una ventana por plataforma.
-- **Twitch:** usa la conexión que ya tiene el reloj.
-- **Kick:** pon el nombre de tu canal. Si Kick no deja leerlo, el panel te explica cómo pegar el número del chat a mano (una sola vez).
-- **YouTube:** pon tu @canal; encuentra solo el directo cuando sales en vivo. No pide clave.
-- **TikTok:** TikTok no tiene una forma oficial de leer el chat, así que se usa **Euler Stream** (cuenta gratis en eulerstream.com → copia tu API Key → pégala en el panel). Muestra también los regalos (🎁 Rosa x5).
-- Oculta los comandos (`!algo`) y los bots que pongas en la lista. Con **💬 Mensaje de prueba** acomodas el overlay sin estar en vivo.
+- Arriba eliges **Un solo chat** o **Por plataforma** (una columna por cada una), el tamaño de letra y si se ve la hora. En "Un solo chat", tocando una plataforma arriba la ocultas o la vuelves a mostrar.
+- **⚙️ Ajustes** para conectar cada plataforma:
+  - **Twitch:** usa la conexión que ya tiene el reloj.
+  - **Kick:** pon el nombre de tu canal. Si Kick no deja leerlo, el panel te explica cómo pegar el número del chat a mano (una sola vez).
+  - **YouTube:** pon tu @canal; encuentra solo el directo cuando sales en vivo. No pide clave.
+  - **TikTok:** TikTok no tiene una forma oficial de leer el chat, así que se usa **Euler Stream** (cuenta gratis en eulerstream.com → copia tu API Key → pégala en Ajustes). Muestra también los regalos (🎁 Rosa x5).
+- Oculta los comandos (`!algo`) y los bots que pongas en la lista. Con **💬 Mensaje de prueba** ves cómo se ve sin estar en vivo.
 
 ## 💬 Mensajes automáticos en el chat (bot)
 
