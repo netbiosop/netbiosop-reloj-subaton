@@ -168,6 +168,7 @@ class TwitchClient {
 
   stop() {
     this.stopped = true;
+    this.chatOk = false;
     clearTimeout(this.reconnectTimer);
     clearTimeout(this.watchdog);
     for (const ws of [this.ws, this.pendingWs]) ws?.close();
