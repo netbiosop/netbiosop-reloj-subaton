@@ -13,7 +13,8 @@ const RAIZ = path.join(__dirname, '..');
 const DATA_DIR = process.env.DATA_DIR || path.join(RAIZ, 'data');
 const LOG_DIR = process.env.LOG_DIR || path.join(RAIZ, 'logs');
 const CONF = path.join(RAIZ, 'respaldo-config.json'); // fuera de "data" a propósito
-const ARCHIVOS = ['subaton.json', 'podio.json', 'codigo.json', 'hype.json', 'automensajes.json'];
+const ARCHIVOS = ['subaton.json', 'podio.json', 'codigo.json', 'hype.json', 'automensajes.json', 'multichat.json'];
+const IMPORTANTES = ['subaton.json', 'podio.json'];
 const RECIENTES = 100, DIAS = 60, ESPERA_SEG = 5;
 const stat = (f) => fs.statSync(f, { throwIfNoEntry: false });
 
@@ -93,6 +94,7 @@ function huella() {
   return ARCHIVOS.map((f) => { const s = stat(path.join(DATA_DIR, f)); return s ? f + s.size + ':' + s.mtimeMs : f + '-'; }).join('|');
 }
 function respaldar(motivo = 'automática', forzar = false) {
+  try { require('./respaldo-github').pedir(motivo); } catch {} // copia silenciosa en GitHub (si está configurada)
   if (!conf.on && !forzar) return null;
   guardarAntes();
   const h = huella();
@@ -153,7 +155,7 @@ function iniciar(guardar) {
 }
 // cada donación, sub o bits: espera unos segundos por si llegan más juntos y hace una sola copia
 function alAporte() {
-  if (!conf.on) return;
+  if (!conf.on) { try { antesDeCopiar(); require('./respaldo-github').pedir('aporte nuevo'); } catch {} return; }
   aportesJuntos++;
   clearTimeout(timerAporte);
   timerAporte = setTimeout(() => {

@@ -172,17 +172,29 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
+## 🗨️ Multichat (Twitch, Kick, YouTube y TikTok)
+
+Menú → **🗨️ Multichat**. Es para ti, no sale en el stream: lees en un solo lugar lo que te escriben en todas tus plataformas, y cada mensaje dice de cuál viene (TW, KICK, YT, TT). Ábrelo en otra pantalla o en el celular.
+
+- Arriba eliges **Un solo chat** o **Por plataforma** (una columna por cada una), el tamaño de letra y si se ve la hora. En "Un solo chat", tocando una plataforma arriba la ocultas o la vuelves a mostrar.
+- **⚙️ Ajustes** para conectar cada plataforma:
+  - **Twitch:** usa la conexión que ya tiene el reloj.
+  - **Kick:** pon el nombre de tu canal. Si Kick no deja leerlo, el panel te explica cómo pegar el número del chat a mano (una sola vez).
+  - **YouTube:** pon tu @canal; encuentra solo el directo cuando sales en vivo. No pide clave.
+  - **TikTok:** TikTok no tiene una forma oficial de leer el chat, así que se usa **Euler Stream** (cuenta gratis en eulerstream.com → copia tu API Key → pégala en Ajustes). Muestra también los regalos (🎁 Rosa x5).
+- Oculta los comandos (`!algo`) y los bots que pongas en la lista. Con **💬 Mensaje de prueba** ves cómo se ve sin estar en vivo.
+
 ## 💬 Mensajes automáticos en el chat (bot)
 
-No aparece en el menú. Se prende y se apaga **desde el chat de Twitch**:
+Menú → **💬 Mensajes automáticos**. Se prende y se apaga **desde el chat de Twitch** (o con el botón del panel):
 
 - `activar bot` → empieza a mandar un mensaje **cada 10 minutos**, de a uno y en orden (rotando).
 - `desactivar bot` → deja de mandarlos.
-- Solo pueden hacerlo **Nephallems** y tú (el dueño del canal). El bot responde en el chat para confirmar.
+- Pueden hacerlo tú (el dueño del canal) y las personas de la lista del panel (viene con **Nephallems**). Para sumar a alguien: escribe su nombre de Twitch y toca **＋ Agregar**; se revisa en Twitch que la cuenta exista con ese nombre. La ✕ lo quita. El bot responde en el chat para confirmar.
 - Solo manda mensajes con el stream en vivo y nunca durante el descanso.
 - Los mensajes salen desde tu cuenta de Twitch. Si no escribe nada, en Configuración pulsa Desconectar y vuelve a Conectar con Twitch.
 
-**Editar los mensajes:** abre a mano la dirección `http://localhost:3000/automensajes-panel` (con el puerto de tu reloj). Ahí agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
+**Editar los mensajes:** en el panel agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
 
 ## 🔄 Actualizaciones automáticas
 

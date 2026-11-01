@@ -63,14 +63,22 @@ module.exports = [
     overlays: [{ nombre: 'Tren del hype (pantalla completa)', url: '/hype', tam: '1920 × 1080' }],
   },
   {
+    id: 'multichat',
+    nombre: 'Multichat',
+    icono: '🗨️',
+    color: '#53fc18',
+    desc: 'Para ti: lee en un solo lugar lo que te escriben en Twitch, Kick, YouTube y TikTok (todo junto o una columna por plataforma).',
+    panel: '/multichat',
+    overlays: [],
+  },
+  {
     id: 'automensajes',
     nombre: 'Mensajes automáticos',
     icono: '💬',
     color: '#5ab0ff',
-    desc: 'Mensajes con emotes que se escriben solos en tu chat cada X minutos. Se prenden y apagan desde el chat con "activar bot" / "desactivar bot".',
+    desc: 'Un mensaje con emotes en tu chat cada 10 minutos. Se prende con "activar bot" en el chat o con el botón del panel.',
     panel: '/automensajes-panel',
     overlays: [],
-    oculto: true, // no sale en el menú: se activa desde el chat ("activar bot") y el panel se abre en /automensajes-panel
   },
   {
     id: 'respaldo',

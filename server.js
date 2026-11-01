@@ -23,6 +23,8 @@ const { StreamElementsClient } = require('./src/streamelements');
 const paypal = require('./src/paypal');
 const { createCommands } = require('./src/commands');
 const automensajes = require('./src/automensajes');
+const respaldoGithub = require('./src/respaldo-github');
+const multichat = require('./src/multichat');
 const { createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
@@ -168,6 +170,8 @@ setInterval(() => broadcast('state', stateMsg()), 10000);
 
 // ---------- Integraciones ----------
 const podio = createPodio({ store });
+// cualquier cambio del podio (aporte, a mano, quitado, nombre, metas) llega al instante a los overlays
+podio.onCambio((v) => broadcast('podio', { v }));
 // Cada aporte real (no las pruebas) también entra al podio del mes
 const onContribution = (ev) => {
   const entry = engine.contribute(ev);
@@ -185,9 +189,9 @@ const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
   onContribution,
-  onChat: (e) => { automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
+  onChat: (e) => { try { multichat.deTwitch(e); } catch (err) { console.error('[Multichat]', err.message); } automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
   onStream: (isLive, initial) => onStream(isLive, initial),
-  onStatus: sendConnections,
+  onStatus: () => { sendConnections(); multichat.estadoTwitch(twitch.chatOk); },
   onHype: (fase, e, desfase) => onHype(fase, e, desfase),
   redirectUri: `http://localhost:${PORT}/auth/twitch/callback`,
 });
@@ -821,6 +825,14 @@ app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
 setInterval(() => intentar('Código', () => codigo.tick(broadcast, codigoCtx())), 5000);
 
+// ---------- Multichat (Twitch, Kick, YouTube y TikTok en un solo chat) ----------
+app.get('/api/multichat', (req, res) => res.json(multichat.publicData()));
+app.post('/api/multichat/config', podioRoute((req) => multichat.setConfig(req.body)));
+app.post('/api/multichat/reconectar', podioRoute((req) => multichat.reconectar(String(req.body.plataforma || ''))));
+app.post('/api/multichat/probar', podioRoute((req) => multichat.probar(String(req.body.plataforma || ''))));
+multichat.iniciar(broadcast);
+multichat.estadoTwitch(twitch.chatOk);
+
 // ---------- Mensajes automáticos en el chat ----------
 const autoCtx = () => ({
   live: !!stream.live, descanso: !!d.settings.descanso,
@@ -831,6 +843,23 @@ const autoCtx = () => ({
 });
 app.get('/api/automensajes', (req, res) => res.json(automensajes.estado(autoCtx())));
 app.post('/api/automensajes/config', podioRoute((req) => automensajes.setConfig(req.body)));
+// Agregar a alguien que puede escribir "activar bot": se verifica que exista en Twitch con ese nombre exacto
+app.post('/api/automensajes/quien', async (req, res) => {
+  try {
+    const login = automensajes.normalizar(req.body.login);
+    if (!automensajes.esLogin(login)) throw new Error('Ese no es un nombre de Twitch válido (solo letras, números y _, de 3 a 25)');
+    let nombre = login, verificado = false;
+    if (twitch.s?.accessToken) {
+      const j = await twitch.helix('GET', '/users?login=' + encodeURIComponent(login));
+      const u = j.data?.[0];
+      if (!u) throw new Error(`No existe nadie en Twitch con el nombre "${login}". Revisa que esté escrito igual que en Twitch.`);
+      nombre = u.display_name || u.login; verificado = true;
+    }
+    console.log(`[Automensajes] ${nombre} ahora puede escribir "activar bot"${verificado ? '' : ' (sin verificar: Twitch no está conectado)'}`);
+    ok(res, { result: automensajes.agregarQuien(login, nombre), nombre, verificado });
+  } catch (err) { res.json({ error: err.message }, 400); }
+});
+app.post('/api/automensajes/quitar', podioRoute((req) => automensajes.quitarQuien(req.body.login)));
 app.post('/api/automensajes/enviar', async (req, res) => {
   try { ok(res, { result: await automensajes.enviarAhora(String(req.body.id || ''), autoCtx()) }); } catch (err) { res.json({ error: err.message }, 400); }
 });
@@ -897,6 +926,17 @@ app.post('/api/respaldo/abrir', (req, res) => {
   intentar('Respaldo', () => fs.mkdirSync(dir, { recursive: true }));
   abrirCarpeta(dir);
   ok(res);
+});
+// Copia oculta en GitHub (privado): solo se configura escribiendo /respaldo-github en el navegador
+app.get('/api/respaldo-github', (req, res) => res.json(respaldoGithub.info()));
+app.post('/api/respaldo-github/config', async (req, res) => {
+  try { ok(res, { result: await respaldoGithub.setConfig(req.body) }); } catch (err) { res.json({ error: err.message }, 400); }
+});
+app.post('/api/respaldo-github/ahora', async (req, res) => {
+  intentar('Datos', guardarTodo);
+  await respaldoGithub.subir('manual');
+  const i = respaldoGithub.info();
+  i.error ? res.json({ error: i.error }, 400) : ok(res, { result: i });
 });
 app.post('/api/respaldo/restaurar', (req, res) => {
   try { respaldo.pedirRestaurar(String(req.body.copia || '')); } catch (err) { return res.json({ error: err.message }, 400); }
@@ -994,6 +1034,7 @@ function guardarTodo() {
   codigo.save();
   hype.save();
   automensajes.save();
+  multichat.save();
 }
 
 // Lo que comparten reiniciar y apagar: guardar todo, soltar las conexiones y liberar los puertos
@@ -1003,6 +1044,7 @@ function prepararCierre() {
   persistTimer();
   guardarTodo();
   for (const c of [twitch, mp, se]) intentar('Conexiones', () => c.stop());
+  intentar('Multichat', () => multichat.parar());
 }
 function cerrarServidores(alCerrar) {
   server.close(alCerrar);
@@ -1033,15 +1075,16 @@ function shutdown(reason) {
   if (shuttingDown) return;
   prepararCierre();
   intentar('Respaldo', () => respaldo.respaldar('al cerrar', true));
+  const subida = Promise.race([respaldoGithub.subir('al cerrar').catch((e) => console.error('[Respaldo GitHub]', e.message)), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);
   logger.close(stream.live ? ['Resumen hasta el cierre:', ...sessionSummary()] : []);
   intentar('Paneles', () => live.broadcast('shutdown', { reason }));
-  setTimeout(() => {
+  Promise.all([subida, new Promise((r) => setTimeout(r, 300))]).then(() => {
     intentar('Servidores', () => cerrarServidores());
     removePid();
     process.exit(0);
-  }, 300);
-  setTimeout(() => process.exit(0), 3000).unref();
+  });
+  setTimeout(() => process.exit(0), 10000).unref();
 }
 
 // Archivo con el número de proceso: si alguna vez el reloj se cuelga, iniciar.bat lo puede cerrar
