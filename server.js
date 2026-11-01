@@ -827,14 +827,29 @@ multichat.iniciar(broadcast);
 multichat.estadoTwitch(twitch.chatOk);
 
 // ---------- Mensajes automáticos en el chat ----------
+// Cuentas vinculadas (ej. Nephallems): el bot escribe con la cuenta de quien lo activó
+const cuentasTwitch = require('./src/twitch-cuentas').crearCuentas({ store, twitch });
 const autoCtx = () => ({
   live: !!stream.live, descanso: !!d.settings.descanso,
   puedeChat: () => !!twitch.chatOk,
-  enviar: (texto, responderA) => twitch.sendChat(texto, responderA),
+  tieneCuenta: (login) => cuentasTwitch.tiene(login),
+  // si la cuenta de esa persona falla (permiso quitado), sale con la del canal para no perder el mensaje
+  enviar: async (texto, responderA, como) => (como && cuentasTwitch.tiene(como) && (await cuentasTwitch.enviar(como, texto, responderA))) || (twitch.chatOk ? twitch.sendChat(texto, responderA) : false),
   tiempo: () => fmtDuration(timer.remainingMs / 1000),
   canal: () => d.secrets?.twitch?.login || '',
 });
-app.get('/api/automensajes', (req, res) => res.json(automensajes.estado(autoCtx())));
+app.get('/api/automensajes', (req, res) => res.json({ ...automensajes.estado(autoCtx()), cuentas: cuentasTwitch.resumen() }));
+// Vincular la cuenta de una persona de la lista: devuelve el código para twitch.tv/activate
+app.post('/api/automensajes/vincular', async (req, res) => {
+  try {
+    const login = automensajes.normalizar(req.body.login);
+    if (!automensajes.getConfig().quienes.includes(login)) throw new Error('Primero agrega a esa persona a la lista');
+    ok(res, { result: await cuentasTwitch.empezar(login) });
+  } catch (err) { res.json({ error: err.message }, 400); }
+});
+app.get('/api/automensajes/vincular', (req, res) => res.json(cuentasTwitch.estado(automensajes.normalizar(req.query.login))));
+app.post('/api/automensajes/desvincular', podioRoute((req) => { const l = automensajes.normalizar(req.body.login); cuentasTwitch.quitar(l); return { login: l }; }));
+app.post('/api/automensajes/vincular/cancelar', podioRoute((req) => { cuentasTwitch.cancelar(automensajes.normalizar(req.body.login)); return {}; }));
 app.post('/api/automensajes/config', podioRoute((req) => automensajes.setConfig(req.body)));
 // Agregar a alguien que puede escribir "activar bot": se verifica que exista en Twitch con ese nombre exacto
 app.post('/api/automensajes/quien', async (req, res) => {
@@ -852,7 +867,7 @@ app.post('/api/automensajes/quien', async (req, res) => {
     ok(res, { result: automensajes.agregarQuien(login, nombre), nombre, verificado });
   } catch (err) { res.json({ error: err.message }, 400); }
 });
-app.post('/api/automensajes/quitar', podioRoute((req) => automensajes.quitarQuien(req.body.login)));
+app.post('/api/automensajes/quitar', podioRoute((req) => { cuentasTwitch.quitar(automensajes.normalizar(req.body.login)); return automensajes.quitarQuien(req.body.login); }));
 app.post('/api/automensajes/enviar', async (req, res) => {
   try { ok(res, { result: await automensajes.enviarAhora(String(req.body.id || ''), autoCtx()) }); } catch (err) { res.json({ error: err.message }, 400); }
 });
