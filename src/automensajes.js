@@ -60,6 +60,8 @@ let siguiente = 0;    // índice del próximo mensaje en la rotación
 let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
 
+const comoValido = (c) => { c = normalizar(c); return c === 'canal' || config.quienes.includes(c) ? c : ''; };
+
 function setConfig(b = {}) {
   if ('on' in b) { if (!!b.on && !config.on) ultimoEnvio = Date.now(); config.on = !!b.on; }
   if ('soloEnVivo' in b) config.soloEnVivo = !!b.soloEnVivo;
@@ -73,6 +75,7 @@ function setConfig(b = {}) {
       id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || 'm' + Date.now().toString(36) + i,
       texto: limpiar(m.texto),
       on: m.on !== false,
+      como: comoValido(m.como), // '' = quien activó el bot · 'canal' = tu cuenta · o el usuario de alguien de la lista
     })).filter((m) => m.texto);
   }
   save();
@@ -88,8 +91,15 @@ function armar(texto, ctx) {
 // Con qué cuenta sale: la de quien lo activó si la vinculó, si no la del canal
 const cuentaDeQuienActivo = (ctx) => (config.activadoPor && ctx.tieneCuenta?.(config.activadoPor.login) ? config.activadoPor : null);
 
+// Con qué cuenta sale ESTE mensaje: la que se eligió para él, o la de quien activó el bot
+function cuentaDelMensaje(m, ctx) {
+  if (m.como === 'canal') return null;
+  if (m.como) return ctx.tieneCuenta?.(m.como) ? { login: m.como, nombre: config.nombres?.[m.como] || m.como } : null; // sin vincular: sale con la del canal
+  return cuentaDeQuienActivo(ctx);
+}
+
 async function enviar(m, ctx, manual = false) {
-  const como = cuentaDeQuienActivo(ctx);
+  const como = cuentaDelMensaje(m, ctx);
   if (!como && !ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
   enviando = true;
   try {
@@ -174,6 +184,7 @@ function quitarQuien(login) {
   login = normalizar(login);
   config.quienes = config.quienes.filter((u) => u !== login);
   if (config.nombres) delete config.nombres[login];
+  for (const m of config.mensajes) if (m.como === login) m.como = '';
   save();
   return config;
 }

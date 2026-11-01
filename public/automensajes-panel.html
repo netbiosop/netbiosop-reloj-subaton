@@ -46,6 +46,8 @@
   /* mensajes */
   .msg{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2);margin-bottom:10px}
   .msg.apagado{opacity:.55}
+  .msg .como{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0}
+  .msg .como select{font:inherit;font-size:12px;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:8px;padding:4px 6px;max-width:190px}
   .msg .lado{display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:170px}
   .msg .cada{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
   .msg .cada input{width:70px}
@@ -154,6 +156,12 @@ document.addEventListener('focusin', (e) => { if (e.target.matches('#lista texta
 
 const mmss = (s) => s >= 3600 ? `${Math.floor(s/3600)} h ${Math.floor(s%3600/60)} min` : s >= 60 ? `${Math.floor(s/60)} min ${String(s%60).padStart(2,'0')} s` : `${s} s`;
 
+// "Sale con": quien activó el bot, tu cuenta, o alguien de la lista
+function opcionesComo(sel = ''){
+  const op = (v, t) => `<option value="${esc(v)}" ${v === (sel || '') ? 'selected' : ''}>${t}</option>`;
+  return op('', '👤 Quien activó el bot') + op('canal', '📺 Tu cuenta')
+    + cfg.quienes.map((u) => op(u, esc(cuentas[u]?.nombre || (cfg.nombres || {})[u] || u) + (cuentas[u] ? ' ✔' : ' (sin vincular)'))).join('');
+}
 function pintarLista(){
   $('lista').innerHTML = cfg.mensajes.map((m) => `
     <div class="msg ${m.on ? '' : 'apagado'}" data-id="${m.id}">
@@ -163,6 +171,7 @@ function pintarLista(){
         <div class="cont"><span data-cont>${m.texto.length}</span>/450</div>
       </div>
       <div class="lado">
+        <label class="como">Sale con <select data-k="como">${opcionesComo(m.como)}</select></label>
         <div class="prox" data-prox></div>
         <div style="display:flex;gap:6px">
           <button class="sm" data-enviar title="Lo manda ya al chat">📤 Enviar ahora</button>
@@ -181,7 +190,7 @@ function pintarGeneral(){
 }
 let cuentas = {};
 function pintarEstado(j){
-  if (JSON.stringify(j.cuentas || {}) !== JSON.stringify(cuentas)) { cuentas = j.cuentas || {}; pintarPersonas(); }
+  if (JSON.stringify(j.cuentas || {}) !== JSON.stringify(cuentas)) { cuentas = j.cuentas || {}; pintarPersonas(); refrescarComo(); }
   const sc = $('saleComo');
   sc.hidden = !j.saleComo;
   if (j.saleComo) sc.innerHTML = j.activadoPor
@@ -200,11 +209,15 @@ function pintarEstado(j){
   });
 }
 
+function refrescarComo(){
+  document.querySelectorAll('.msg [data-k=como]').forEach((sel) => { if (document.activeElement !== sel) { const v = sel.value; sel.innerHTML = opcionesComo(v); } });
+}
 function leerLista(){
   return [...document.querySelectorAll('.msg')].map((el) => ({
     id: el.dataset.id,
     on: el.querySelector('[data-k=on]').checked,
     texto: el.querySelector('[data-k=texto]').value,
+    como: el.querySelector('[data-k=como]').value,
   }));
 }
 async function guardar(cambios){
@@ -285,7 +298,7 @@ async function agregarQuien(){
   $('btnQuien').disabled = true; notaQuien('Buscando en Twitch…');
   try {
     const j = await api('/api/automensajes/quien', 'POST', { login: v });
-    cfg = j.result; pintarPersonas(); $('nuevoQuien').value = '';
+    cfg = j.result; pintarPersonas(); refrescarComo(); $('nuevoQuien').value = '';
     notaQuien(j.verificado ? `✔ ${j.nombre} ya puede escribir "activar bot"` : `✔ Agregado. No se pudo revisar en Twitch (no está conectado): asegúrate de que esté bien escrito.`, j.verificado ? 'ok' : '');
   } catch (e) { notaQuien(e.message, 'mal'); }
   $('btnQuien').disabled = false;
@@ -312,7 +325,7 @@ $('personas').onclick = async (e) => {
   const b = e.target.closest('[data-quitar]'); if (!b) return;
   const nombre = (cfg.nombres || {})[b.dataset.quitar] || b.dataset.quitar;
   if (!confirm(`¿Quitar a ${nombre}? Ya no va a poder activar el bot.`)) return;
-  try { cfg = (await api('/api/automensajes/quitar', 'POST', { login: b.dataset.quitar })).result; pintarPersonas(); notaQuien(`${nombre} ya no puede activarlo.`); } catch (err) { notaQuien(err.message, 'mal'); }
+  try { cfg = (await api('/api/automensajes/quitar', 'POST', { login: b.dataset.quitar })).result; pintarPersonas(); pintarLista(); notaQuien(`${nombre} ya no puede activarlo.`); } catch (err) { notaQuien(err.message, 'mal'); }
 };
 
 async function cargarEstado(){ try { pintarEstado(await api('/api/automensajes')); } catch {} }
