@@ -83,8 +83,8 @@ function deTwitch(e) {
 }
 
 // ---------- Kick (Pusher) ----------
-const kick = { ws: null, timer: null, ping: null, intento: 0, id: '' };
-const canalKick = (v) => String(v || '').trim().replace(/^https?:\/\/(www\.)?kick\.com\//i, '').replace(/^@/, '').split(/[/?#]/)[0].toLowerCase();
+const kick = { ws: null, timer: null, ping: null, intento: 0, gen: 0 };
+const canalKick = (v) => String(v || '').trim().replace(/^(https?:\/\/)?([\w-]+\.)?kick\.com\//i, '').replace(/^@/, '').split(/[/?#]/)[0].toLowerCase();
 async function chatroomKick(slug) {
   const r = await fetch(`${KICK_API}/api/v2/channels/${encodeURIComponent(slug)}`, { headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
   if (r.status === 404) throw new Error(`No existe el canal "${slug}" en Kick`);
@@ -93,21 +93,22 @@ async function chatroomKick(slug) {
   if (!j?.chatroom?.id) throw new Error('Kick no devolvió el número del chat');
   return String(j.chatroom.id);
 }
-function pararKick() { clearTimeout(kick.timer); clearInterval(kick.ping); try { kick.ws?.close(); } catch {} kick.ws = null; }
+function pararKick() { kick.gen++; clearTimeout(kick.timer); clearInterval(kick.ping); try { kick.ws?.close(); } catch {} kick.ws = null; }
 async function conectarKick() {
   pararKick();
-  const c = config.kick, slug = canalKick(c.canal);
+  const gen = kick.gen, c = config.kick, slug = canalKick(c.canal);
   if (!c.on || !slug) return setEstado('kick', 'apagado', c.on ? 'Falta el nombre del canal' : '');
   setEstado('kick', 'conectando', slug);
   let id = String(c.chatroomId || '').trim();
   if (!id || c.chatroomDe !== slug) {
-    try { id = await chatroomKick(slug); c.chatroomId = id; c.chatroomDe = slug; save(); }
-    catch (e) {
+    try { id = await chatroomKick(slug); } catch (e) {
+      if (gen !== kick.gen) return; // mientras buscaba se apagó o cambió el canal
       setEstado('kick', 'error', `${e.message}. Abre kick.com/api/v2/channels/${slug} en el navegador, busca "chatroom":{"id": y pega ese número en el panel.`);
       return reintentarKick();
     }
+    if (gen !== kick.gen) return;
+    c.chatroomId = id; c.chatroomDe = slug; save();
   }
-  kick.id = id;
   const ws = new WebSocket(KICK_WS);
   kick.ws = ws;
   ws.onmessage = (ev) => {
@@ -138,14 +139,13 @@ function partesKick(texto) {
 function reintentarKick() { clearTimeout(kick.timer); const s = Math.min(60, 5 * 2 ** kick.intento++); kick.timer = setTimeout(conectarKick, s * 1000); }
 
 // ---------- YouTube (chat del directo, sin clave) ----------
-const yt = { timer: null, gen: 0, video: '', cont: '', key: '', version: '' };
+const yt = { timer: null, gen: 0, cont: '', key: '', version: '' };
 const HDR_YT = { 'User-Agent': UA, 'Accept-Language': 'es-419,es;q=0.9', Cookie: 'CONSENT=YES+1; SOCS=CAI' };
 function urlYouTube(v) {
   v = String(v || '').trim();
   const vid = v.match(/(?:v=|youtu\.be\/|\/live\/|\/shorts\/)([\w-]{11})/);
   if (vid) return { video: vid[1] };
-  if (/^[\w-]{11}$/.test(v) && !v.startsWith('@')) return { video: v };
-  const h = v.replace(/^https?:\/\/(www\.)?youtube\.com\//i, '').replace(/\/(live|streams|featured)?\/?$/, '');
+  const h = v.replace(/^(https?:\/\/)?([\w-]+\.)?youtube\.com\//i, '').replace(/\/(live|streams|featured)?\/?$/, '');
   if (!h) return null;
   return { canal: h.startsWith('@') || h.startsWith('channel/') || h.startsWith('c/') ? h : '@' + h };
 }
@@ -179,7 +179,6 @@ async function conectarYT() {
     if (!video) { setEstado('youtube', 'esperando', 'El canal no está en vivo: se revisa cada minuto'); yt.timer = setTimeout(conectarYT, 60000); return; }
     await empezarChatYT(video);
     if (gen !== yt.gen) return;
-    yt.video = video;
     setEstado('youtube', 'conectado', dir.canal || video);
     leerYT(gen, true);
   } catch (e) {
@@ -197,6 +196,7 @@ async function leerYT(gen, primera = false) {
     if (gen !== yt.gen) return;
     if (!r.ok) throw new Error('YouTube respondió ' + r.status);
     const j = await r.json();
+    if (gen !== yt.gen) return;
     const lc = j.continuationContents?.liveChatContinuation;
     if (!lc) { setEstado('youtube', 'esperando', 'Terminó el directo: se revisa cada minuto'); yt.timer = setTimeout(conectarYT, 60000); return; }
     const sig = lc.continuations?.[0] || {};
@@ -234,7 +234,7 @@ function mensajeYT(item) {
 
 // ---------- TikTok (Euler Stream) ----------
 const tt = { ws: null, timer: null, intento: 0 };
-const usuarioTT = (v) => String(v || '').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\//i, '').replace(/^@/, '').split(/[/?#]/)[0];
+const usuarioTT = (v) => String(v || '').trim().replace(/^(https?:\/\/)?([\w-]+\.)?tiktok\.com\//i, '').replace(/^@/, '').split(/[/?#]/)[0];
 function pararTT() { clearTimeout(tt.timer); try { tt.ws?.close(); } catch {} tt.ws = null; }
 function conectarTT() {
   pararTT();
