@@ -116,6 +116,7 @@ $('vCols').onclick = () => { pref.vista = 'columnas'; guardar(); armar(); pintar
 $('tam').oninput = () => { pref.tam = Number($('tam').value); guardar(); document.documentElement.style.setProperty('--tam', pref.tam + 'px'); };
 $('horas').onclick = () => { pref.horas = !pref.horas; guardar(); document.body.classList.toggle('sinhora', !pref.horas); };
 
+armar(); // aunque /api/multichat falle, la página no queda en blanco
 Multichat.conectar({
   alInicio: (j) => { todos = j.mensajes || []; },
   alConfig: (c) => {

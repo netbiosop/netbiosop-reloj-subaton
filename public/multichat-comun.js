@@ -34,7 +34,7 @@ window.Multichat = (() => {
   }
   // Conexión en vivo: llama a alMensaje(m), alEstado(estado), alConfig(config)
   function conectar({ alMensaje, alEstado, alConfig, alInicio }) {
-    fetch('/api/multichat').then((r) => r.json()).then((j) => { alInicio?.(j); alEstado?.(j.estado); alConfig?.(j.config); }).catch(() => {});
+    fetch('/api/multichat').then((r) => r.json()).then((j) => { alInicio?.(j); alEstado?.(j.estado); alConfig?.(j.config); }).catch((e) => console.error('[Multichat] No se pudo leer /api/multichat:', e));
     const es = new EventSource('/events');
     es.onmessage = (ev) => {
       let d; try { d = JSON.parse(ev.data); } catch { return; }

@@ -81,7 +81,7 @@ function createPodio({ store }) {
   let version = Date.now();
   let saveTimer = null;
   let alCambiar = () => {}, avisoTimer = null; // avisa a los overlays apenas cambia algo (podio, metas, top general)
-  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch {} }, 150); };
+  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch (e) { console.error('[Podio] No se pudo avisar a los overlays:', e.message); } }, 150); };
 
   function save() {
     version++;
