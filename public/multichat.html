@@ -118,11 +118,11 @@ $('horas').onclick = () => { pref.horas = !pref.horas; guardar(); document.body.
 
 armar(); // aunque /api/multichat falle, la página no queda en blanco
 Multichat.conectar({
-  alInicio: (j) => { todos = j.mensajes || []; },
+  alInicio: (j) => { todos = j.mensajes || []; armar(); },
   alConfig: (c) => {
     const nuevas = Object.keys(PLAT).filter((p) => c[p]?.on);
     const cambio = nuevas.join() !== activas.join(); activas = nuevas.length ? nuevas : ['twitch'];
-    if (cambio || !Object.keys(cols).length) armar();
+    if (cambio) armar();
     pintarEstados();
   },
   alEstado: (e) => { estado = e; pintarEstados(); },

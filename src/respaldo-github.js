@@ -56,7 +56,7 @@ function leerArchivos() {
 
 async function subir(motivo = 'automática') {
   if (!configurado()) return null;
-  if (estado.subiendo) { otraVez = motivo; return null; } // se vuelve a pedir cuando termine la que está subiendo
+  if (estado.subiendo) { otraVez = motivo; return null; } // se vuelve a pedir al terminar (al cerrar el reloj no da tiempo)
   const archivos = leerArchivos();
   if (!archivos.length) return null;
   const huella = JSON.stringify(archivos);
