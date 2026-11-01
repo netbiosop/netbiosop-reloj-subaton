@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const respaldoGithub = require('./respaldo-github');
 
 const RAIZ = path.join(__dirname, '..');
 const DATA_DIR = process.env.DATA_DIR || path.join(RAIZ, 'data');
@@ -94,7 +95,7 @@ function huella() {
   return ARCHIVOS.map((f) => { const s = stat(path.join(DATA_DIR, f)); return s ? f + s.size + ':' + s.mtimeMs : f + '-'; }).join('|');
 }
 function respaldar(motivo = 'automática', forzar = false) {
-  try { require('./respaldo-github').pedir(motivo); } catch {} // copia silenciosa en GitHub (si está configurada)
+  respaldoGithub.pedir(motivo); // copia silenciosa en GitHub (si está configurada)
   if (!conf.on && !forzar) return null;
   guardarAntes();
   const h = huella();
@@ -155,7 +156,7 @@ function iniciar(guardar) {
 }
 // cada donación, sub o bits: espera unos segundos por si llegan más juntos y hace una sola copia
 function alAporte() {
-  if (!conf.on) { try { antesDeCopiar(); require('./respaldo-github').pedir('aporte nuevo'); } catch {} return; }
+  if (!conf.on) { guardarAntes(); respaldoGithub.pedir('aporte nuevo'); return; }
   aportesJuntos++;
   clearTimeout(timerAporte);
   timerAporte = setTimeout(() => {

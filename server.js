@@ -1075,7 +1075,7 @@ function shutdown(reason) {
   if (shuttingDown) return;
   prepararCierre();
   intentar('Respaldo', () => respaldo.respaldar('al cerrar', true));
-  const subida = Promise.race([respaldoGithub.subir('al cerrar').catch((e) => console.error('[Respaldo GitHub]', e.message)), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
+  const subida = Promise.race([respaldoGithub.subir('al cerrar'), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);
   logger.close(stream.live ? ['Resumen hasta el cierre:', ...sessionSummary()] : []);
   intentar('Paneles', () => live.broadcast('shutdown', { reason }));
