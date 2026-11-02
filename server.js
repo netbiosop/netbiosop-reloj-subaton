@@ -671,7 +671,8 @@ app.get('/auth/twitch', (req, res) => {
   res.redirect(twitch.authUrl(oauthState));
 });
 app.get('/auth/twitch/callback', async (req, res) => {
-  const back = (msg) => res.send(`<meta charset="utf-8"><body style="font-family:sans-serif;background:#111;color:#eee;padding:40px"><h2>${msg}</h2><p>Puedes cerrar esta pestaña y volver al <a style="color:#b18cff" href="/panel">panel</a>.</p></body>`);
+  // msg lleva texto de la URL (error_description): cualquiera puede armar el enlace, así que se escapa
+  const back = (msg) => res.send(`<meta charset="utf-8"><body style="font-family:sans-serif;background:#111;color:#eee;padding:40px"><h2>${String(msg).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</h2><p>Puedes cerrar esta pestaña y volver al <a style="color:#b18cff" href="/panel">panel</a>.</p></body>`);
   if (req.query.error) return back('Twitch canceló la conexión: ' + req.query.error_description);
   if (!req.query.state || req.query.state !== oauthState) return back('La conexión expiró, inténtalo de nuevo desde el panel.');
   try {
