@@ -46,15 +46,24 @@
   /* mensajes */
   .msg{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2);margin-bottom:10px}
   .msg.apagado{opacity:.55}
+  .msg .como{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0}
+  .msg .como select{font:inherit;font-size:12px;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:8px;padding:4px 6px;max-width:190px}
   .msg .lado{display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:170px}
   .msg .cont{font-size:11px;color:var(--muted);text-align:right}
   .msg .prox{font-size:12px;color:var(--accent);font-weight:600}
   .peligro:hover{border-color:var(--bad)}
   .agregar{width:100%;justify-content:center;border-style:dashed;padding:12px}
-  .personas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-  .persona{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-weight:600}
-  .persona button{padding:1px 7px;border-radius:999px;font-size:11px;background:transparent}
-  .persona button:hover{border-color:var(--bad);color:var(--bad)}
+  .personas{display:grid;gap:8px;margin-bottom:8px}
+  .persona{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:12px;background:var(--card2);border:1px solid var(--line)}
+  .persona b{font-weight:700}
+  .persona .cuenta{font-size:12px;color:var(--muted);flex:1;min-width:150px}
+  .persona .cuenta.ok{color:var(--ok)}
+  .persona button{padding:4px 9px;font-size:12px}
+  .persona .x:hover{border-color:var(--bad);color:var(--bad)}
+  .vincular{flex-basis:100%;margin-top:4px;padding:12px;border-radius:10px;background:#0f0e14;border:1px dashed var(--accent)}
+  .vincular ol{margin:6px 0 8px;padding-left:20px} .vincular li{margin:3px 0}
+  .codigo{font:700 30px/1.1 ui-monospace,Consolas,monospace;letter-spacing:4px;color:#fff;background:#1d2a3a;border-radius:10px;padding:8px 14px;display:inline-block;user-select:all}
+  .saleComo{margin-top:8px;padding:8px 10px;border-radius:10px;background:#0f0e14;border:1px solid var(--line);font-size:13px}
   .agregarQuien{display:flex;gap:8px} .agregarQuien input{flex:1;min-width:0}
   code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
   @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .msg{grid-template-columns:auto 1fr} .msg .lado{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center;min-width:0} }
@@ -72,6 +81,7 @@
     <h2>Estado</h2>
     <span class="estado" id="estado"><i></i><span id="estadoTxt">…</span></span>
     <div class="nota" id="estadoNota"></div>
+    <div class="saleComo" id="saleComo" hidden></div>
     <div class="nota" style="margin-top:12px">Se prende y se apaga desde el chat: <code>activar bot</code> · <code>desactivar bot</code></div>
     <label>Quiénes pueden activarlo (además de ti)</label>
     <div class="personas" id="personas"></div>
@@ -80,6 +90,7 @@
       <button id="btnQuien">＋ Agregar</button>
     </div>
     <div class="nota" id="notaQuien">Escríbelo igual que en Twitch: se revisa que la cuenta exista.</div>
+    <div class="nota">Para que los mensajes salgan <b>con el nombre de quien activa el bot</b>, esa persona tiene que <b>vincular su cuenta</b> una vez (Twitch no deja escribir a nombre de alguien sin su permiso). Si no la vincula, salen con tu cuenta.</div>
     <div class="fila">
       <div><label>Un mensaje cada (min)</label><input type="number" id="cadaMin" min="1" max="240"></div>
       <div><label>Esperar mensajes del chat</label><input type="number" id="minChat" min="0" max="100"></div>
@@ -142,6 +153,12 @@ document.addEventListener('focusin', (e) => { if (e.target.matches('#lista texta
 
 const mmss = (s) => s >= 3600 ? `${Math.floor(s/3600)} h ${Math.floor(s%3600/60)} min` : s >= 60 ? `${Math.floor(s/60)} min ${String(s%60).padStart(2,'0')} s` : `${s} s`;
 
+// "Sale con": quien activó el bot, tu cuenta, o alguien de la lista
+function opcionesComo(sel = ''){
+  const op = (v, t) => `<option value="${esc(v)}" ${v === (sel || '') ? 'selected' : ''}>${t}</option>`;
+  return op('', '👤 Quien activó el bot') + op('canal', '📺 Tu cuenta')
+    + cfg.quienes.map((u) => op(u, esc(cuentas[u]?.nombre || (cfg.nombres || {})[u] || u) + (cuentas[u] ? ' ✔' : ' (sin vincular)'))).join('');
+}
 function pintarLista(){
   $('lista').innerHTML = cfg.mensajes.map((m) => `
     <div class="msg ${m.on ? '' : 'apagado'}" data-id="${m.id}">
@@ -151,6 +168,7 @@ function pintarLista(){
         <div class="cont"><span data-cont>${m.texto.length}</span>/450</div>
       </div>
       <div class="lado">
+        <label class="como">Sale con <select data-k="como">${opcionesComo(m.como)}</select></label>
         <div class="prox" data-prox></div>
         <div style="display:flex;gap:6px">
           <button class="sm" data-enviar title="Lo manda ya al chat">📤 Enviar ahora</button>
@@ -167,7 +185,14 @@ function pintarGeneral(){
   if (document.activeElement !== $('cadaMin')) $('cadaMin').value = cfg.cadaMin;
   pintarPersonas();
 }
+let cuentas = {};
 function pintarEstado(j){
+  if (JSON.stringify(j.cuentas || {}) !== JSON.stringify(cuentas)) { cuentas = j.cuentas || {}; pintarPersonas(); refrescarComo(); }
+  const sc = $('saleComo');
+  sc.hidden = !j.saleComo;
+  if (j.saleComo) sc.innerHTML = j.activadoPor
+    ? `Activado por <b>${esc(j.activadoPor.nombre)}</b> · los mensajes salen con la cuenta de <b>${esc(j.saleComo)}</b>${cuentas[j.activadoPor.login] ? '' : ` <span class="nota">(${esc(j.activadoPor.nombre)} no vinculó su cuenta)</span>`}`
+    : `Los mensajes salen con la cuenta de <b>${esc(j.saleComo)}</b>`;
   const e = $('estado');
   e.className = 'estado ' + (j.motivo === 'activo' ? 'activo' : j.motivo === 'sin permiso de chat' ? 'mal' : j.motivo === 'apagado' ? '' : 'alerta');
   const txt = { activo: 'Funcionando', apagado: 'Apagado', 'sin permiso de chat': 'Sin permiso para escribir en el chat' }[j.motivo] || j.motivo[0].toUpperCase() + j.motivo.slice(1);
@@ -181,11 +206,15 @@ function pintarEstado(j){
   });
 }
 
+function refrescarComo(){
+  document.querySelectorAll('.msg [data-k=como]').forEach((sel) => { if (document.activeElement !== sel) { const v = sel.value; sel.innerHTML = opcionesComo(v); } });
+}
 function leerLista(){
   return [...document.querySelectorAll('.msg')].map((el) => ({
     id: el.dataset.id,
     on: el.querySelector('[data-k=on]').checked,
     texto: el.querySelector('[data-k=texto]').value,
+    como: el.querySelector('[data-k=como]').value,
   }));
 }
 async function guardar(cambios){
@@ -232,9 +261,31 @@ $('on').onclick = () => guardar({ on: !cfg.on });
 $('soloEnVivo').onchange = () => guardar({ soloEnVivo: $('soloEnVivo').checked });
 $('minChat').onchange = () => guardar({ minChat: Number($('minChat').value) });
 $('cadaMin').onchange = () => guardar({ cadaMin: Number($('cadaMin').value) });
+const vinc = {}; // login → { codigo, url, estado, mensaje }
 function pintarPersonas(){
-  $('personas').innerHTML = cfg.quienes.map((u) => `<span class="persona">👤 ${esc((cfg.nombres || {})[u] || u)}<button title="Quitar" data-quitar="${esc(u)}">✕</button></span>`).join('')
-    || '<span class="nota" style="margin:0">Nadie más: solo tú puedes activarlo.</span>';
+  $('personas').innerHTML = cfg.quienes.map((u) => {
+    const nombre = esc((cfg.nombres || {})[u] || u), ligada = !!cuentas[u], v = vinc[u];
+    const caja = v ? (v.estado === 'esperando'
+      ? `<div class="vincular">Pásale esto a <b>${nombre}</b> (por mensaje o en el chat):
+          <ol><li>Que entre a <b>twitch.tv/activate</b> desde su celular o su PC, <b>con su propia cuenta</b>.</li><li>Que escriba este código y toque <b>Autorizar</b>:</li></ol>
+          <span class="codigo">${esc(v.codigo)}</span>
+          <div class="nota">Esperando a ${nombre}… el código vence en ${Math.ceil((v.venceEnSeg || 0) / 60)} min. <button class="sm" data-cancelar="${esc(u)}">Cancelar</button></div></div>`
+      : `<div class="vincular"><div class="nota ${v.estado === 'listo' ? 'ok' : 'mal'}">${esc(v.mensaje || '')}</div>${v.estado === 'error' ? `<button class="sm" data-vincular="${esc(u)}" style="margin-top:6px">Pedir un código nuevo</button>` : ''}</div>`) : '';
+    return `<div class="persona">👤 <b>${nombre}</b>
+      <span class="cuenta ${ligada ? 'ok' : ''}">${ligada ? '✔ Cuenta vinculada: sus mensajes salen con su nombre' : 'Sin vincular: sus mensajes salen con tu cuenta'}</span>
+      ${ligada ? `<button data-desvincular="${esc(u)}">Desvincular</button>` : v && v.estado === 'esperando' ? '' : `<button data-vincular="${esc(u)}">🔗 Vincular cuenta</button>`}
+      <button class="x" title="Quitar de la lista" data-quitar="${esc(u)}">✕</button>${caja}</div>`;
+  }).join('') || '<span class="nota" style="margin:0">Nadie más: solo tú puedes activarlo.</span>';
+}
+async function seguirVinculo(u){
+  try {
+    const j = await api('/api/automensajes/vincular?login=' + encodeURIComponent(u));
+    vinc[u] = j;
+    if (j.vinculada && j.estado === 'listo') cuentas[u] = cuentas[u] || { nombre: u };
+    pintarPersonas();
+    if (j.estado === 'esperando') setTimeout(() => seguirVinculo(u), 3000);
+    else if (j.estado === 'listo') { cargarEstado(); setTimeout(() => { delete vinc[u]; pintarPersonas(); }, 8000); }
+  } catch {}
 }
 function notaQuien(t, c=''){ $('notaQuien').textContent = t; $('notaQuien').className = 'nota ' + c; }
 async function agregarQuien(){
@@ -244,7 +295,7 @@ async function agregarQuien(){
   $('btnQuien').disabled = true; notaQuien('Buscando en Twitch…');
   try {
     const j = await api('/api/automensajes/quien', 'POST', { login: v });
-    cfg = j.result; pintarPersonas(); $('nuevoQuien').value = '';
+    cfg = j.result; pintarPersonas(); refrescarComo(); $('nuevoQuien').value = '';
     notaQuien(j.verificado ? `✔ ${j.nombre} ya puede escribir "activar bot"` : `✔ Agregado. No se pudo revisar en Twitch (no está conectado): asegúrate de que esté bien escrito.`, j.verificado ? 'ok' : '');
   } catch (e) { notaQuien(e.message, 'mal'); }
   $('btnQuien').disabled = false;
@@ -252,10 +303,26 @@ async function agregarQuien(){
 $('btnQuien').onclick = agregarQuien;
 $('nuevoQuien').onkeydown = (e) => { if (e.key === 'Enter') agregarQuien(); };
 $('personas').onclick = async (e) => {
+  const vb = e.target.closest('[data-vincular]');
+  if (vb) {
+    const u = vb.dataset.vincular; vb.disabled = true;
+    try { vinc[u] = (await api('/api/automensajes/vincular', 'POST', { login: u })).result; pintarPersonas(); setTimeout(() => seguirVinculo(u), 3000); }
+    catch (err) { vinc[u] = { estado: 'error', mensaje: err.message }; pintarPersonas(); }
+    return;
+  }
+  const cb = e.target.closest('[data-cancelar]');
+  if (cb) { await api('/api/automensajes/vincular/cancelar', 'POST', { login: cb.dataset.cancelar }).catch(() => {}); delete vinc[cb.dataset.cancelar]; pintarPersonas(); return; }
+  const db = e.target.closest('[data-desvincular]');
+  if (db) {
+    const u = db.dataset.desvincular, nombre = (cfg.nombres || {})[u] || u;
+    if (!confirm(`¿Desvincular la cuenta de ${nombre}? Sus mensajes van a salir con tu cuenta.`)) return;
+    try { await api('/api/automensajes/desvincular', 'POST', { login: u }); delete cuentas[u]; pintarPersonas(); cargarEstado(); } catch (err) { notaQuien(err.message, 'mal'); }
+    return;
+  }
   const b = e.target.closest('[data-quitar]'); if (!b) return;
   const nombre = (cfg.nombres || {})[b.dataset.quitar] || b.dataset.quitar;
   if (!confirm(`¿Quitar a ${nombre}? Ya no va a poder activar el bot.`)) return;
-  try { cfg = (await api('/api/automensajes/quitar', 'POST', { login: b.dataset.quitar })).result; pintarPersonas(); notaQuien(`${nombre} ya no puede activarlo.`); } catch (err) { notaQuien(err.message, 'mal'); }
+  try { cfg = (await api('/api/automensajes/quitar', 'POST', { login: b.dataset.quitar })).result; pintarPersonas(); pintarLista(); notaQuien(`${nombre} ya no puede activarlo.`); } catch (err) { notaQuien(err.message, 'mal'); }
 };
 
 async function cargarEstado(){

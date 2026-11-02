@@ -1,6 +1,8 @@
 // Mensajes automáticos en el chat de Twitch: sale un mensaje cada X minutos (10 por defecto), uno detrás de otro.
 // No aparece en el menú: se prende y se apaga desde el chat.
-//  • "activar bot" / "desactivar bot" → solo Nephallems (y el dueño del canal).
+//  • "activar bot" / "desactivar bot" → las personas de la lista (ej. Nephallems) y el dueño del canal.
+//  • Los mensajes salen con la cuenta de quien lo activó, si esa persona vinculó su cuenta (src/twitch-cuentas.js);
+//    si no, salen con la cuenta del canal.
 //  • Los mensajes se editan en /automensajes-panel y se guardan en data/automensajes.json.
 //  • Solo con el stream en vivo (opcional) y nunca durante el descanso.
 const fs = require('fs');
@@ -14,6 +16,7 @@ const DESACTIVAR = /^!?\s*desactivar\s*bot\b/i;
 
 const DEFAULTS = {
   on: false,              // se prende cuando escriben "activar bot" en el chat
+  activadoPor: null,      // { login, nombre } de quien lo prendió: los mensajes salen con su cuenta
   quienes: ['nephallems'], // quiénes pueden activarlo además del dueño del canal
   cadaMin: 10,            // sale un mensaje cada 10 minutos, rotando
   soloEnVivo: true,
@@ -57,6 +60,8 @@ let siguiente = 0;    // índice del próximo mensaje en la rotación
 let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
 
+const comoValido = (c) => { c = normalizar(c); return c === 'canal' || config.quienes.includes(c) ? c : ''; };
+
 function setConfig(b = {}) {
   if ('on' in b) { if (!!b.on && !config.on) ultimoEnvio = Date.now(); config.on = !!b.on; }
   if ('soloEnVivo' in b) config.soloEnVivo = !!b.soloEnVivo;
@@ -70,6 +75,7 @@ function setConfig(b = {}) {
       id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || 'm' + Date.now().toString(36) + i,
       texto: limpiar(m.texto),
       on: m.on !== false,
+      como: comoValido(m.como), // '' = quien activó el bot · 'canal' = tu cuenta · o el usuario de alguien de la lista
     })).filter((m) => m.texto);
   }
   save();
@@ -82,18 +88,29 @@ function armar(texto, ctx) {
   return texto.replace(/\{(\w+)\}/g, (todo, k) => (k.toLowerCase() in vars ? vars[k.toLowerCase()] : todo));
 }
 
+// Con qué cuenta sale: la de quien lo activó si la vinculó, si no la del canal
+const cuentaDeQuienActivo = (ctx) => (config.activadoPor && ctx.tieneCuenta?.(config.activadoPor.login) ? config.activadoPor : null);
+
+// Con qué cuenta sale ESTE mensaje: la que se eligió para él, o la de quien activó el bot
+function cuentaDelMensaje(m, ctx) {
+  if (m.como === 'canal') return null;
+  if (m.como) return ctx.tieneCuenta?.(m.como) ? { login: m.como, nombre: config.nombres?.[m.como] || m.como } : null; // sin vincular: sale con la del canal
+  return cuentaDeQuienActivo(ctx);
+}
+
 async function enviar(m, ctx, manual = false) {
-  if (!ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
-  const ok = await ctx.enviar(armar(m.texto, ctx));
+  const como = cuentaDelMensaje(m, ctx);
+  if (!como && !ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
+  const ok = await ctx.enviar(armar(m.texto, ctx), null, como?.login);
   if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
   if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; }
-  console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
+  console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
   return { enviado: m.id };
 }
 
 const activos = () => config.mensajes.filter((m) => m.on && m.texto);
 const motivo = (ctx) => (!config.on ? 'apagado' : ctx.descanso ? 'en pausa (descanso)' : config.soloEnVivo && !ctx.live ? 'esperando que empiece el stream'
-  : !ctx.puedeChat?.() ? 'sin permiso de chat' : !activos().length ? 'sin mensajes' : 'activo');
+  : !ctx.puedeChat?.() && !cuentaDeQuienActivo(ctx) ? 'sin permiso de chat' : !activos().length ? 'sin mensajes' : 'activo');
 
 // Se llama cada pocos segundos. ctx: { live, descanso, puedeChat(), enviar(texto) → bool, tiempo(), canal() }
 async function tick(ctx) {
@@ -117,14 +134,18 @@ function alChat(e, ctx) {
   if (puede && (ACTIVAR.test(texto) || DESACTIVAR.test(texto))) {
     const prender = ACTIVAR.test(texto);
     const yaEstaba = config.on === prender;
+    const quien = e.chatter_user_name || login;
+    config.activadoPor = prender ? { login, nombre: quien } : null;
     setConfig({ on: prender });
     siguiente = 0;
-    const quien = e.chatter_user_name || login;
-    console.log(`[Automensajes] ${prender ? '🤖 Bot activado' : '💤 Bot desactivado'} por ${quien} desde el chat`);
+    const conSuCuenta = !!ctx?.tieneCuenta?.(login);
+    console.log(`[Automensajes] ${prender ? '🤖 Bot activado' : '💤 Bot desactivado'} por ${quien} desde el chat${prender && e.chatter_user_id !== e.broadcaster_user_id ? (conSuCuenta ? ` · los mensajes salen con la cuenta de ${quien}` : ` · ${quien} no vinculó su cuenta: salen con la del canal`) : ''}`);
+    // la confirmación sale con la cuenta de quien lo pidió; si no la vinculó, con la del canal y diciendo quién fue
+    const firma = conSuCuenta || e.chatter_user_id === e.broadcaster_user_id ? '' : ` por ${quien}`;
     const aviso = prender
-      ? (yaEstaba ? '🤖 El bot ya estaba activado' : '🤖 Bot activado') + `: un mensaje cada ${config.cadaMin} minutos${config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : ''}.`
-      : yaEstaba ? '💤 El bot ya estaba desactivado.' : '💤 Bot desactivado.';
-    if (ctx?.puedeChat?.()) ctx.enviar(aviso, e.message_id); // sendChat no rechaza: si falla, lo anota en el registro
+      ? (yaEstaba ? '🤖 El bot ya estaba activado' : `🤖 Bot activado${firma}`) + `: un mensaje cada ${config.cadaMin} minutos${config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : ''}.`
+      : yaEstaba ? '💤 El bot ya estaba desactivado.' : `💤 Bot desactivado${firma}.`;
+    if (conSuCuenta || ctx?.puedeChat?.()) ctx.enviar(aviso, e.message_id, conSuCuenta ? login : null); // sendChat y cuentasTwitch.enviar no rechazan: si fallan, lo anotan en el registro
     return;
   }
   if (e.chatter_user_id !== e.broadcaster_user_id) lineasChat++;
@@ -138,8 +159,11 @@ function enviarAhora(id, ctx) {
 
 function estado(ctx) {
   const mot = motivo(ctx), lista = activos();
+  const como = cuentaDeQuienActivo(ctx);
   return {
     config, motivo: mot, activo: mot === 'activo',
+    saleComo: config.on ? (como ? como.nombre : ctx.canal?.() || 'tu canal') : null,
+    activadoPor: config.on ? config.activadoPor : null,
     faltanLineas: Math.max(0, config.minChat - lineasChat),
     proximoEnSeg: mot === 'activo' ? Math.max(0, Math.round((ultimoEnvio + config.cadaMin * 60000 - Date.now()) / 1000)) : null,
     proximoId: lista.length ? lista[siguiente % lista.length].id : null,
@@ -159,6 +183,7 @@ function quitarQuien(login) {
   login = normalizar(login);
   config.quienes = config.quienes.filter((u) => u !== login);
   if (config.nombres) delete config.nombres[login];
+  for (const m of config.mensajes) if (m.como === login) m.como = '';
   save();
   return config;
 }
