@@ -106,7 +106,7 @@ function crearCuentas({ store, twitch }) {
   function cancelar(login) { delete vinculando[login]; }
   function quitar(login) {
     delete vinculando[login];
-    if (cuentas()[login]) { delete cuentas()[login]; store.save(); console.log(`[Automensajes] Cuenta de ${login} desvinculada`); }
+    if (cuenta(login)) { delete cuentas()[login]; store.save(); console.log(`[Automensajes] Cuenta de ${login} desvinculada`); }
   }
   const resumen = () => Object.fromEntries(Object.entries(cuentas()).map(([k, c]) => [k, { nombre: c.nombre }]));
 

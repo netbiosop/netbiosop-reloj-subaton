@@ -62,7 +62,10 @@ let enviando = false;
 // Lo que el bot escribió con una cuenta vinculada vuelve por el chat como si fuera de esa persona: no cuenta para minChat
 const ecos = [];
 const MAX_ECOS = 10;
-function anotarEco(login, texto) { ecos.push({ login, texto: String(texto).trim() }); if (ecos.length > MAX_ECOS) ecos.shift(); }
+function anotarEco(login, texto) {
+  ecos.push({ login, texto: String(texto).slice(0, MAX_TEXTO).trim() }); // se envía recortado: {canal} y {tiempo} alargan la plantilla
+  if (ecos.length > MAX_ECOS) ecos.shift();
+}
 
 const comoValido = (c) => { c = normalizar(c); return c === 'canal' || config.quienes.includes(c) ? c : ''; };
 
