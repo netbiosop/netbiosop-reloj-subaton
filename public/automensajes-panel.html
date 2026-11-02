@@ -285,7 +285,7 @@ async function seguirVinculo(u){
     pintarPersonas();
     if (j.estado === 'esperando') setTimeout(() => seguirVinculo(u), 3000);
     else if (j.estado === 'listo') { cargarEstado(); setTimeout(() => { delete vinc[u]; pintarPersonas(); }, 8000); }
-  } catch {}
+  } catch (err) { vinc[u] = { estado: 'error', mensaje: 'Se perdió el contacto con el reloj: ' + err.message }; pintarPersonas(); }
 }
 function notaQuien(t, c=''){ $('notaQuien').textContent = t; $('notaQuien').className = 'nota ' + c; }
 async function agregarQuien(){
@@ -311,7 +311,7 @@ $('personas').onclick = async (e) => {
     return;
   }
   const cb = e.target.closest('[data-cancelar]');
-  if (cb) { await api('/api/automensajes/vincular/cancelar', 'POST', { login: cb.dataset.cancelar }).catch(() => {}); delete vinc[cb.dataset.cancelar]; pintarPersonas(); return; }
+  if (cb) { await api('/api/automensajes/vincular/cancelar', 'POST', { login: cb.dataset.cancelar }).catch((err) => notaQuien(err.message, 'mal')); delete vinc[cb.dataset.cancelar]; pintarPersonas(); return; }
   const db = e.target.closest('[data-desvincular]');
   if (db) {
     const u = db.dataset.desvincular, nombre = (cfg.nombres || {})[u] || u;
