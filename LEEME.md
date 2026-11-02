@@ -186,17 +186,25 @@ Menú → **🗨️ Multichat**. Es para ti, no sale en el stream: lees en un so
 
 ## 💬 Mensajes automáticos en el chat (bot)
 
-Menú → **💬 Mensajes automáticos**. Se prende y se apaga **desde el chat de Twitch** (o con el botón del panel):
+Menú → **💬 Mensajes automáticos**. Cada persona de la lista (viene con **Nephallems**) tiene **su propio bot**, y tú también.
 
-- `activar bot` → empieza a mandar un mensaje **cada 10 minutos**, de a uno y en orden (rotando).
-- `desactivar bot` → deja de mandarlos.
-- Pueden hacerlo tú (el dueño del canal) y las personas de la lista del panel (viene con **Nephallems**). Para sumar a alguien: escribe su nombre de Twitch y toca **＋ Agregar**; se revisa en Twitch que la cuenta exista con ese nombre. La ✕ lo quita. El bot responde en el chat para confirmar.
-- Solo manda mensajes con el stream en vivo y nunca durante el descanso.
-- **Con el nombre de quien lo activa:** si Nephallems (u otra persona de la lista) **vincula su cuenta**, los mensajes y la confirmación salen con su nombre. Se hace una sola vez: en el panel toca **🔗 Vincular cuenta** junto a su nombre, y esa persona entra a **twitch.tv/activate** con su propia cuenta y escribe el código que aparece. Si no la vincula, salen con tu cuenta y la confirmación dice "Bot activado por Nephallems".
-- **Quién manda cada mensaje:** cada mensaje tiene **"Sale con"**: *Quien activó el bot* (lo normal), *Tu cuenta*, o una persona de la lista (por ejemplo, que el mensaje de bienvenida salga siempre con la cuenta de Nephallems). Si esa persona no vinculó su cuenta, sale con la tuya.
+**Desde el chat de Twitch** (no hace falta entrar al panel):
+
+| Escribe | Qué hace |
+|---|---|
+| `activar bot` | prende **tu** bot |
+| `desactivar bot` | apaga **tu** bot (el dueño del canal puede escribir `desactivar bot todos`) |
+| `bot mensaje <texto>` | guarda un mensaje tuyo (hasta 3) |
+| `bot mis mensajes` | muestra tus mensajes con su número |
+| `bot cambiar 1 <texto>` | cambia tu mensaje #1 |
+| `bot borrar 1` · `bot borrar todo` | borra uno o todos tus mensajes |
+| `bot ayuda` | muestra los comandos |
+
+- Mientras alguien tenga su bot activo, sale **un mensaje cada 10 minutos**, de a uno y rotando: los mensajes generales del panel + los propios de **cada persona que tenga su bot activo**. Los de una persona que apagó su bot dejan de salir.
+- Solo con el stream en vivo y nunca durante el descanso.
+- **Con su nombre:** los mensajes de cada persona salen con **su cuenta** si la vinculó una vez (en el panel, **🔗 Vincular cuenta** junto a su nombre → esa persona entra a **twitch.tv/activate** con su cuenta y escribe el código). Si no la vinculó, salen con tu cuenta.
+- **En el panel:** el botón de arriba es **tu bot**; en "Bot activo de" ves quién lo tiene prendido y puedes apagar el de cualquiera (✕) o **Apagar todos**. Los mensajes que cada uno eligió en el chat aparecen con la etiqueta "💬 de …" y también puedes editarlos o borrarlos. Los generales tienen **"Sale con"**: quien activó el bot, tu cuenta o una persona de la lista.
 - Si no escribe nada, en Configuración pulsa Desconectar y vuelve a Conectar con Twitch.
-
-**Editar los mensajes:** en el panel agregas, editas o borras mensajes, pones emotes y `{tiempo}` (lo que queda en el reloj), cambias los 10 minutos y quiénes pueden activarlo.
 
 ## 🔄 Actualizaciones automáticas
 

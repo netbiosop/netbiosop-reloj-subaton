@@ -1,29 +1,32 @@
 // Mensajes automáticos en el chat de Twitch: sale un mensaje cada X minutos (10 por defecto), uno detrás de otro.
-// No aparece en el menú: se prende y se apaga desde el chat.
-//  • "activar bot" / "desactivar bot" → las personas de la lista (ej. Nephallems) y el dueño del canal.
-//  • Los mensajes salen con la cuenta de quien lo activó, si esa persona vinculó su cuenta (src/twitch-cuentas.js);
-//    si no, salen con la cuenta del canal.
-//  • Los mensajes se editan en /automensajes-panel y se guardan en data/automensajes.json.
-//  • Solo con el stream en vivo (opcional) y nunca durante el descanso.
+//  • Cada persona de la lista (ej. Nephallems) prende y apaga SU bot desde el chat: "activar bot" / "desactivar bot".
+//    El dueño del canal también, o con el botón del panel ("tu bot").
+//  • Cada una elige sus propios mensajes desde el chat, sin entrar al panel:
+//      bot mensaje <texto> · bot mis mensajes · bot cambiar <n> <texto> · bot borrar <n> · bot borrar todo · bot ayuda
+//  • Mientras alguien tenga su bot activo, rotan los mensajes generales del panel + los de cada persona activa.
+//    Los de cada persona salen con su cuenta si la vinculó (src/twitch-cuentas.js); si no, con la del canal.
+//  • Se guarda en data/automensajes.json. Solo con el stream en vivo (opcional) y nunca durante el descanso.
 const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'automensajes.json');
-const MAX_TEXTO = 450; // límite de Twitch por mensaje (500) con margen
+const MAX_TEXTO = 450;   // límite de Twitch por mensaje (500) con margen
+const MAX_PROPIOS = 3;   // mensajes que cada persona puede elegir desde el chat
+const DUENO = '_dueno';  // el dueño del canal en la lista de bots activos
 const ACTIVAR = /^!?\s*activar\s*bot\b/i;
 const DESACTIVAR = /^!?\s*desactivar\s*bot\b/i;
+const COMANDO = /^!?\s*bot\s+(.+)$/i;
 
 const DEFAULTS = {
-  on: false,              // se prende cuando escriben "activar bot" en el chat
-  activadoPor: null,      // { login, nombre } de quien lo prendió: los mensajes salen con su cuenta
-  quienes: ['nephallems'], // quiénes pueden activarlo además del dueño del canal
-  cadaMin: 10,            // sale un mensaje cada 10 minutos, rotando
+  activos: {},             // login → { nombre, desde }: quién tiene su bot prendido (DUENO = el dueño del canal)
+  quienes: ['nephallems'], // quiénes pueden usarlo además del dueño del canal
+  cadaMin: 10,             // sale un mensaje cada 10 minutos, rotando
   soloEnVivo: true,
-  minChat: 0,             // opcional: esperar N mensajes del chat antes de cada automensaje (0 = no esperar)
-  mensajes: [
-    { id: 'm1', texto: '¡Bienvenidos al stream! Si te gusta el contenido, deja tu follow 💜 HeyGuys', on: true },
-    { id: 'm2', texto: '⏱ El subatón sigue: quedan {tiempo} en el reloj. ¡Cada sub, bits o donación suma tiempo! PogChamp', on: true },
+  minChat: 0,              // opcional: esperar N mensajes del chat antes de cada automensaje (0 = no esperar)
+  mensajes: [              // autor: '' = general (del panel) · o el usuario que lo eligió desde el chat
+    { id: 'm1', texto: '¡Bienvenidos al stream! Si te gusta el contenido, deja tu follow 💜 HeyGuys', on: true, como: '', autor: '' },
+    { id: 'm2', texto: '⏱ El subatón sigue: quedan {tiempo} en el reloj. ¡Cada sub, bits o donación suma tiempo! PogChamp', on: true, como: '', autor: '' },
   ],
 };
 
@@ -32,6 +35,7 @@ const normalizar = (u) => String(u || '').replace(/^@/, '').trim().toLowerCase()
 const esLogin = (u) => /^[a-z0-9_]{3,25}$/.test(u); // así son los nombres de usuario de Twitch
 const num = (v, min, max, def) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : def; };
 const limpiar = (v) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim().slice(0, MAX_TEXTO);
+const nuevoId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
 let config = clone(DEFAULTS);
 try {
@@ -40,11 +44,15 @@ try {
   if (!Array.isArray(config.mensajes)) config.mensajes = [];
   if (!Array.isArray(config.quienes)) config.quienes = clone(DEFAULTS.quienes);
   if (!config.nombres || typeof config.nombres !== 'object') config.nombres = {};
-  if (j.version !== 2) { config.on = false; config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); } // la 2.10.0 tenía un tiempo por mensaje
+  if (!config.activos || typeof config.activos !== 'object') config.activos = {};
+  if (j.version !== 2 && j.version !== 3) { config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); j.on = false; }
+  if (j.version !== 3 && j.on) config.activos[j.activadoPor?.login || DUENO] = { nombre: j.activadoPor?.nombre || '', desde: Date.now() }; // hasta la 2.15 había un solo bot
+  config.mensajes = config.mensajes.map((m) => ({ como: '', autor: '', ...m }));
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Automensajes] No se pudo leer', FILE, '-', err.message);
 }
-config.version = 2;
+delete config.on; delete config.activadoPor;
+config.version = 3;
 
 function save() {
   try {
@@ -54,32 +62,50 @@ function save() {
   } catch (err) { console.error('[Automensajes] No se pudo guardar:', err.message); }
 }
 
-// ---------- Programación ----------
+// ---------- Quién está activo y qué mensajes rotan ----------
 let ultimoEnvio = 0;  // último automensaje (o desde cuándo se cuenta)
-let siguiente = 0;    // índice del próximo mensaje en la rotación
+let ultimoId = '';    // el último que salió (la rotación sigue desde ahí)
 let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
+
+const hayActivos = () => Object.keys(config.activos).length > 0;
+const nombreDe = (login) => (login === DUENO ? 'tú' : config.activos[login]?.nombre || config.nombres?.[login] || login);
+// Rotan: los generales (si alguien tiene su bot activo) + los propios de cada persona activa
+const enRotacion = () => (hayActivos() ? config.mensajes.filter((m) => m.on && m.texto && (!m.autor || config.activos[m.autor])) : []);
+
+function activar(login, nombre) {
+  if (!hayActivos()) ultimoEnvio = Date.now(); // el primero sale después de un intervalo completo
+  config.activos[login] = { nombre: nombre || config.activos[login]?.nombre || '', desde: Date.now() };
+  save();
+}
+function desactivar(login) {
+  if (login === '*') config.activos = {}; else delete config.activos[login];
+  save();
+}
 
 const comoValido = (c) => { c = normalizar(c); return c === 'canal' || config.quienes.includes(c) ? c : ''; };
 
 function setConfig(b = {}) {
-  if ('on' in b) { if (!!b.on && !config.on) ultimoEnvio = Date.now(); config.on = !!b.on; }
+  if ('on' in b) (b.on ? activar(DUENO, '') : desactivar(DUENO)); // el botón del panel = tu bot
+  if (b.apagarTodos) desactivar('*');
+  if (b.apagar) desactivar(normalizar(b.apagar) === DUENO ? DUENO : normalizar(b.apagar));
   if ('soloEnVivo' in b) config.soloEnVivo = !!b.soloEnVivo;
   if ('cadaMin' in b) config.cadaMin = num(b.cadaMin, 1, 240, config.cadaMin);
   if ('minChat' in b) config.minChat = num(b.minChat, 0, 100, config.minChat);
-  if ('quienes' in b) {
-    config.quienes = [...new Set((Array.isArray(b.quienes) ? b.quienes : String(b.quienes).split(/[\s,]+/)).map(normalizar).filter(esLogin))].slice(0, 30);
-  }
   if (Array.isArray(b.mensajes)) {
-    config.mensajes = b.mensajes.slice(0, 30).map((m, i) => ({
-      id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || 'm' + Date.now().toString(36) + i,
-      texto: limpiar(m.texto),
-      on: m.on !== false,
-      como: comoValido(m.como), // '' = quien activó el bot · 'canal' = tu cuenta · o el usuario de alguien de la lista
-    })).filter((m) => m.texto);
+    config.mensajes = b.mensajes.slice(0, 60).map((m) => {
+      const autor = normalizar(m.autor);
+      return {
+        id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || nuevoId(),
+        texto: limpiar(m.texto),
+        on: m.on !== false,
+        autor: config.quienes.includes(autor) ? autor : '',
+        como: config.quienes.includes(autor) ? autor : comoValido(m.como), // los de una persona salen siempre con su cuenta
+      };
+    }).filter((m) => m.texto);
   }
   save();
-  return config;
+  return publicConfig();
 }
 
 // Reemplaza {tiempo} y {canal}
@@ -88,14 +114,14 @@ function armar(texto, ctx) {
   return texto.replace(/\{(\w+)\}/g, (todo, k) => (k.toLowerCase() in vars ? vars[k.toLowerCase()] : todo));
 }
 
-// Con qué cuenta sale: la de quien lo activó si la vinculó, si no la del canal
-const cuentaDeQuienActivo = (ctx) => (config.activadoPor && ctx.tieneCuenta?.(config.activadoPor.login) ? config.activadoPor : null);
-
-// Con qué cuenta sale ESTE mensaje: la que se eligió para él, o la de quien activó el bot
+// Con qué cuenta sale un mensaje: la de su autor o la elegida; los generales "de quien activó",
+// con la de la última persona que activó su bot y la tenga vinculada. Si no, la del canal.
 function cuentaDelMensaje(m, ctx) {
+  const ligada = (login) => (login && login !== 'canal' && ctx.tieneCuenta?.(login) ? { login, nombre: nombreDe(login) } : null);
   if (m.como === 'canal') return null;
-  if (m.como) return ctx.tieneCuenta?.(m.como) ? { login: m.como, nombre: config.nombres?.[m.como] || m.como } : null; // sin vincular: sale con la del canal
-  return cuentaDeQuienActivo(ctx);
+  if (m.autor || m.como) return ligada(m.autor || m.como);
+  const ultimo = Object.entries(config.activos).filter(([l]) => l !== DUENO && ctx.tieneCuenta?.(l)).sort((a, b) => b[1].desde - a[1].desde)[0];
+  return ultimo ? ligada(ultimo[0]) : null;
 }
 
 async function enviar(m, ctx, manual = false) {
@@ -105,51 +131,105 @@ async function enviar(m, ctx, manual = false) {
   try {
     const ok = await ctx.enviar(armar(m.texto, ctx), null, como?.login);
     if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
-    if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; }
+    if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; ultimoId = m.id; }
     console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
     return { enviado: m.id };
   } finally { enviando = false; }
 }
 
-const activos = () => config.mensajes.filter((m) => m.on && m.texto);
-const motivo = (ctx) => (!config.on ? 'apagado' : ctx.descanso ? 'en pausa (descanso)' : config.soloEnVivo && !ctx.live ? 'esperando que empiece el stream'
-  : !ctx.puedeChat?.() && !cuentaDeQuienActivo(ctx) ? 'sin permiso de chat' : !activos().length ? 'sin mensajes' : 'activo');
+const motivo = (ctx) => (!hayActivos() ? 'apagado' : ctx.descanso ? 'en pausa (descanso)' : config.soloEnVivo && !ctx.live ? 'esperando que empiece el stream'
+  : !enRotacion().length ? 'sin mensajes' : 'activo');
+const siguienteMensaje = () => { const l = enRotacion(); if (!l.length) return null; const i = l.findIndex((m) => m.id === ultimoId); return l[(i + 1) % l.length]; };
 
-// Se llama cada pocos segundos. ctx: { live, descanso, puedeChat(), enviar(texto) → bool, tiempo(), canal() }
+// Se llama cada pocos segundos. ctx: { live, descanso, puedeChat(), tieneCuenta(login), enviar(texto, responderA, como) → bool, tiempo(), canal() }
 async function tick(ctx) {
   const t = Date.now();
   if (motivo(ctx) !== 'activo') { ultimoEnvio = t; lineasChat = 0; return; } // al volver, el primero sale después de un intervalo completo
   if (enviando || t - ultimoEnvio < config.cadaMin * 60000 || lineasChat < config.minChat) return;
-  const lista = activos();
-  const m = lista[siguiente % lista.length];
-  siguiente = (siguiente + 1) % lista.length;
-  try { await enviar(m, ctx); } catch (e) { ultimoEnvio = t; console.error('[Automensajes]', e.message); } // reintenta en el próximo intervalo
+  const m = siguienteMensaje();
+  try { await enviar(m, ctx); } catch (e) { ultimoEnvio = t; ultimoId = m.id; console.error('[Automensajes]', e.message); } // sigue con el próximo en el siguiente intervalo
 }
 
-// Cada mensaje del chat: "activar bot" / "desactivar bot", y cuenta para el anti-spam opcional
+// ---------- Desde el chat ----------
+const AYUDA = 'Comandos del bot: "activar bot" / "desactivar bot" · "bot mensaje <texto>" agrega uno tuyo (hasta 3) · "bot mis mensajes" · "bot cambiar <n> <texto>" · "bot borrar <n>" o "bot borrar todo"';
+const propios = (login) => config.mensajes.filter((m) => m.autor === login);
+const corto = (t, n = 60) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
+
+// Lo que pide una persona con "bot …" → texto de respuesta
+function comando(login, nombre, resto) {
+  const [palabra, ...partes] = resto.trim().split(/\s+/);
+  const p = palabra.toLowerCase(), texto = limpiar(partes.join(' '));
+  if (login === DUENO && ['mensaje', 'mis', 'cambiar', 'borrar'].includes(p)) return 'Tus mensajes (los del canal) se editan en el panel del reloj. Estos comandos son para las personas de la lista.';
+  if (p === 'mensaje' || p === 'agregar') {
+    if (!texto) return 'Escribe el mensaje después: bot mensaje ¡Sigan a este canal! 💜';
+    const mios = propios(login);
+    if (mios.length >= MAX_PROPIOS) return `Ya tienes ${MAX_PROPIOS} mensajes. Cambia uno con "bot cambiar 1 <texto>" o borra uno con "bot borrar 1".`;
+    config.mensajes.push({ id: nuevoId(), texto, on: true, autor: login, como: login });
+    save();
+    console.log(`[Automensajes] ${nombre} agregó un mensaje desde el chat: ${corto(texto, 70)}`);
+    return `✅ Guardado como tu mensaje #${mios.length + 1}${config.activos[login] ? '' : '. Sale cuando actives tu bot con "activar bot"'}.`;
+  }
+  if (p === 'mis' || p === 'mensajes' || p === 'lista') {
+    const mios = propios(login);
+    if (!mios.length) return 'No tienes mensajes propios. Agrega uno con: bot mensaje <texto>';
+    let out = 'Tus mensajes: ' + mios.map((m, i) => `${i + 1}) ${corto(m.texto)}`).join(' · ');
+    return out.slice(0, MAX_TEXTO);
+  }
+  if (p === 'cambiar' || p === 'editar') {
+    const n = parseInt(partes[0], 10), nuevo = limpiar(partes.slice(1).join(' '));
+    const m = propios(login)[n - 1];
+    if (!m || !nuevo) return 'Así: bot cambiar 1 <nuevo texto> (mira el número con "bot mis mensajes")';
+    m.texto = nuevo; save();
+    return `✅ Cambiado tu mensaje #${n}.`;
+  }
+  if (p === 'borrar' || p === 'quitar') {
+    if (/^todo/i.test(partes[0] || '')) {
+      const n = propios(login).length;
+      config.mensajes = config.mensajes.filter((m) => m.autor !== login); save();
+      return n ? `🗑 Borrados tus ${n} mensajes.` : 'No tenías mensajes propios.';
+    }
+    const n = parseInt(partes[0], 10), m = propios(login)[n - 1];
+    if (!m) return 'Así: bot borrar 1 (mira el número con "bot mis mensajes") o bot borrar todo';
+    config.mensajes = config.mensajes.filter((x) => x !== m); save();
+    return `🗑 Borrado tu mensaje #${n}.`;
+  }
+  if (p === 'ayuda' || p === 'help' || p === 'comandos') return AYUDA;
+  return null; // "bot …" cualquiera (ej. "bot que buen stream"): no es un comando
+}
+
 function alChat(e, ctx) {
   if (!e) return;
   const texto = String(e.message?.text || '').trim();
   const login = String(e.chatter_user_login || '').toLowerCase();
-  const puede = e.chatter_user_id === e.broadcaster_user_id || config.quienes.includes(login);
+  const esDueno = e.chatter_user_id === e.broadcaster_user_id;
+  const puede = esDueno || config.quienes.includes(login);
+  const clave = esDueno ? DUENO : login;
+  const quien = e.chatter_user_name || login;
+  const conSuCuenta = !esDueno && !!ctx?.tieneCuenta?.(login);
+  // las respuestas salen con la cuenta de esa persona si la vinculó; si no, con la del canal diciendo su nombre
+  const responder = (txt, conNombre = true) => {
+    if (!conSuCuenta && !ctx?.puedeChat?.()) return;
+    Promise.resolve(ctx.enviar(conSuCuenta || esDueno || !conNombre ? txt : `@${quien} ${txt}`, e.message_id, conSuCuenta ? login : null)).catch(() => {});
+  };
+
   if (puede && (ACTIVAR.test(texto) || DESACTIVAR.test(texto))) {
     const prender = ACTIVAR.test(texto);
-    const yaEstaba = config.on === prender;
-    const quien = e.chatter_user_name || login;
-    config.activadoPor = prender ? { login, nombre: quien } : null;
-    setConfig({ on: prender });
-    siguiente = 0;
-    const conSuCuenta = !!ctx?.tieneCuenta?.(login);
-    console.log(`[Automensajes] ${prender ? '🤖 Bot activado' : '💤 Bot desactivado'} por ${quien} desde el chat${prender && e.chatter_user_id !== e.broadcaster_user_id ? (conSuCuenta ? ` · los mensajes salen con la cuenta de ${quien}` : ` · ${quien} no vinculó su cuenta: salen con la del canal`) : ''}`);
-    // la confirmación sale con la cuenta de quien lo pidió; si no la vinculó, con la del canal y diciendo quién fue
-    const firma = conSuCuenta || e.chatter_user_id === e.broadcaster_user_id ? '' : ` por ${quien}`;
-    const aviso = prender
-      ? (yaEstaba ? '🤖 El bot ya estaba activado' : `🤖 Bot activado${firma}`) + `: un mensaje cada ${config.cadaMin} minutos${config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : ''}.`
-      : yaEstaba ? '💤 El bot ya estaba desactivado.' : `💤 Bot desactivado${firma}.`;
-    if (conSuCuenta || ctx?.puedeChat?.()) Promise.resolve(ctx.enviar(aviso, e.message_id, conSuCuenta ? login : null)).catch(() => {});
+    const todos = esDueno && !prender && /\btodos?\b/i.test(texto);
+    const yaEstaba = !!config.activos[clave] === prender && !todos;
+    if (prender) activar(clave, esDueno ? '' : quien); else desactivar(todos ? '*' : clave);
+    const mios = esDueno ? 0 : propios(login).length;
+    console.log(`[Automensajes] ${prender ? '🤖 Bot activado' : '💤 Bot desactivado'} por ${quien}${todos ? ' (para todos)' : ''} desde el chat${prender && !esDueno ? (conSuCuenta ? ' · salen con su cuenta' : ' · no vinculó su cuenta: salen con la del canal') : ''}`);
+    const sufijo = config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : '';
+    const aviso = todos ? '💤 Bot desactivado para todos.'
+      : prender ? `${yaEstaba ? '🤖 Tu bot ya estaba activado' : '🤖 Bot activado'}: un mensaje cada ${config.cadaMin} minutos${sufijo}.${!esDueno && !mios ? ' Elige el tuyo con: bot mensaje <texto>' : ''}`
+      : yaEstaba ? '💤 Tu bot ya estaba desactivado.' : '💤 Bot desactivado.';
+    responder(aviso);
     return;
   }
-  if (e.chatter_user_id !== e.broadcaster_user_id) lineasChat++;
+  const c = puede && texto.match(COMANDO);
+  const r = c ? comando(clave, quien, c[1]) : null;
+  if (r) { responder(r); return; }
+  if (!esDueno) lineasChat++;
 }
 
 function enviarAhora(id, ctx) {
@@ -158,35 +238,40 @@ function enviarAhora(id, ctx) {
   return enviar(m, ctx, true);
 }
 
+// Para el panel: la config sin cambios + "on" (tu bot) y la lista de activos
+function publicConfig() {
+  return { ...config, on: !!config.activos[DUENO] };
+}
 function estado(ctx) {
-  const mot = motivo(ctx), lista = activos();
-  const como = cuentaDeQuienActivo(ctx);
+  const mot = motivo(ctx), sig = siguienteMensaje();
   return {
-    config, motivo: mot, activo: mot === 'activo',
-    saleComo: config.on ? (como ? como.nombre : ctx.canal?.() || 'tu canal') : null,
-    activadoPor: config.on ? config.activadoPor : null,
+    config: publicConfig(), motivo: mot, activo: mot === 'activo',
+    activos: Object.entries(config.activos).map(([login, a]) => ({ login, nombre: login === DUENO ? 'Tú' : a.nombre || login, cuentaPropia: login !== DUENO && !!ctx.tieneCuenta?.(login), propios: propios(login).length })),
     faltanLineas: Math.max(0, config.minChat - lineasChat),
     proximoEnSeg: mot === 'activo' ? Math.max(0, Math.round((ultimoEnvio + config.cadaMin * 60000 - Date.now()) / 1000)) : null,
-    proximoId: lista.length ? lista[siguiente % lista.length].id : null,
+    proximoId: sig ? sig.id : null,
+    enRotacion: enRotacion().map((m) => m.id),
   };
 }
 
-// Personas que pueden escribir "activar bot" (el nombre ya viene verificado con Twitch desde el servidor)
+// Personas que pueden usar el bot (el nombre ya viene verificado con Twitch desde el servidor)
 function agregarQuien(login, nombre) {
   login = normalizar(login);
   if (!esLogin(login)) throw new Error('Ese no es un nombre de Twitch válido (solo letras, números y _, de 3 a 25)');
   if (!config.quienes.includes(login)) config.quienes.push(login);
   config.nombres = { ...(config.nombres || {}), [login]: String(nombre || login).slice(0, 25) };
   save();
-  return config;
+  return publicConfig();
 }
 function quitarQuien(login) {
   login = normalizar(login);
   config.quienes = config.quienes.filter((u) => u !== login);
   if (config.nombres) delete config.nombres[login];
+  delete config.activos[login];
+  config.mensajes = config.mensajes.filter((m) => m.autor !== login); // sus mensajes se van con esa persona
   for (const m of config.mensajes) if (m.como === login) m.como = '';
   save();
-  return config;
+  return publicConfig();
 }
 
-module.exports = { agregarQuien, quitarQuien, normalizar, esLogin, setConfig, tick, alChat, enviarAhora, estado, save, getConfig: () => config };
+module.exports = { agregarQuien, quitarQuien, normalizar, esLogin, setConfig, tick, alChat, enviarAhora, estado, save, getConfig: publicConfig };
