@@ -59,11 +59,19 @@ let ultimoEnvio = 0;  // último automensaje (o desde cuándo se cuenta)
 let siguiente = 0;    // índice del próximo mensaje en la rotación
 let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
+// Lo que el bot escribió con una cuenta vinculada vuelve por el chat como si fuera de esa persona: no cuenta para minChat
+const ecos = [];
+const MAX_ECOS = 10;
+function anotarEco(login, texto) { ecos.push({ login, texto: String(texto).trim() }); if (ecos.length > MAX_ECOS) ecos.shift(); }
 
 const comoValido = (c) => { c = normalizar(c); return c === 'canal' || config.quienes.includes(c) ? c : ''; };
 
 function setConfig(b = {}) {
-  if ('on' in b) { if (!!b.on && !config.on) ultimoEnvio = Date.now(); config.on = !!b.on; }
+  if ('on' in b) {
+    if (!!b.on !== config.on) config.activadoPor = null; // alChat lo vuelve a poner si fue desde el chat
+    if (!!b.on && !config.on) ultimoEnvio = Date.now();
+    config.on = !!b.on;
+  }
   if ('soloEnVivo' in b) config.soloEnVivo = !!b.soloEnVivo;
   if ('cadaMin' in b) config.cadaMin = num(b.cadaMin, 1, 240, config.cadaMin);
   if ('minChat' in b) config.minChat = num(b.minChat, 0, 100, config.minChat);
@@ -101,8 +109,10 @@ function cuentaDelMensaje(m, ctx) {
 async function enviar(m, ctx, manual = false) {
   const como = cuentaDelMensaje(m, ctx);
   if (!como && !ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
-  const ok = await ctx.enviar(armar(m.texto, ctx), null, como?.login);
+  const texto = armar(m.texto, ctx);
+  const ok = await ctx.enviar(texto, null, como?.login);
   if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
+  if (como) anotarEco(como.login, texto);
   if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; }
   console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
   return { enviado: m.id };
@@ -135,8 +145,9 @@ function alChat(e, ctx) {
     const prender = ACTIVAR.test(texto);
     const yaEstaba = config.on === prender;
     const quien = e.chatter_user_name || login;
-    config.activadoPor = prender ? { login, nombre: quien } : null;
     setConfig({ on: prender });
+    config.activadoPor = prender ? { login, nombre: quien } : null;
+    save();
     siguiente = 0;
     const conSuCuenta = !!ctx?.tieneCuenta?.(login);
     console.log(`[Automensajes] ${prender ? '🤖 Bot activado' : '💤 Bot desactivado'} por ${quien} desde el chat${prender && e.chatter_user_id !== e.broadcaster_user_id ? (conSuCuenta ? ` · los mensajes salen con la cuenta de ${quien}` : ` · ${quien} no vinculó su cuenta: salen con la del canal`) : ''}`);
@@ -145,10 +156,13 @@ function alChat(e, ctx) {
     const aviso = prender
       ? (yaEstaba ? '🤖 El bot ya estaba activado' : `🤖 Bot activado${firma}`) + `: un mensaje cada ${config.cadaMin} minutos${config.soloEnVivo && !ctx?.live ? ' (cuando empiece el stream)' : ''}.`
       : yaEstaba ? '💤 El bot ya estaba desactivado.' : `💤 Bot desactivado${firma}.`;
+    if (conSuCuenta) anotarEco(login, aviso);
     if (conSuCuenta || ctx?.puedeChat?.()) ctx.enviar(aviso, e.message_id, conSuCuenta ? login : null); // sendChat y cuentasTwitch.enviar no rechazan: si fallan, lo anotan en el registro
     return;
   }
-  if (e.chatter_user_id !== e.broadcaster_user_id) lineasChat++;
+  if (e.chatter_user_id === e.broadcaster_user_id) return;
+  const eco = ecos.findIndex((x) => x.login === login && x.texto === texto);
+  if (eco >= 0) ecos.splice(eco, 1); else lineasChat++;
 }
 
 function enviarAhora(id, ctx) {
@@ -184,6 +198,7 @@ function quitarQuien(login) {
   config.quienes = config.quienes.filter((u) => u !== login);
   if (config.nombres) delete config.nombres[login];
   for (const m of config.mensajes) if (m.como === login) m.como = '';
+  if (config.activadoPor?.login === login) config.activadoPor = null;
   save();
   return config;
 }
