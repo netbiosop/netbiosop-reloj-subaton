@@ -63,6 +63,13 @@
   .vincular{flex-basis:100%;margin-top:4px;padding:12px;border-radius:10px;background:#0f0e14;border:1px dashed var(--accent)}
   .vincular ol{margin:6px 0 8px;padding-left:20px} .vincular li{margin:3px 0}
   .codigo{font:700 30px/1.1 ui-monospace,Consolas,monospace;letter-spacing:4px;color:#fff;background:#1d2a3a;border-radius:10px;padding:8px 14px;display:inline-block;user-select:all}
+  .activos{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .activo{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:999px;background:rgba(61,220,151,.12);border:1px solid rgba(61,220,151,.4);font-size:12px;font-weight:600}
+  .activo small{color:var(--muted);font-weight:500}
+  .activo button{padding:0 7px;border-radius:999px;font-size:11px;background:transparent}
+  .msg .autor{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(90,176,255,.15);color:var(--accent);margin-bottom:6px}
+  .msg.fuera{opacity:.55}
+  .cmds code{white-space:nowrap}
   .saleComo{margin-top:8px;padding:8px 10px;border-radius:10px;background:#0f0e14;border:1px solid var(--line);font-size:13px}
   .agregarQuien{display:flex;gap:8px} .agregarQuien input{flex:1;min-width:0}
   code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
@@ -72,7 +79,7 @@
 <body>
 <header>
   <h1>💬 Mensajes automáticos</h1>
-  <button class="switch" id="on"><span class="bola"></span><span id="onTxt">Apagado</span></button>
+  <button class="switch" id="on"><span class="bola"></span><span id="onTxt">Tu bot: apagado</span></button>
   <span class="sp"></span>
   <a class="btn sm" href="/menu">🏠 Menú</a>
 </header>
@@ -82,7 +89,9 @@
     <span class="estado" id="estado"><i></i><span id="estadoTxt">…</span></span>
     <div class="nota" id="estadoNota"></div>
     <div class="saleComo" id="saleComo" hidden></div>
-    <div class="nota" style="margin-top:12px">Se prende y se apaga desde el chat: <code>activar bot</code> · <code>desactivar bot</code></div>
+    <div class="nota cmds" style="margin-top:12px">Cada persona prende y apaga <b>su</b> bot desde el chat: <code>activar bot</code> · <code>desactivar bot</code> (tú también puedes: <code>desactivar bot todos</code> apaga el de todos).<br>
+      Y elige sus mensajes sin entrar acá: <code>bot mensaje &lt;texto&gt;</code> (hasta 3) · <code>bot mis mensajes</code> · <code>bot cambiar 1 &lt;texto&gt;</code> · <code>bot borrar 1</code> · <code>bot borrar todo</code> · <code>bot ayuda</code>.<br>
+      Mientras alguien tenga su bot activo rotan tus mensajes (los de abajo) + los de cada persona activa.</div>
     <label>Quiénes pueden activarlo (además de ti)</label>
     <div class="personas" id="personas"></div>
     <div class="agregarQuien">
@@ -159,16 +168,19 @@ function opcionesComo(sel = ''){
   return op('', '👤 Quien activó el bot') + op('canal', '📺 Tu cuenta')
     + cfg.quienes.map((u) => op(u, esc(cuentas[u]?.nombre || (cfg.nombres || {})[u] || u) + (cuentas[u] ? ' ✔' : ' (sin vincular)'))).join('');
 }
+let enRotacion = new Set();
+const nombrePersona = (u) => esc(cuentas[u]?.nombre || (cfg.nombres || {})[u] || u);
 function pintarLista(){
   $('lista').innerHTML = cfg.mensajes.map((m) => `
-    <div class="msg ${m.on ? '' : 'apagado'}" data-id="${m.id}">
+    <div class="msg ${m.on ? '' : 'apagado'} ${m.autor && !enRotacion.has(m.id) ? 'fuera' : ''}" data-id="${m.id}" data-autor="${esc(m.autor || '')}">
       <input type="checkbox" data-k="on" ${m.on ? 'checked' : ''} title="Prender o apagar este mensaje" style="margin-top:10px">
       <div>
+        ${m.autor ? `<span class="autor" title="Lo eligió en el chat con «bot mensaje». Sale solo mientras tenga su bot activo.">💬 de ${nombrePersona(m.autor)}</span>` : ''}
         <textarea data-k="texto" maxlength="450" placeholder="Escribe el mensaje… (puedes usar emotes y {tiempo})">${esc(m.texto)}</textarea>
         <div class="cont"><span data-cont>${m.texto.length}</span>/450</div>
       </div>
       <div class="lado">
-        <label class="como">Sale con <select data-k="como">${opcionesComo(m.como)}</select></label>
+        ${m.autor ? `<span class="como">Sale con ${cuentas[m.autor] ? 'su cuenta ✔' : 'tu cuenta (no vinculó la suya)'}</span>` : `<label class="como">Sale con <select data-k="como">${opcionesComo(m.como)}</select></label>`}
         <div class="prox" data-prox></div>
         <div style="display:flex;gap:6px">
           <button class="sm" data-enviar title="Lo manda ya al chat">📤 Enviar ahora</button>
@@ -179,7 +191,7 @@ function pintarLista(){
     </div>`).join('') || '<div class="nota">No hay mensajes. Toca "Agregar mensaje".</div>';
 }
 function pintarGeneral(){
-  $('on').classList.toggle('on', cfg.on); $('onTxt').textContent = cfg.on ? 'Prendido' : 'Apagado';
+  $('on').classList.toggle('on', cfg.on); $('onTxt').textContent = cfg.on ? 'Tu bot: prendido' : 'Tu bot: apagado';
   $('soloEnVivo').checked = cfg.soloEnVivo;
   if (document.activeElement !== $('minChat')) $('minChat').value = cfg.minChat;
   if (document.activeElement !== $('cadaMin')) $('cadaMin').value = cfg.cadaMin;
@@ -187,12 +199,17 @@ function pintarGeneral(){
 }
 let cuentas = {};
 function pintarEstado(j){
-  if (JSON.stringify(j.cuentas || {}) !== JSON.stringify(cuentas)) { cuentas = j.cuentas || {}; pintarPersonas(); refrescarComo(); }
+  if (JSON.stringify(j.cuentas || {}) !== JSON.stringify(cuentas)) { cuentas = j.cuentas || {}; pintarPersonas(); if (document.activeElement?.closest?.('#lista')) refrescarComo(); else pintarLista(); }
   const sc = $('saleComo');
-  sc.hidden = !j.saleComo;
-  if (j.saleComo) sc.innerHTML = j.activadoPor
-    ? `Activado por <b>${esc(j.activadoPor.nombre)}</b> · los mensajes salen con la cuenta de <b>${esc(j.saleComo)}</b>${cuentas[j.activadoPor.login] ? '' : ` <span class="nota">(${esc(j.activadoPor.nombre)} no vinculó su cuenta)</span>`}`
-    : `Los mensajes salen con la cuenta de <b>${esc(j.saleComo)}</b>`;
+  sc.hidden = !(j.activos || []).length;
+  sc.innerHTML = `<div style="margin-bottom:6px">Bot activo de:</div><div class="activos">${(j.activos || []).map((a) => `<span class="activo">🤖 ${esc(a.nombre)}${a.login === '_dueno' ? '' : ` <small>${a.cuentaPropia ? 'con su cuenta' : 'con tu cuenta'} · ${a.propios} propio${a.propios === 1 ? '' : 's'}</small>`}<button title="Apagar su bot" data-apagar="${esc(a.login)}">✕</button></span>`).join('')}
+    ${(j.activos || []).length > 1 ? '<button class="sm" data-apagar="*">Apagar todos</button>' : ''}</div>`;
+  enRotacion = new Set(j.enRotacion || []);
+  // si alguien agregó o cambió sus mensajes desde el chat, se ven acá (sin pisar lo que estés escribiendo)
+  if (cfg && j.config && JSON.stringify(j.config.mensajes) !== JSON.stringify(cfg.mensajes) && !document.activeElement?.closest?.('#lista') && $('guardado').textContent !== 'Guardando…') {
+    cfg = j.config; pintarLista();
+  }
+  document.querySelectorAll('.msg').forEach((el) => el.classList.toggle('fuera', !!el.dataset.autor && !enRotacion.has(el.dataset.id)));
   const e = $('estado');
   e.className = 'estado ' + (j.motivo === 'activo' ? 'activo' : j.motivo === 'sin permiso de chat' ? 'mal' : j.motivo === 'apagado' ? '' : 'alerta');
   const txt = { activo: 'Funcionando', apagado: 'Apagado', 'sin permiso de chat': 'Sin permiso para escribir en el chat' }[j.motivo] || j.motivo[0].toUpperCase() + j.motivo.slice(1);
@@ -214,7 +231,8 @@ function leerLista(){
     id: el.dataset.id,
     on: el.querySelector('[data-k=on]').checked,
     texto: el.querySelector('[data-k=texto]').value,
-    como: el.querySelector('[data-k=como]').value,
+    autor: el.dataset.autor || '',
+    como: el.querySelector('[data-k=como]')?.value || '',
   }));
 }
 async function guardar(cambios){
@@ -258,6 +276,7 @@ $('agregar').onclick = () => {
   const t = [...document.querySelectorAll('#lista textarea')].pop(); t.focus(); ultimoCampo = t;
 };
 $('on').onclick = () => guardar({ on: !cfg.on });
+$('saleComo').onclick = (e) => { const b = e.target.closest('[data-apagar]'); if (!b) return; guardar(b.dataset.apagar === '*' ? { apagarTodos: true } : b.dataset.apagar === '_dueno' ? { on: false } : { apagar: b.dataset.apagar }); };
 $('soloEnVivo').onchange = () => guardar({ soloEnVivo: $('soloEnVivo').checked });
 $('minChat').onchange = () => guardar({ minChat: Number($('minChat').value) });
 $('cadaMin').onchange = () => guardar({ cadaMin: Number($('cadaMin').value) });
