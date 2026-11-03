@@ -13,6 +13,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'automensajes.json');
 const MAX_TEXTO = 450;   // límite de Twitch por mensaje (500) con margen
 const MAX_PROPIOS = 3;   // mensajes que cada persona puede elegir desde el chat
+const MAX_MENSAJES = 60; // en total, desde el panel
 const DUENO = '_dueno';  // el dueño del canal en la lista de bots activos
 const ACTIVAR = /^!?\s*activar\s*bot\b/i;
 const DESACTIVAR = /^!?\s*desactivar\s*bot\b/i;
@@ -46,7 +47,10 @@ try {
   if (!config.nombres || typeof config.nombres !== 'object') config.nombres = {};
   if (!config.activos || typeof config.activos !== 'object') config.activos = {};
   if (j.version !== 2 && j.version !== 3) { config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); j.on = false; }
-  if (j.version !== 3 && j.on) config.activos[j.activadoPor?.login || DUENO] = { nombre: j.activadoPor?.nombre || '', desde: Date.now() }; // hasta la 2.15 había un solo bot
+  if (j.version !== 3 && j.on) { // hasta la 2.15 había un solo bot; si lo activó el dueño desde el chat, activadoPor tiene su login
+    const l = j.activadoPor?.login;
+    config.activos[config.quienes.includes(l) ? l : DUENO] = { nombre: j.activadoPor?.nombre || '', desde: Date.now() };
+  }
   config.mensajes = config.mensajes.map((m) => ({ como: '', autor: '', ...m }));
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Automensajes] No se pudo leer', FILE, '-', err.message);
@@ -95,12 +99,13 @@ const comoValido = (c) => { c = normalizar(c); return c === 'canal' || config.qu
 function setConfig(b = {}) {
   if ('on' in b) (b.on ? activar(DUENO, '') : desactivar(DUENO)); // el botón del panel = tu bot
   if (b.apagarTodos) desactivar('*');
-  if (b.apagar) desactivar(normalizar(b.apagar) === DUENO ? DUENO : normalizar(b.apagar));
+  if (b.apagar) desactivar(normalizar(b.apagar));
   if ('soloEnVivo' in b) config.soloEnVivo = !!b.soloEnVivo;
   if ('cadaMin' in b) config.cadaMin = num(b.cadaMin, 1, 240, config.cadaMin);
   if ('minChat' in b) config.minChat = num(b.minChat, 0, 100, config.minChat);
   if (Array.isArray(b.mensajes)) {
-    config.mensajes = b.mensajes.slice(0, 60).map((m) => {
+    const delChat = new Set(config.mensajes.filter((m) => m.autor).map((m) => m.id));
+    config.mensajes = b.mensajes.filter((m) => m && typeof m === 'object').slice(0, MAX_MENSAJES).map((m) => {
       const autor = normalizar(m.autor);
       return {
         id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || nuevoId(),
@@ -109,7 +114,7 @@ function setConfig(b = {}) {
         autor: config.quienes.includes(autor) ? autor : '',
         como: config.quienes.includes(autor) ? autor : comoValido(m.como), // los de una persona salen siempre con su cuenta
       };
-    }).filter((m) => m.texto);
+    }).filter((m) => m.texto && (!m.autor || delChat.has(m.id))); // un panel desactualizado no revive lo que la persona borró desde el chat
   }
   save();
   return publicConfig();
