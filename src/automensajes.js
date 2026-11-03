@@ -41,7 +41,7 @@ let config = clone(DEFAULTS);
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   config = { ...clone(DEFAULTS), ...j };
-  if (!Array.isArray(config.mensajes)) config.mensajes = [];
+  config.mensajes = Array.isArray(config.mensajes) ? config.mensajes.filter((m) => m && typeof m.texto === 'string') : [];
   if (!Array.isArray(config.quienes)) config.quienes = clone(DEFAULTS.quienes);
   if (!config.nombres || typeof config.nombres !== 'object') config.nombres = {};
   if (!config.activos || typeof config.activos !== 'object') config.activos = {};
@@ -67,6 +67,13 @@ let ultimoEnvio = 0;  // último automensaje (o desde cuándo se cuenta)
 let ultimoId = '';    // el último que salió (la rotación sigue desde ahí)
 let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
+// Lo que el bot escribió con una cuenta vinculada vuelve por el chat como si fuera de esa persona: no cuenta para minChat
+const ecos = [];
+const MAX_ECOS = 10;
+function anotarEco(login, texto) {
+  ecos.push({ login, texto: String(texto).slice(0, MAX_TEXTO).trim() }); // se envía recortado: {canal} y {tiempo} alargan la plantilla
+  if (ecos.length > MAX_ECOS) ecos.shift();
+}
 
 const hayActivos = () => Object.keys(config.activos).length > 0;
 const nombreDe = (login) => (login === DUENO ? 'tú' : config.activos[login]?.nombre || config.nombres?.[login] || login);
@@ -127,14 +134,13 @@ function cuentaDelMensaje(m, ctx) {
 async function enviar(m, ctx, manual = false) {
   const como = cuentaDelMensaje(m, ctx);
   if (!como && !ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
-  enviando = true;
-  try {
-    const ok = await ctx.enviar(armar(m.texto, ctx), null, como?.login);
-    if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
-    if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; ultimoId = m.id; }
-    console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${m.texto.slice(0, 70)}${m.texto.length > 70 ? '…' : ''}`);
-    return { enviado: m.id };
-  } finally { enviando = false; }
+  const texto = armar(m.texto, ctx);
+  const ok = await ctx.enviar(texto, null, como?.login);
+  if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
+  if (como) anotarEco(como.login, texto);
+  if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; ultimoId = m.id; }
+  console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${corto(m.texto, 71)}`);
+  return { enviado: m.id };
 }
 
 const motivo = (ctx) => (!hayActivos() ? 'apagado' : ctx.descanso ? 'en pausa (descanso)' : config.soloEnVivo && !ctx.live ? 'esperando que empiece el stream'
@@ -147,7 +153,9 @@ async function tick(ctx) {
   if (motivo(ctx) !== 'activo') { ultimoEnvio = t; lineasChat = 0; return; } // al volver, el primero sale después de un intervalo completo
   if (enviando || t - ultimoEnvio < config.cadaMin * 60000 || lineasChat < config.minChat) return;
   const m = siguienteMensaje();
+  enviando = true; // solo el envío automático: "Enviar ahora" desde el panel no debe soltar este seguro
   try { await enviar(m, ctx); } catch (e) { ultimoEnvio = t; ultimoId = m.id; console.error('[Automensajes]', e.message); } // sigue con el próximo en el siguiente intervalo
+  finally { enviando = false; }
 }
 
 // ---------- Desde el chat ----------
@@ -209,7 +217,8 @@ function alChat(e, ctx) {
   // las respuestas salen con la cuenta de esa persona si la vinculó; si no, con la del canal diciendo su nombre
   const responder = (txt, conNombre = true) => {
     if (!conSuCuenta && !ctx?.puedeChat?.()) return;
-    Promise.resolve(ctx.enviar(conSuCuenta || esDueno || !conNombre ? txt : `@${quien} ${txt}`, e.message_id, conSuCuenta ? login : null)).catch(() => {});
+    if (conSuCuenta) anotarEco(login, txt);
+    ctx.enviar(conSuCuenta || esDueno || !conNombre ? txt : `@${quien} ${txt}`, e.message_id, conSuCuenta ? login : null); // sendChat y cuentasTwitch.enviar no rechazan: si fallan, lo anotan en el registro
   };
 
   if (puede && (ACTIVAR.test(texto) || DESACTIVAR.test(texto))) {
@@ -229,7 +238,9 @@ function alChat(e, ctx) {
   const c = puede && texto.match(COMANDO);
   const r = c ? comando(clave, quien, c[1]) : null;
   if (r) { responder(r); return; }
-  if (!esDueno) lineasChat++;
+  if (esDueno) return;
+  const eco = ecos.findIndex((x) => x.login === login && x.texto === texto);
+  if (eco >= 0) ecos.splice(eco, 1); else lineasChat++;
 }
 
 function enviarAhora(id, ctx) {
