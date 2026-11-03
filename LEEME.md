@@ -358,6 +358,15 @@ El reloj busca el nombre en todos los lugares donde Mercado Pago lo pone (transf
 - **Si igual llega como "Donación Mercado Pago"** (Mercado Pago no mandó el nombre): ponle el nombre en el podio con ✏️ y **se recuerda**. La próxima donación de esa misma persona ya entra con ese nombre.
 
 
+### ¿Es una donación? (aprobar antes de que cuente)
+
+Cuando entra una donación de **Mercado Pago** o **PayPal**, queda **en espera** y aparece un aviso abajo a la derecha del menú y de los paneles (con un sonido y el título de la pestaña con "(1) ¿Donación?"):
+- **✔ Es donación** → suma a todo: tiempo del reloj, podio, metas y patitos.
+- **✖ No es donación** → no hace nada.
+- Marca **"Lo mismo para sus próximos pagos"** para no tener que responder más por esa persona (siempre cuenta, o nunca cuenta).
+- Mientras no respondas, queda esperando (aunque cierres y abras el reloj). Las **subs y los bits cuentan siempre solos**.
+- Se activa o desactiva en Configuración → Mercado Pago → *Preguntar antes de contar* (por separado para Mercado Pago y PayPal); ahí también ves y quitas a quienes marcaste como "siempre donación".
+
 ### Pagos que NO son donaciones (tu sueldo, compras que haces tú)
 
 - Lo que **pagas tú** con la app de Mercado Pago (compras, QR, servicios) **nunca cuenta**: el reloj solo cuenta un pago si está confirmado que lo cobraste tú.

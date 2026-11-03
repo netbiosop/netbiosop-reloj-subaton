@@ -273,6 +273,11 @@
         </div>
         <p class="hint">URL del webhook (evento <b>Pagos</b>): <code class="hookurl" data-hook="/webhooks/mercadopago"></code></p>
         <div class="row gap"><button class="primary" id="btnMpSave">Guardar y conectar</button><button class="danger-ghost" id="btnMpClear">Quitar token</button></div>
+        <h4 style="margin-top:16px">Preguntar antes de contar</h4>
+        <p class="hint">Cuando entra una donación aparece un aviso <b>¿Es una donación?</b> en el menú y los paneles. Si tocas <b>✔ Es donación</b> suma a todo (reloj, podio, metas, patitos); si tocas <b>✖ No es donación</b> no hace nada. Mientras no respondas, queda en espera. Las subs y los bits cuentan siempre solos.</p>
+        <label class="check"><input type="checkbox" id="pregMp"> Preguntar con las de <b>Mercado Pago</b></label>
+        <label class="check"><input type="checkbox" id="pregPp"> Preguntar con las de <b>PayPal</b></label>
+        <div id="siempreDon" class="hint"></div>
         <h4 style="margin-top:16px">Pagos que NO son donaciones</h4>
         <p class="hint">Lo que pagas tú con la app nunca cuenta. Además, los pagos de estas personas (por ejemplo tu sueldo) no suman tiempo, ni podio, ni metas. Un nombre por línea: "Luis Villa" también descarta "Luis María Villa", y "Luis V" descarta cualquier "Luis V…".</p>
         <textarea id="mpIgnorarNombres" rows="4" style="width:100%"></textarea>
@@ -402,5 +407,6 @@
 <div class="toast" id="toast"></div>
 <script src="sounds.js"></script>
 <script src="panel.js"></script>
+<script src="/pendientes.js"></script>
 </body>
 </html>

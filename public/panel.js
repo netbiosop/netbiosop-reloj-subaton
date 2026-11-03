@@ -401,6 +401,20 @@ $('#mpIgnorarClaves').onclick = async (e) => {
 };
 cargarMpIgnorar();
 
+// Preguntar antes de contar una donación
+async function cargarPreguntar() {
+  try {
+    const j = await api('GET', '/api/pendientes');
+    $('#pregMp').checked = j.preguntar?.mercadopago !== false; $('#pregPp').checked = j.preguntar?.paypal !== false;
+    $('#siempreDon').innerHTML = (j.siempre || []).length ? 'Siempre son donación (no se pregunta): ' + j.siempre.map((x) => `<span class="tag">${esc(x.nombre)} <a href="#" data-olvidar-siempre="${esc(x.quien)}" title="Volver a preguntar">✕</a></span>`).join(' ') : '';
+  } catch {}
+}
+const guardarPreguntar = (extra = {}) => api('POST', '/api/pendientes/config', { preguntar: { mercadopago: $('#pregMp').checked, paypal: $('#pregPp').checked }, ...extra }).then(cargarPreguntar).catch(() => {});
+$('#pregMp').onchange = () => guardarPreguntar();
+$('#pregPp').onchange = () => guardarPreguntar();
+$('#siempreDon').onclick = (e) => { const a = e.target.closest('[data-olvidar-siempre]'); if (!a) return; e.preventDefault(); guardarPreguntar({ olvidarSiempre: a.dataset.olvidarSiempre }); };
+cargarPreguntar();
+
 $('#btnMpSave').onclick = () => saveSecrets({ mercadopago: { accessToken: $('#mpToken').value, mode: $('#mpMode').value, pollSeconds: Number($('#mpPoll').value) || 15, nombre: $('#mpNombre').value, webhookSecret: $('#mpSecret').value } }, 'Mercado Pago guardado, conectando…');
 $('#btnMpClear').onclick = () => confirm('¿Quitar el token de Mercado Pago?') && saveSecrets({ mercadopago: { accessToken: null } }, 'Token quitado');
 $('#btnSeSave').onclick = () => {
