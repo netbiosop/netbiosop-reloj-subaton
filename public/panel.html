@@ -273,6 +273,11 @@
         </div>
         <p class="hint">URL del webhook (evento <b>Pagos</b>): <code class="hookurl" data-hook="/webhooks/mercadopago"></code></p>
         <div class="row gap"><button class="primary" id="btnMpSave">Guardar y conectar</button><button class="danger-ghost" id="btnMpClear">Quitar token</button></div>
+        <h4 style="margin-top:16px">Pagos que NO son donaciones</h4>
+        <p class="hint">Lo que pagas tú con la app nunca cuenta. Además, los pagos de estas personas (por ejemplo tu sueldo) no suman tiempo, ni podio, ni metas. Un nombre por línea: "Luis Villa" también descarta "Luis María Villa", y "Luis V" descarta cualquier "Luis V…".</p>
+        <textarea id="mpIgnorarNombres" rows="4" style="width:100%"></textarea>
+        <div id="mpIgnorarClaves" class="hint"></div>
+        <div class="row gap"><button id="btnMpIgnorar">Guardar lista</button><span class="hint" id="mpIgnorarNota"></span></div>
       </details>
 
       <details class="conn">

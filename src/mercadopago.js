@@ -6,6 +6,18 @@ const crypto = require('crypto');
 
 const API = 'https://api.mercadopago.com';
 
+// "Luis Villa" coincide con "LUIS MARÍA VILLA" (las palabras de la regla, en orden, empezando por el primer nombre);
+// una sola letra vale como inicial: "Luis V" coincide con "Luis Villa" y "Luis Valdez". "Luisa Villa" no coincide con "Luis Villa".
+const palabras = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+const igual = (palabra, regla) => (regla.length === 1 ? palabra.startsWith(regla) : palabra === regla);
+function coincideNombre(nombre, regla) {
+  const n = palabras(nombre), r = palabras(regla);
+  if (!r.length || !n.length || !igual(n[0], r[0])) return false;
+  let i = 1;
+  for (const w of r.slice(1)) { while (i < n.length && !igual(n[i], w)) i++; if (i++ >= n.length) return false; }
+  return true;
+}
+
 class MercadoPagoClient {
   constructor({ store, onContribution, onStatus }) {
     this.store = store;
@@ -96,6 +108,16 @@ class MercadoPagoClient {
     const n = cands.map((v) => String(v || '').replace(/\s+/g, ' ').trim()).find((v) => v && !/^(null|undefined|n\/a)$/i.test(v));
     return n || '';
   }
+  // todos los nombres que trae el pago (para la lista de "no contar")
+  nombresDe(p) {
+    const bp = p.point_of_interaction?.transaction_data?.bank_info?.payer || {};
+    return [bp.long_name, bp.account_holder_name, bp.name, [p.payer?.first_name, p.payer?.last_name].filter(Boolean).join(' '),
+      [p.additional_info?.payer?.first_name, p.additional_info?.payer?.last_name].filter(Boolean).join(' '), p.card?.cardholder?.name, p.payer?.nickname]
+      .map((v) => String(v || '').trim()).filter(Boolean);
+  }
+  ignorar(p, nombre, motivo) {
+    console.log(`[Mercado Pago] Pago ignorado: ${p.transaction_amount} ${p.currency_id || ''}${nombre ? ' de ' + nombre : ''} · ${motivo}. No suma tiempo, ni podio, ni metas.`);
+  }
   // cómo se muestra en el stream: "Juan P." (por defecto), solo "Juan" o "Juan Pérez"
   formatear(nombre) {
     const titulo = (w) => w.charAt(0).toLocaleUpperCase('es') + w.slice(1).toLocaleLowerCase('es');
@@ -115,8 +137,6 @@ class MercadoPagoClient {
 
   async processPayment(p) {
     if (!p || p.status !== 'approved') return;
-    // Solo pagos que RECIBES (no los que haces tú)
-    if (this.userId && p.collector_id && String(p.collector_id) !== String(this.userId)) return;
     // Ignora pagos aprobados antes de empezar el subatón
     const approvedAt = Date.parse(p.date_approved || p.date_created || 0);
     if (approvedAt && approvedAt < (this.store.data.mpSince || 0) - 60_000) return;
@@ -124,10 +144,21 @@ class MercadoPagoClient {
     if (!(amount > 0)) return;
     if ((this.vistos ||= new Set()).has(String(p.id))) return;
     this.vistos.add(String(p.id));
-    // la búsqueda de pagos a veces viene sin el nombre: se pide el pago completo
+    // la búsqueda de pagos a veces viene sin el nombre o sin quién lo cobró: se pide el pago completo
+    const cobrador = (x) => x.collector_id ?? x.collector?.id;
     let nombre = this.nombreDe(p);
-    if (!nombre) { try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); nombre = this.nombreDe(full); p = { ...p, ...full }; } catch {} }
+    if (!nombre || (this.userId && !cobrador(p))) { try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); } catch {} }
+    // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
+    if (this.userId) {
+      if (String(cobrador(p) ?? '') !== String(this.userId)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
+      if (p.payer?.id && String(p.payer.id) === String(this.userId)) return this.ignorar(p, nombre, 'lo pagaste tú');
+    }
     const pk = this.clave(p);
+    // Personas de "no contar" (ej. el sueldo): por nombre o porque marcaste un pago suyo como "No es donación"
+    const lista = this.store.data.settings.mpIgnorar || {};
+    if (pk && (lista.claves || []).some((c) => c.clave === pk)) return this.ignorar(p, nombre, 'marcaste a esta persona como "no es donación"');
+    const regla = this.nombresDe(p).map((n) => (lista.nombres || []).find((r) => coincideNombre(n, r))).find(Boolean);
+    if (regla) return this.ignorar(p, nombre, `está en tu lista de "no contar" ("${regla}")`);
     // si en el motivo de la transferencia escribió su usuario de Twitch (@usuario), se usa ese
     const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/@([A-Za-z0-9_]{3,25})/);
     const recordado = (arroba && arroba[1]) || (pk && this.store.data.mpNombres && this.store.data.mpNombres[pk]);
@@ -169,4 +200,4 @@ class MercadoPagoClient {
   }
 }
 
-module.exports = { MercadoPagoClient };
+module.exports = { coincideNombre, MercadoPagoClient };

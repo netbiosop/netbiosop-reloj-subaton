@@ -23,6 +23,8 @@ const DEFAULTS = {
     horasDiarias: { on: false, seconds: 4 * 3600, unaVezPorDia: true, ultimoDia: '' },
     descanso: false,          // "Pausar todo": reloj en pausa, pero sigue escuchando subs, bits y donaciones
     descansoSumaTiempo: true, // en descanso, ¿lo que entra suma tiempo al reloj (queda guardado)?
+    // Pagos de Mercado Pago que NO son donaciones (ej. el sueldo): no suman tiempo, ni podio, ni metas
+    mpIgnorar: { nombres: ['Luis Maria Villa', 'Luis Villa', 'Luis V'], claves: [] },
     descansoPrevRunning: false, // ¿el reloj estaba corriendo al pausar todo? (para reanudarlo igual)
     sounds: {                 // sonidos del overlay (se escuchan en OBS)
       enabled: true,

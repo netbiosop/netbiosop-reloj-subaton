@@ -802,6 +802,38 @@ app.post('/api/podio/event', podioRoute((req) => { const r = podio.addManual(req
 app.post('/api/podio/event/:id', podioRoute((req) => podio.renameEvent(req.params.id, req.body.user)));
 app.post('/api/podio/renombrar', podioRoute((req) => podio.renamePerson(req.body)));
 app.post('/api/podio/rey', podioRoute((req) => podio.setRey(req.body)));
+// ---------- Pagos que NO son donaciones (ej. el sueldo por Mercado Pago) ----------
+const mpIgnorar = () => (d.settings.mpIgnorar ||= { nombres: [], claves: [] });
+app.get('/api/mp/ignorar', (req, res) => res.json(mpIgnorar()));
+app.post('/api/mp/ignorar', (req, res) => {
+  const l = mpIgnorar();
+  if (Array.isArray(req.body.nombres)) l.nombres = [...new Set(req.body.nombres.map((n) => String(n).replace(/\s+/g, ' ').trim().slice(0, 60)).filter(Boolean))].slice(0, 50);
+  if (req.body.quitarClave) l.claves = l.claves.filter((c) => c.clave !== req.body.quitarClave);
+  store.save();
+  ok(res, { result: l });
+});
+// Un aporte que entró como donación pero no lo era: sale del podio y las metas, y se descuenta del reloj lo que sumó
+app.post('/api/podio/no-es-donacion', (req, res) => {
+  try {
+    const ev = podio.evento(String(req.body.id || ''));
+    if (!ev || ev.cat !== 'dinero' || ev.manual) throw new Error('Solo se puede con donaciones que llegaron solas (Mercado Pago o PayPal)');
+    const log = ev.ref ? d.log.find((e) => e.id === ev.ref) : null;
+    const secs = log && !log.anulado ? Number(log.seconds) || 0 : 0;
+    const que = `${ev.user} · ${ev.amount} ${ev.currency}`;
+    if (secs > 0) engine.manualAdjust(-secs, `No era donación (${que}): se descuenta lo que sumó`);
+    if (log && !log.anulado) {
+      log.anulado = true; log.note = 'No era donación: se quitó del reloj, el podio y las metas';
+      const st = d.stats[log.source];
+      if (st && !log.test) { st.count = Math.max(0, st.count - 1); st.amount = Math.round((st.amount - (Number(log.amount) || 0)) * 100) / 100; st.seconds = Math.max(0, st.seconds - secs); }
+    }
+    podio.removeEvent(ev.id);
+    const clave = ev.pk || log?.payer;
+    if (req.body.recordar && clave && !mpIgnorar().claves.some((c) => c.clave === clave)) mpIgnorar().claves.push({ clave, nombre: ev.user, at: Date.now() });
+    store.save();
+    console.log(`🚫 No era donación: ${que}${secs ? ` (se descontaron ${fmtDuration(secs)} del reloj)` : ''}${req.body.recordar && clave ? ' · sus próximos pagos tampoco cuentan' : ''}`);
+    ok(res, { result: { segundos: secs, recordado: !!(req.body.recordar && clave) } });
+  } catch (err) { res.json({ error: err.message }, 400); }
+});
 app.post('/api/podio/vincular-mp', podioRoute((req) => podio.vincularMP(req.body.nombre, req.body.monto)));
 app.delete('/api/podio/event/:id', podioRoute((req) => podio.removeEvent(req.params.id)));
 app.post('/api/podio/rates', async (req, res) => {

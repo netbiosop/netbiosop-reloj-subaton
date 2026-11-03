@@ -380,6 +380,27 @@ $('#btnTwConnect').onclick = (e) => {
 };
 $('#btnTwReconnect').onclick = () => api('POST', '/api/twitch/reconnect');
 $('#btnTwDisconnect').onclick = () => confirm('¿Desconectar Twitch?') && api('POST', '/api/twitch/disconnect');
+// Pagos de Mercado Pago que no son donaciones (ej. el sueldo)
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function cargarMpIgnorar() {
+  try {
+    const l = await api('GET', '/api/mp/ignorar');
+    if (document.activeElement !== $('#mpIgnorarNombres')) $('#mpIgnorarNombres').value = (l.nombres || []).join('\n');
+    $('#mpIgnorarClaves').innerHTML = (l.claves || []).length
+      ? 'Personas marcadas con "No es donación": ' + l.claves.map((c) => `<span class="tag">${esc(c.nombre)} <a href="#" data-olvidar="${esc(c.clave)}" title="Volver a contar sus pagos">✕</a></span>`).join(' ')
+      : '';
+  } catch {}
+}
+$('#btnMpIgnorar').onclick = async () => {
+  try { await api('POST', '/api/mp/ignorar', { nombres: $('#mpIgnorarNombres').value.split('\n') }); $('#mpIgnorarNota').textContent = '✔ Guardado'; cargarMpIgnorar(); }
+  catch (e) { $('#mpIgnorarNota').textContent = e.message; }
+};
+$('#mpIgnorarClaves').onclick = async (e) => {
+  const a = e.target.closest('[data-olvidar]'); if (!a) return; e.preventDefault();
+  try { await api('POST', '/api/mp/ignorar', { quitarClave: a.dataset.olvidar }); cargarMpIgnorar(); } catch {}
+};
+cargarMpIgnorar();
+
 $('#btnMpSave').onclick = () => saveSecrets({ mercadopago: { accessToken: $('#mpToken').value, mode: $('#mpMode').value, pollSeconds: Number($('#mpPoll').value) || 15, nombre: $('#mpNombre').value, webhookSecret: $('#mpSecret').value } }, 'Mercado Pago guardado, conectando…');
 $('#btnMpClear').onclick = () => confirm('¿Quitar el token de Mercado Pago?') && saveSecrets({ mercadopago: { accessToken: null } }, 'Token quitado');
 $('#btnSeSave').onclick = () => {

@@ -357,6 +357,14 @@ El reloj busca el nombre en todos los lugares donde Mercado Pago lo pone (transf
 - **Vincular con el usuario de Twitch:** escribe en el chat `!mp.add @usuario` (tú o tus mods) y la última donación de Mercado Pago pasa a ser de ese usuario. Desde ahí, las próximas donaciones de esa misma persona ya entran con su nombre de Twitch. También funciona si quien dona escribe su `@usuario` en el motivo de la transferencia.
 - **Si igual llega como "Donación Mercado Pago"** (Mercado Pago no mandó el nombre): ponle el nombre en el podio con ✏️ y **se recuerda**. La próxima donación de esa misma persona ya entra con ese nombre.
 
+
+### Pagos que NO son donaciones (tu sueldo, compras que haces tú)
+
+- Lo que **pagas tú** con la app de Mercado Pago (compras, QR, servicios) **nunca cuenta**: el reloj solo cuenta un pago si está confirmado que lo cobraste tú.
+- **Lista de "no contar"** (Configuración → Mercado Pago → *Pagos que NO son donaciones*): un nombre por línea. Viene con **Luis Maria Villa**, **Luis Villa** y **Luis V**. "Luis Villa" también descarta "Luis María Villa"; una sola letra vale como inicial, así que "Luis V" descarta a cualquier "Luis V…" (Villa, Vázquez…).
+- **🚫 No es donación**: si igual entró un pago que no era donación, en Menú → 🏆 Podio y Metas → Aportes del mes, toca ese botón junto al pago. Se quita del podio y de las metas y **se descuenta del reloj el tiempo que había sumado**. Te pregunta si tampoco quieres contar los **próximos** pagos de esa persona (la puedes volver a contar desde la lista con la ✕).
+- Cada pago descartado queda anotado en la ventana del reloj con el motivo.
+
 ## 7. Conectar PayPal
 
 ### Opción recomendada: con StreamElements (si tu PayPal ya está en tu página de propinas de StreamElements)
