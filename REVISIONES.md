@@ -25,6 +25,11 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   canal; `cuentasTwitch.enviar` y `twitch.sendChat` nunca rechazan (por eso el aviso de `alChat` no lleva `.catch`).
 - El repo no tiene pruebas automáticas: las correcciones se comprueban con scripts de node que simulan `fetch` y
   `WebSocket` (sin red) y con Chromium headless sobre el servidor arrancado con las variables de arriba.
+- Automensajes (v2.16): un mensaje con `autor` (elegido desde el chat) no puede empezar con `!`, `/`, el prefijo de
+  comandos ni ser una orden del bot (`esOrden`, al guardar y al enviar): si sale con la cuenta del canal, Twitch lo
+  devuelve como escrito por el dueño y `commands.handle` lo ejecutaría. El seguro `enviando` va solo en `tick()` y los
+  ecos de cuentas vinculadas no cuentan para `minChat`: al fusionar `main`, conservar las dos cosas (se perdieron una vez).
+- `setConfig({mensajes})` no revive mensajes con autor que ya no están en el servidor (panel desactualizado).
 
 ## Pendientes
 - `public/eventos.js` común para el `EventSource` de los cinco overlays (hoy repetido).
@@ -49,8 +54,9 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
 - Podio: `removeEvent` deja borrar el aporte positivo después de una resta y el saldo negativo queda escondido.
 - Copia en GitHub: "Subir una copia ahora" muestra "✔ Listo" si había otra subida en curso o nada cambió; al cerrar, si
   hay una subida en curso, la final no sale (`subir()` devuelve `null` sin motivo).
-- **Automensajes y "nephallems"**: ya se puede vaciar la lista (`quitarQuien`, v2.12); siguen el valor por defecto
-  `['nephallems']` en todas las instalaciones y la comparación por login. `agregarQuien` no tiene el tope de 30 de
+- **Automensajes y "nephallems"** (empeoró con la v2.16): ya se puede vaciar la lista (`quitarQuien`, v2.12); siguen el
+  valor por defecto `['nephallems']` en todas las instalaciones y la comparación por login. Desde la v2.16 esa persona
+  escribe sus propios textos con la cuenta del canal si no vinculó la suya (los comandos ya se filtran). `agregarQuien` no tiene el tope de 30 de
   `setConfig` y `esLogin` acepta 3 caracteres (Twitch exige 4).
 - Estructura: `src/datos.js` (DATA_DIR + leer/guardar JSON atómico, hoy copiado en 6 módulos) y un planificador común
   "cada X min" para `codigo.js`/`automensajes.js` (cada uno tiene su `num` con distinto redondeo); `public/comun.js` para
@@ -65,6 +71,15 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   cuentas vinculadas: con otro canal se usarían ahí. `setConfig({quienes})` por la API no limpia cuentas ni `m.como`.
   Si el envío con la cuenta vinculada pasa los 15 s, se reenvía con la del canal (puede salir dos veces) y el registro
   dice "(como X)" aunque salió con la del canal.
+- Automensajes v2.16, decide el dueño: (1) ¿los mensajes de quien no vinculó su cuenta salen con la del canal? (2) los
+  comandos "bot …" no tienen pausa por persona: 50 "bot ayuda" son 50 mensajes del canal (límite de Twitch); (3) el panel
+  ya no muestra "Sin permiso para escribir en el chat" (`motivo()` lo quitó; quedan 3 ramas muertas en
+  `automensajes-panel.html:~214`); (4) guardar desde el panel mientras alguien hace "bot mensaje"/"bot cambiar" en el
+  chat todavía borra lo nuevo o revierte el cambio (hace falta versión o guardar por id); (5) el script de pruebas sin
+  red de esta revisión podría vivir en el repo (p. ej. `pruebas/automensajes.js`), pero los relojes lo descargarían.
+- Limpieza menor de automensajes: `nombres` falta en `DEFAULTS` (defensas `config.nombres || {}` en 4 sitios del módulo
+  y 5 del panel); `nombreDe(DUENO)` y `estado()` arman el nombre del dueño distinto ('tú'/'Tú'); `ctx?.` mezclado con
+  `ctx.` en `alChat`; `catch {}` sin comentario en `multichat.js:96,118,238`, `respaldo-github.js:19`, `multichat.html:67`.
 - `src/twitch-cuentas.js` repite `sendChat`/`refresh` de `TwitchClient` y lee `twitch.s` por fuera; las 7 rutas de
   automensajes en `server.js` (1.183 líneas, sigue creciendo) podrían ir a `automensajes.rutas(app, …)`. El 450 de
   Twitch está en 4 sitios.
@@ -72,6 +87,17 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   conectores con reintento común. `api()` está copiada en 10 archivos de `public/` (sumar a `public/comun.js`).
 
 ## Historial
+### 2026-11-03 — revisión nocturna (PR #2, rama `revision-nocturna`, + `main` v2.16.0)
+- Se fusionó `main` v2.16.0 (un bot por persona). Conflicto en `src/automensajes.js`: se tomó el de `main` y se
+  volvieron a poner el seguro `enviando` en `tick()`, los `ecos` y el filtro de mensajes nulos (se habían perdido).
+- `automensajes.js` `comando`: "bot mensaje !fijar 0" de alguien de la lista salía con la cuenta del canal y el reloj lo
+  ejecutaba como del dueño (también "desactivar bot todos", `!sumar`, `!mp.add`) → `esOrden` (ver Decisiones),
+  `ctx.prefijo` en `server.js`, sin caracteres invisibles en `limpiar()`. Sinónimos del dueño ("bot agregar") guardaban
+  un mensaje con autor `_dueno` → tabla `SINONIMOS`.
+- Migración desde la 2.15: el bot activado por el dueño desde el chat quedaba como `activos['micanal']` (no se podía
+  apagar con "Tu bot") → `_dueno`. Panel desactualizado revivía mensajes borrados desde el chat o de alguien quitado.
+- Comprobado con un script de node sin red (12 casos, los nuevos fallaban antes) y el servidor arrancado aislado.
+- Pendiente: decisiones de la v2.16 y "nephallems" (ver Pendientes).
 ### 2026-11-02 — revisión nocturna (PR #2, rama `revision-nocturna`, + `main` v2.15.0)
 - Se fusionó `main` (v2.14/2.15: cuentas de Twitch vinculadas para automensajes). Conflicto en `src/automensajes.js`:
   el seguro `enviando` queda solo en `tick()`; sin `.catch` vacío en el aviso.
