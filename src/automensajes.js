@@ -14,6 +14,8 @@ const FILE = path.join(DATA_DIR, 'automensajes.json');
 const MAX_TEXTO = 450;   // límite de Twitch por mensaje (500) con margen
 const MAX_PROPIOS = 3;   // mensajes que cada persona puede elegir desde el chat
 const MAX_MENSAJES = 60; // en total, desde el panel
+const MAX_ECOS = 10;     // envíos recientes con cuenta vinculada cuyo eco no cuenta como chat
+const LARGO_REGISTRO = 70;
 const DUENO = '_dueno';  // el dueño del canal en la lista de bots activos
 const ACTIVAR = /^!?\s*activar\s*bot\b/i;
 const DESACTIVAR = /^!?\s*desactivar\s*bot\b/i;
@@ -35,7 +37,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const normalizar = (u) => String(u || '').replace(/^@/, '').trim().toLowerCase();
 const esLogin = (u) => /^[a-z0-9_]{3,25}$/.test(u); // así son los nombres de usuario de Twitch
 const num = (v, min, max, def) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : def; };
-const limpiar = (v) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim().slice(0, MAX_TEXTO);
+const limpiar = (v) => String(v ?? '').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim().slice(0, MAX_TEXTO);
 const nuevoId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
 let config = clone(DEFAULTS);
@@ -48,8 +50,8 @@ try {
   if (!config.activos || typeof config.activos !== 'object') config.activos = {};
   if (j.version !== 2 && j.version !== 3) { config.cadaMin = 10; config.minChat = 0; config.mensajes = config.mensajes.map(({ cadaMin, ...m }) => m); j.on = false; }
   if (j.version !== 3 && j.on) { // hasta la 2.15 había un solo bot; si lo activó el dueño desde el chat, activadoPor tiene su login
-    const l = j.activadoPor?.login;
-    config.activos[config.quienes.includes(l) ? l : DUENO] = { nombre: j.activadoPor?.nombre || '', desde: Date.now() };
+    const login = j.activadoPor?.login;
+    config.activos[config.quienes.includes(login) ? login : DUENO] = { nombre: j.activadoPor?.nombre || '', desde: Date.now() };
   }
   config.mensajes = config.mensajes.map((m) => ({ como: '', autor: '', ...m }));
 } catch (err) {
@@ -73,7 +75,6 @@ let lineasChat = 0;   // mensajes de otras personas desde el último automensaje
 let enviando = false;
 // Lo que el bot escribió con una cuenta vinculada vuelve por el chat como si fuera de esa persona: no cuenta para minChat
 const ecos = [];
-const MAX_ECOS = 10;
 function anotarEco(login, texto) {
   ecos.push({ login, texto: String(texto).slice(0, MAX_TEXTO).trim() }); // se envía recortado: {canal} y {tiempo} alargan la plantilla
   if (ecos.length > MAX_ECOS) ecos.shift();
@@ -108,13 +109,15 @@ function setConfig(b = {}) {
     config.mensajes = b.mensajes.filter((m) => m && typeof m === 'object').slice(0, MAX_MENSAJES).map((m) => {
       const autor = normalizar(m.autor);
       return {
+        pedido: autor, // el autor que manda el panel, antes de compararlo con la lista
         id: String(m.id || '').replace(/[^\w-]/g, '').slice(0, 20) || nuevoId(),
         texto: limpiar(m.texto),
         on: m.on !== false,
         autor: config.quienes.includes(autor) ? autor : '',
         como: config.quienes.includes(autor) ? autor : comoValido(m.como), // los de una persona salen siempre con su cuenta
       };
-    }).filter((m) => m.texto && (!m.autor || delChat.has(m.id))); // un panel desactualizado no revive lo que la persona borró desde el chat
+    }).filter((m) => m.texto && (!m.pedido || delChat.has(m.id))) // un panel desactualizado no revive lo que la persona borró (o a quien se quitó de la lista)
+      .map(({ pedido, ...m }) => m);
   }
   save();
   return publicConfig();
@@ -140,11 +143,13 @@ async function enviar(m, ctx, manual = false) {
   const como = cuentaDelMensaje(m, ctx);
   if (!como && !ctx.puedeChat?.()) throw new Error('Twitch no tiene permiso para escribir en el chat: en Configuración pulsa Desconectar y vuelve a Conectar con Twitch');
   const texto = armar(m.texto, ctx);
+  // también al enviar: mensajes guardados antes de este filtro, o el prefijo cambió después
+  if (m.autor && esOrden(texto, ctx)) throw new Error(`No se envía el mensaje de ${nombreDe(m.autor)}: empieza con un comando (si su cuenta falla, sale con la del canal)`);
   const ok = await ctx.enviar(texto, null, como?.login);
   if (!ok) throw new Error('Twitch no aceptó el mensaje (mira la ventana del reloj para ver el motivo)');
   if (como) anotarEco(como.login, texto);
   if (!manual) { ultimoEnvio = Date.now(); lineasChat = 0; ultimoId = m.id; }
-  console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${corto(m.texto, 71)}`);
+  console.log(`[Automensajes] 💬 ${manual ? '(desde el panel) ' : ''}${como ? `(como ${como.nombre}) ` : ''}${corto(m.texto, LARGO_REGISTRO)}`);
   return { enviado: m.id };
 }
 
@@ -171,7 +176,7 @@ const corto = (t, n = 60) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
 const SINONIMOS = { agregar: 'mensaje', mensajes: 'mis', lista: 'mis', editar: 'cambiar', quitar: 'borrar', help: 'ayuda', comandos: 'ayuda' };
 // Un mensaje que sale con la cuenta del canal vuelve por el chat como si lo hubiera escrito el dueño:
 // no puede ser un comando (del reloj, de otro bot, de Twitch) ni una orden de este bot.
-const esOrden = (t, ctx) => /^[!/]/.test(t) || t.startsWith(ctx.prefijo?.() || '!') || ACTIVAR.test(t) || DESACTIVAR.test(t) || COMANDO.test(t);
+const esOrden = (t, ctx) => /^[!/]/.test(t) || t.startsWith(ctx.prefijo()) || ACTIVAR.test(t) || DESACTIVAR.test(t) || COMANDO.test(t);
 const NO_ORDEN = 'El mensaje no puede empezar con un comando (! o /) ni ser una orden del bot.';
 
 // Lo que pide una persona con "bot …" → texto de respuesta
@@ -186,7 +191,7 @@ function comando(login, nombre, resto, ctx) {
     if (mios.length >= MAX_PROPIOS) return `Ya tienes ${MAX_PROPIOS} mensajes. Cambia uno con "bot cambiar 1 <texto>" o borra uno con "bot borrar 1".`;
     config.mensajes.push({ id: nuevoId(), texto, on: true, autor: login, como: login });
     save();
-    console.log(`[Automensajes] ${nombre} agregó un mensaje desde el chat: ${corto(texto, 70)}`);
+    console.log(`[Automensajes] ${nombre} agregó un mensaje desde el chat: ${corto(texto, LARGO_REGISTRO)}`);
     return `✅ Guardado como tu mensaje #${mios.length + 1}${config.activos[login] ? '' : '. Sale cuando actives tu bot con "activar bot"'}.`;
   }
   if (p === 'mis') {
