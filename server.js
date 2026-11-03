@@ -845,6 +845,7 @@ const autoCtx = () => ({
   enviar: async (texto, responderA, como) => (como && cuentasTwitch.tiene(como) && (await cuentasTwitch.enviar(como, texto, responderA))) || (twitch.chatOk ? twitch.sendChat(texto, responderA) : false),
   tiempo: () => fmtDuration(timer.remainingMs / 1000),
   canal: () => d.secrets?.twitch?.login || '',
+  prefijo: () => d.chat?.prefix || '!',
 });
 app.get('/api/automensajes', (req, res) => res.json({ ...automensajes.estado(autoCtx()), cuentas: cuentasTwitch.resumen() }));
 // Vincular la cuenta de una persona de la lista: devuelve el código para twitch.tv/activate

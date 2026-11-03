@@ -159,17 +159,24 @@ async function tick(ctx) {
 }
 
 // ---------- Desde el chat ----------
-const AYUDA = 'Comandos del bot: "activar bot" / "desactivar bot" · "bot mensaje <texto>" agrega uno tuyo (hasta 3) · "bot mis mensajes" · "bot cambiar <n> <texto>" · "bot borrar <n>" o "bot borrar todo"';
+const AYUDA = `Comandos del bot: "activar bot" / "desactivar bot" · "bot mensaje <texto>" agrega uno tuyo (hasta ${MAX_PROPIOS}) · "bot mis mensajes" · "bot cambiar <n> <texto>" · "bot borrar <n>" o "bot borrar todo"`;
 const propios = (login) => config.mensajes.filter((m) => m.autor === login);
 const corto = (t, n = 60) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
 
+const SINONIMOS = { agregar: 'mensaje', mensajes: 'mis', lista: 'mis', editar: 'cambiar', quitar: 'borrar', help: 'ayuda', comandos: 'ayuda' };
+// Un mensaje que sale con la cuenta del canal vuelve por el chat como si lo hubiera escrito el dueño:
+// no puede ser un comando (del reloj, de otro bot, de Twitch) ni una orden de este bot.
+const esOrden = (t, ctx) => /^[!/]/.test(t) || t.startsWith(ctx.prefijo?.() || '!') || ACTIVAR.test(t) || DESACTIVAR.test(t) || COMANDO.test(t);
+const NO_ORDEN = 'El mensaje no puede empezar con un comando (! o /) ni ser una orden del bot.';
+
 // Lo que pide una persona con "bot …" → texto de respuesta
-function comando(login, nombre, resto) {
+function comando(login, nombre, resto, ctx) {
   const [palabra, ...partes] = resto.trim().split(/\s+/);
-  const p = palabra.toLowerCase(), texto = limpiar(partes.join(' '));
+  const p = SINONIMOS[palabra.toLowerCase()] || palabra.toLowerCase(), texto = limpiar(partes.join(' '));
   if (login === DUENO && ['mensaje', 'mis', 'cambiar', 'borrar'].includes(p)) return 'Tus mensajes (los del canal) se editan en el panel del reloj. Estos comandos son para las personas de la lista.';
-  if (p === 'mensaje' || p === 'agregar') {
+  if (p === 'mensaje') {
     if (!texto) return 'Escribe el mensaje después: bot mensaje ¡Sigan a este canal! 💜';
+    if (esOrden(texto, ctx)) return NO_ORDEN;
     const mios = propios(login);
     if (mios.length >= MAX_PROPIOS) return `Ya tienes ${MAX_PROPIOS} mensajes. Cambia uno con "bot cambiar 1 <texto>" o borra uno con "bot borrar 1".`;
     config.mensajes.push({ id: nuevoId(), texto, on: true, autor: login, como: login });
@@ -177,20 +184,20 @@ function comando(login, nombre, resto) {
     console.log(`[Automensajes] ${nombre} agregó un mensaje desde el chat: ${corto(texto, 70)}`);
     return `✅ Guardado como tu mensaje #${mios.length + 1}${config.activos[login] ? '' : '. Sale cuando actives tu bot con "activar bot"'}.`;
   }
-  if (p === 'mis' || p === 'mensajes' || p === 'lista') {
+  if (p === 'mis') {
     const mios = propios(login);
     if (!mios.length) return 'No tienes mensajes propios. Agrega uno con: bot mensaje <texto>';
-    let out = 'Tus mensajes: ' + mios.map((m, i) => `${i + 1}) ${corto(m.texto)}`).join(' · ');
-    return out.slice(0, MAX_TEXTO);
+    return ('Tus mensajes: ' + mios.map((m, i) => `${i + 1}) ${corto(m.texto)}`).join(' · ')).slice(0, MAX_TEXTO);
   }
-  if (p === 'cambiar' || p === 'editar') {
+  if (p === 'cambiar') {
     const n = parseInt(partes[0], 10), nuevo = limpiar(partes.slice(1).join(' '));
     const m = propios(login)[n - 1];
     if (!m || !nuevo) return 'Así: bot cambiar 1 <nuevo texto> (mira el número con "bot mis mensajes")';
+    if (esOrden(nuevo, ctx)) return NO_ORDEN;
     m.texto = nuevo; save();
     return `✅ Cambiado tu mensaje #${n}.`;
   }
-  if (p === 'borrar' || p === 'quitar') {
+  if (p === 'borrar') {
     if (/^todo/i.test(partes[0] || '')) {
       const n = propios(login).length;
       config.mensajes = config.mensajes.filter((m) => m.autor !== login); save();
@@ -201,7 +208,7 @@ function comando(login, nombre, resto) {
     config.mensajes = config.mensajes.filter((x) => x !== m); save();
     return `🗑 Borrado tu mensaje #${n}.`;
   }
-  if (p === 'ayuda' || p === 'help' || p === 'comandos') return AYUDA;
+  if (p === 'ayuda') return AYUDA;
   return null; // "bot …" cualquiera (ej. "bot que buen stream"): no es un comando
 }
 
@@ -236,7 +243,7 @@ function alChat(e, ctx) {
     return;
   }
   const c = puede && texto.match(COMANDO);
-  const r = c ? comando(clave, quien, c[1]) : null;
+  const r = c ? comando(clave, quien, c[1], ctx) : null;
   if (r) { responder(r); return; }
   if (esDueno) return;
   const eco = ecos.findIndex((x) => x.login === login && x.texto === texto);
