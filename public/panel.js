@@ -389,7 +389,7 @@ async function cargarMpIgnorar() {
     $('#mpIgnorarClaves').innerHTML = (l.claves || []).length
       ? 'Personas marcadas con "No es donación": ' + l.claves.map((c) => `<span class="tag">${esc(c.nombre)} <a href="#" data-olvidar="${esc(c.clave)}" title="Volver a contar sus pagos">✕</a></span>`).join(' ')
       : '';
-  } catch {}
+  } catch (e) { toast('No se pudo leer la lista de "no contar": ' + e.message, true); }
 }
 $('#btnMpIgnorar').onclick = async () => {
   try { await api('POST', '/api/mp/ignorar', { nombres: $('#mpIgnorarNombres').value.split('\n') }); $('#mpIgnorarNota').textContent = '✔ Guardado'; cargarMpIgnorar(); }
@@ -397,7 +397,7 @@ $('#btnMpIgnorar').onclick = async () => {
 };
 $('#mpIgnorarClaves').onclick = async (e) => {
   const a = e.target.closest('[data-olvidar]'); if (!a) return; e.preventDefault();
-  try { await api('POST', '/api/mp/ignorar', { quitarClave: a.dataset.olvidar }); cargarMpIgnorar(); } catch {}
+  try { await api('POST', '/api/mp/ignorar', { quitarClave: a.dataset.olvidar }); cargarMpIgnorar(); } catch (err) { toast(err.message, true); }
 };
 cargarMpIgnorar();
 
@@ -407,9 +407,10 @@ async function cargarPreguntar() {
     const j = await api('GET', '/api/pendientes');
     $('#pregMp').checked = j.preguntar?.mercadopago !== false; $('#pregPp').checked = j.preguntar?.paypal !== false;
     $('#siempreDon').innerHTML = (j.siempre || []).length ? 'Siempre son donación (no se pregunta): ' + j.siempre.map((x) => `<span class="tag">${esc(x.nombre)} <a href="#" data-olvidar-siempre="${esc(x.quien)}" title="Volver a preguntar">✕</a></span>`).join(' ') : '';
-  } catch {}
+  } catch (e) { toast('No se pudo leer la configuración de "preguntar": ' + e.message, true); }
 }
-const guardarPreguntar = (extra = {}) => api('POST', '/api/pendientes/config', { preguntar: { mercadopago: $('#pregMp').checked, paypal: $('#pregPp').checked }, ...extra }).then(cargarPreguntar).catch(() => {});
+const guardarPreguntar = (extra = {}) => api('POST', '/api/pendientes/config', { preguntar: { mercadopago: $('#pregMp').checked, paypal: $('#pregPp').checked }, ...extra }).then(cargarPreguntar)
+  .catch((e) => { toast('No se guardó: ' + e.message, true); cargarPreguntar(); }); // la casilla vuelve a lo guardado
 $('#pregMp').onchange = () => guardarPreguntar();
 $('#pregPp').onchange = () => guardarPreguntar();
 $('#siempreDon').onclick = (e) => { const a = e.target.closest('[data-olvidar-siempre]'); if (!a) return; e.preventDefault(); guardarPreguntar({ olvidarSiempre: a.dataset.olvidarSiempre }); };

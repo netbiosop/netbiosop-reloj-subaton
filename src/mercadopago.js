@@ -207,4 +207,4 @@ class MercadoPagoClient {
   }
 }
 
-module.exports = { coincideNombre, MercadoPagoClient };
+module.exports = { MercadoPagoClient };
