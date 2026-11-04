@@ -506,7 +506,7 @@ document.addEventListener('click', (ev)=>{
 
 cargar();
 setInterval(cargar, 10000);
-try { new EventSource('/events').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
+try { (window.__es = new EventSource('/events')).onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {} // pendientes.js la comparte
 </script>
 <script src="/pendientes.js"></script>
 </body>

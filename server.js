@@ -225,14 +225,15 @@ function decidirDonacion({ key, esDonacion, siempre }) {
   if (esDonacion) {
     if (siempre && !(d.settings.siempreDonacion ||= []).some((s) => s.quien === p.quien)) d.settings.siempreDonacion.push({ quien: p.quien, nombre: p.ev.user, at: Date.now() });
     entry = onContribution(p.ev);
-  } else if (siempre) {
+  } else if (siempre && p.ev.payer) {
+    // sin payer (PayPal, StreamElements) no hay a quién recordar: el nombre que se muestra ("Juan P.") en la lista
+    // de Mercado Pago descartaría a cualquier "Juan P…" que pague por Mercado Pago, y PayPal no la consulta
     const l = (d.settings.mpIgnorar ||= { nombres: [], claves: [] });
-    if (p.ev.payer) { if (!l.claves.some((c) => c.clave === p.ev.payer)) l.claves.push({ clave: p.ev.payer, nombre: p.ev.user, at: Date.now() }); }
-    else if (p.ev.user && !l.nombres.includes(p.ev.user)) l.nombres.push(p.ev.user);
+    if (!l.claves.some((c) => c.clave === p.ev.payer)) l.claves.push({ clave: p.ev.payer, nombre: p.ev.user, at: Date.now() });
   }
   store.save();
   avisarPendientes();
-  console.log(`${esDonacion ? '✔ Aprobada como donación' : '✖ No era donación (no suma nada)'}: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''}${siempre ? (esDonacion ? ' · sus próximas cuentan solas' : ' · sus próximos pagos tampoco cuentan') : ''}`);
+  console.log(`${esDonacion ? '✔ Aprobada como donación' : '✖ No era donación (no suma nada)'}: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''}${siempre ? (esDonacion ? ' · sus próximas cuentan solas' : p.ev.payer ? ' · sus próximos pagos tampoco cuentan' : '') : ''}`);
   return { entry, key };
 }
 const mp = new MercadoPagoClient({ store, onContribution: recibirDinero, onStatus: sendConnections });
@@ -779,7 +780,9 @@ app.post('/api/reset', (req, res) => {
   d.stats = {};
   d.multiplier.manual.active = false;
   d.mpSince = Date.now();
+  d.pendientes = []; // una donación en espera del subatón anterior no puede sumar al nuevo
   store.save();
+  avisarPendientes();
   broadcast('reset', {});
   broadcast('state', stateMsg());
   ok(res);
