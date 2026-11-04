@@ -30,10 +30,18 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   devuelve como escrito por el dueño y `commands.handle` lo ejecutaría. El seguro `enviando` va solo en `tick()` y los
   ecos de cuentas vinculadas no cuentan para `minChat`: al fusionar `main`, conservar las dos cosas (se perdieron una vez).
 - `setConfig({mensajes})` no revive mensajes con autor que ya no están en el servidor (panel desactualizado).
+- `public/pendientes.js` usa la conexión `/events` de la página (`window.__es`, que definen `menu.html`, `panel.js` y
+  `podio-panel.html`) y espera cada 300 ms a que exista (el panel la abre tras cargar). Una página nueva que lo cargue debe
+  definir `window.__es`. Alternativa más limpia anotada en Pendientes.
+- "No es donación" + "no preguntar más" sin `payer` (PayPal, StreamElements) no recuerda nada: el nombre mostrado
+  ("Juan P.") en la lista de Mercado Pago descartaba a otros. `/api/reset` descarta las donaciones sin confirmar y las
+  anota en el registro.
+- Mercado Pago: si falla pedir el pago completo y falta el cobrador, se reintenta en el próximo sondeo solo si el fallo
+  es pasajero (red, 429, 5xx).
 
 ## Pendientes
 - `public/eventos.js` común para el `EventSource` de los cinco overlays (hoy repetido).
-- Bajar `server.js` (~1.100 líneas): ciclo de vida (reinicio, apagado, PID) a `src/ciclo.js` y webhooks a
+- Bajar `server.js` (1.274 líneas el 2026-11-04, sigue creciendo): ciclo de vida (reinicio, apagado, PID) a `src/ciclo.js` y webhooks a
   `src/webhooks.js` (los handlers de PayPal y PayPal IPN se parecen mucho).
 
 - **IPN de PayPal sin "email receptor" (seguridad)**: `src/paypal.js:72-74` solo filtra por email si está cargado e
@@ -85,8 +93,37 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   Twitch está en 4 sitios.
 - `src/multichat.js`: Kick, YouTube y TikTok repiten el mismo ciclo (estado, parar, conectar, reintento); una tabla de
   conectores con reintento común. `api()` está copiada en 10 archivos de `public/` (sumar a `public/comun.js`).
+- **Nombres del dueño por defecto en todas las instalaciones (urgente, v2.18)**: `src/store.js:27` trae
+  `mpIgnorar.nombres = ['Luis Maria Villa','Luis Villa','Luis V']`; `merge()` lo aplica a todos los relojes que se
+  actualizan y con la regla de inicial "Luis V" descarta en silencio a cualquier "Luis Valdez/Vargas/Vega" de cualquier
+  streamer (probado: pago de 5000 ARS → 0 contados). Además publica un nombre real. Poner `nombres: []` (los relojes que
+  ya guardaron la lista la conservan: hace falta una migración que la quite si es exactamente la de fábrica).
+  Igual `preguntarDonaciones: {mercadopago: true, paypal: true}`: al actualizarse a mitad de un subatón ninguna
+  donación de MP/PayPal suma hasta que alguien toca el aviso. ¿`false` por defecto para relojes ya instalados?
+- Donaciones por confirmar (v2.17/2.18), estructura: `recibirDinero`/`decidirDonacion` y sus 6 rutas a
+  `src/donaciones.js`; `/api/podio/no-es-donacion` reescribe a mano `d.stats` y `log.anulado` (inversa de
+  `engine.contribute`, debería ser `engine.anular(logId)` y devolver los segundos realmente quitados); `dineroDecidido`
+  repite el control de duplicados `processed` del motor (con otro tope, 1000); defensas `||=`/`?.` sobre claves que ya
+  están en `DEFAULTS` (`server.js:859` repite el valor por defecto de `preguntarDonaciones`); `nombresDe` copia las 7
+  fuentes de `nombreDe` sin el mismo filtro; la clave de un evento sin `id` lleva `Date.now()` y nunca deduplica.
+  "No es donación" no descuenta los patitos que sumó el pago.
+- `pendientes.js`: en vez de `window.__es` + espera, que exponga `window.pendientes = pintar` y cada página lo llame desde
+  su `onmessage` (sin bucle ni global compartida).
 
 ## Historial
+### 2026-11-04 — revisión nocturna (PR #2, rama `revision-nocturna`, + `main` v2.17.0 y v2.18.0)
+- Merge de `main` con conflicto en `src/mercadopago.js`: lógica nueva de main + el aviso del catch de la rama.
+- `public/pendientes.js:64` abría una segunda conexión `/events` por pestaña: con menú + panel + podio Chrome llega a 6 y
+  los botones se cuelgan → usa `window.__es`. También: `appendChild` duplicado y `catch {}`.
+- `server.js:231` "No es donación" + "siempre" en PayPal metía "Juan P." en la lista de Mercado Pago → sin `payer` no se
+  recuerda; la casilla lo dice. `/api/reset` no vaciaba `d.pendientes` → se vacían y se anotan en el registro.
+- `src/mercadopago.js:152` un fallo al pedir el pago completo lo perdía hasta reiniciar → se reintenta si es pasajero.
+- `public/panel.js:392-412` catch vacíos de "no contar"/"preguntar" (la casilla quedaba marcada sin guardar).
+  `coincideNombre` exportado sin uso.
+- Probado con el reloj en carpetas temporales y Chromium (4 pestañas, una petición en 10 ms; fallo de guardado con
+  500) y Mercado Pago con `fetch` simulado. Revisión del propio cambio: reintentos sin fin con 4xx fijo y reset sin rastro.
+- Sin corregir (decide el dueño): nombres del dueño por defecto en `store.js` (urgente) y `preguntarDonaciones` en true.
+
 ### 2026-11-03 — revisión nocturna (PR #2, rama `revision-nocturna`, + `main` v2.16.0)
 - Se fusionó `main` v2.16.0 (un bot por persona). Conflicto en `src/automensajes.js`: se tomó el de `main` y se
   volvieron a poner el seguro `enviando` en `tick()`, los `ecos` y el filtro de mensajes nulos (se habían perdido).
