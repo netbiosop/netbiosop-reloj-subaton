@@ -195,8 +195,48 @@ const twitch = new TwitchClient({
   onHype: (fase, e, desfase) => onHype(fase, e, desfase),
   redirectUri: `http://localhost:${PORT}/auth/twitch/callback`,
 });
-const mp = new MercadoPagoClient({ store, onContribution, onStatus: sendConnections });
-const se = new StreamElementsClient({ store, onContribution, onStatus: sendConnections });
+// ---------- Donaciones por confirmar ----------
+// Mercado Pago y PayPal: si está activado "preguntar", la donación queda en espera hasta que tocas
+// "✔ Es donación" (suma a todo: reloj, podio, metas, patitos) o "✖ No es donación" (no hace nada).
+const DINERO = new Set(['mercadopago', 'paypal']);
+const pendientes = () => (d.pendientes ||= []);
+const decididos = () => (d.dineroDecidido ||= {});
+const quienEs = (ev) => ev.payer || 'nombre:' + String(ev.user || '').toLowerCase().trim();
+const avisarPendientes = () => broadcast('pendientes', { lista: pendientes() });
+function recibirDinero(ev) {
+  if (ev.test || !DINERO.has(ev.source) || d.settings.preguntarDonaciones?.[ev.source] === false) return onContribution(ev);
+  const key = `${ev.source}:${ev.id || `${ev.user}-${ev.amount}-${Date.now()}`}`;
+  if (decididos()[key] || pendientes().some((p) => p.key === key)) return { duplicate: true };
+  const quien = quienEs(ev);
+  if ((d.settings.siempreDonacion || []).some((s) => s.quien === quien)) return onContribution(ev);
+  pendientes().push({ key, quien, ev, at: Date.now() });
+  store.save();
+  avisarPendientes();
+  console.log(`❓ Donación por confirmar: ${ev.user} · ${ev.amount} ${ev.currency || ''} (${ev.source === 'paypal' ? 'PayPal' : 'Mercado Pago'}). Toca "Es donación" o "No es donación" en el panel.`);
+  return { pendiente: true };
+}
+function decidirDonacion({ key, esDonacion, siempre }) {
+  const i = pendientes().findIndex((p) => p.key === key);
+  if (i < 0) throw new Error('Esa donación ya no está esperando (¿la decidiste en otra pestaña?)');
+  const [p] = pendientes().splice(i, 1);
+  const dd = decididos(); dd[key] = esDonacion ? 'si' : 'no';
+  const claves = Object.keys(dd); if (claves.length > 1000) for (const k of claves.slice(0, claves.length - 1000)) delete dd[k];
+  let entry = null;
+  if (esDonacion) {
+    if (siempre && !(d.settings.siempreDonacion ||= []).some((s) => s.quien === p.quien)) d.settings.siempreDonacion.push({ quien: p.quien, nombre: p.ev.user, at: Date.now() });
+    entry = onContribution(p.ev);
+  } else if (siempre) {
+    const l = (d.settings.mpIgnorar ||= { nombres: [], claves: [] });
+    if (p.ev.payer) { if (!l.claves.some((c) => c.clave === p.ev.payer)) l.claves.push({ clave: p.ev.payer, nombre: p.ev.user, at: Date.now() }); }
+    else if (p.ev.user && !l.nombres.includes(p.ev.user)) l.nombres.push(p.ev.user);
+  }
+  store.save();
+  avisarPendientes();
+  console.log(`${esDonacion ? '✔ Aprobada como donación' : '✖ No era donación (no suma nada)'}: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''}${siempre ? (esDonacion ? ' · sus próximas cuentan solas' : ' · sus próximos pagos tampoco cuentan') : ''}`);
+  return { entry, key };
+}
+const mp = new MercadoPagoClient({ store, onContribution: recibirDinero, onStatus: sendConnections });
+const se = new StreamElementsClient({ store, onContribution: recibirDinero, onStatus: sendConnections });
 const ppStatus = { last: null, detail: '' };
 
 // ---------- Stream en vivo / apagado ----------
@@ -810,6 +850,50 @@ app.post('/api/podio/event', podioRoute((req) => { const r = podio.addManual(req
 app.post('/api/podio/event/:id', podioRoute((req) => podio.renameEvent(req.params.id, req.body.user)));
 app.post('/api/podio/renombrar', podioRoute((req) => podio.renamePerson(req.body)));
 app.post('/api/podio/rey', podioRoute((req) => podio.setRey(req.body)));
+app.get('/api/pendientes', (req, res) => res.json({ lista: pendientes(), preguntar: d.settings.preguntarDonaciones, siempre: d.settings.siempreDonacion || [] }));
+app.post('/api/pendientes/decidir', (req, res) => {
+  try { ok(res, { result: decidirDonacion({ key: String(req.body.key || ''), esDonacion: !!req.body.esDonacion, siempre: !!req.body.siempre }) }); }
+  catch (err) { res.json({ error: err.message }, 400); }
+});
+app.post('/api/pendientes/config', (req, res) => {
+  const p = (d.settings.preguntarDonaciones ||= { mercadopago: true, paypal: true });
+  for (const k of ['mercadopago', 'paypal']) if (k in (req.body.preguntar || {})) p[k] = !!req.body.preguntar[k];
+  if (req.body.olvidarSiempre) d.settings.siempreDonacion = (d.settings.siempreDonacion || []).filter((x) => x.quien !== req.body.olvidarSiempre);
+  store.save();
+  ok(res, { result: { preguntar: p, siempre: d.settings.siempreDonacion || [] } });
+});
+// ---------- Pagos que NO son donaciones (ej. el sueldo por Mercado Pago) ----------
+const mpIgnorar = () => (d.settings.mpIgnorar ||= { nombres: [], claves: [] });
+app.get('/api/mp/ignorar', (req, res) => res.json(mpIgnorar()));
+app.post('/api/mp/ignorar', (req, res) => {
+  const l = mpIgnorar();
+  if (Array.isArray(req.body.nombres)) l.nombres = [...new Set(req.body.nombres.map((n) => String(n).replace(/\s+/g, ' ').trim().slice(0, 60)).filter(Boolean))].slice(0, 50);
+  if (req.body.quitarClave) l.claves = l.claves.filter((c) => c.clave !== req.body.quitarClave);
+  store.save();
+  ok(res, { result: l });
+});
+// Un aporte que entró como donación pero no lo era: sale del podio y las metas, y se descuenta del reloj lo que sumó
+app.post('/api/podio/no-es-donacion', (req, res) => {
+  try {
+    const ev = podio.evento(String(req.body.id || ''));
+    if (!ev || ev.cat !== 'dinero' || ev.manual) throw new Error('Solo se puede con donaciones que llegaron solas (Mercado Pago o PayPal)');
+    const log = ev.ref ? d.log.find((e) => e.id === ev.ref) : null;
+    const secs = log && !log.anulado ? Number(log.seconds) || 0 : 0;
+    const que = `${ev.user} · ${ev.amount} ${ev.currency}`;
+    if (secs > 0) engine.manualAdjust(-secs, `No era donación (${que}): se descuenta lo que sumó`);
+    if (log && !log.anulado) {
+      log.anulado = true; log.note = 'No era donación: se quitó del reloj, el podio y las metas';
+      const st = d.stats[log.source];
+      if (st && !log.test) { st.count = Math.max(0, st.count - 1); st.amount = Math.round((st.amount - (Number(log.amount) || 0)) * 100) / 100; st.seconds = Math.max(0, st.seconds - secs); }
+    }
+    podio.removeEvent(ev.id);
+    const clave = ev.pk || log?.payer;
+    if (req.body.recordar && clave && !mpIgnorar().claves.some((c) => c.clave === clave)) mpIgnorar().claves.push({ clave, nombre: ev.user, at: Date.now() });
+    store.save();
+    console.log(`🚫 No era donación: ${que}${secs ? ` (se descontaron ${fmtDuration(secs)} del reloj)` : ''}${req.body.recordar && clave ? ' · sus próximos pagos tampoco cuentan' : ''}`);
+    ok(res, { result: { segundos: secs, recordado: !!(req.body.recordar && clave) } });
+  } catch (err) { res.json({ error: err.message }, 400); }
+});
 app.post('/api/podio/vincular-mp', podioRoute((req) => podio.vincularMP(req.body.nombre, req.body.monto)));
 app.delete('/api/podio/event/:id', podioRoute((req) => podio.removeEvent(req.params.id)));
 app.post('/api/podio/rates', async (req, res) => {
@@ -1004,7 +1088,7 @@ hooks.post('/webhooks/paypal', async (req, res) => {
     ppStatus.last = Date.now();
     ppStatus.detail = result.error || result.ignored || 'Último webhook OK';
     logHook('PayPal', result);
-    if (result.event) onContribution(result.event);
+    if (result.event) recibirDinero(result.event);
     sendConnections();
   } catch (err) {
     console.error('[PayPal]', err.message);
@@ -1019,7 +1103,7 @@ hooks.post('/webhooks/paypal-ipn', async (req, res) => {
     ppStatus.last = Date.now();
     ppStatus.detail = result.error || result.ignored || 'Último IPN OK';
     logHook('PayPal IPN', result);
-    if (result.event) onContribution(result.event);
+    if (result.event) recibirDinero(result.event);
     sendConnections();
   } catch (err) {
     console.error('[PayPal IPN]', err.message);

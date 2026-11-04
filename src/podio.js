@@ -504,7 +504,7 @@ function createPodio({ store }) {
 
   return {
     record, addManual, removeEvent, renameEvent, renamePerson, vincularMP, setRey, setConfig, refreshRates, toUsd, patitosAporte, vaciarPatitos, patitosStream,
-    publicData, adminData, saveNow, version: () => version, onCambio: (fn) => { alCambiar = fn; },
+    publicData, adminData, saveNow, evento: (id) => data.events.find((e) => e.id === id) || null, version: () => version, onCambio: (fn) => { alCambiar = fn; },
   };
 }
 

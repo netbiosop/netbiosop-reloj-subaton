@@ -65,6 +65,8 @@
   .ev .q b{cursor:pointer;border-bottom:1px dashed transparent}
   .ev .q b:hover{border-bottom-color:var(--muted)}
   .ev small{color:var(--muted)}
+  .ev .nodon{font-size:11px;white-space:nowrap}
+  .ev .nodon:hover{border-color:var(--bad);color:var(--bad)}
   .ev .x{background:transparent;border-color:transparent;color:var(--bad)}
   .modo{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:4px}
   .modo button{border:0;border-radius:0;background:#0f0e14;padding:8px;font-weight:600;justify-content:center}
@@ -345,6 +347,7 @@ function pintar(){
     return `<div class="ev"><span class="ic">${ICO[e.cat]}</span>
       <div class="q"><b data-ren="${e.id}" title="Cambiar nombre">${esc(e.user)}</b> <small>· ${det}</small><br>
       <small>${h} · ${SRC[e.source]||e.source}</small>${neg?'<span class="tag resta">restado a mano</span>':e.manual?'<span class="tag">a mano</span>':''}</div>
+      ${e.cat==='dinero' && !e.manual && !neg ? `<button class="sm nodon" data-nodon="${e.id}" title="No es donación (ej. tu sueldo): se quita del podio y las metas y se descuenta del reloj">🚫 No es donación</button>` : ''}
       <button class="sm x" data-del="${e.id}" title="Quitar del podio">✕</button></div>`;
   }).join('') || '<div class="vacio">Sin aportes en este mes.</div>';
 
@@ -393,6 +396,15 @@ $('addBtn').onclick = async ()=>{
 };
 
 $('eventos').addEventListener('click', async (ev)=>{
+  const nd = ev.target.closest('[data-nodon]');
+  if(nd){
+    const e = D.events.find(x=>x.id===nd.dataset.nodon);
+    if(!confirm(`¿${e.user} (${fmtNum(e.amount)} ${e.currency}) NO es una donación?\n\nSe quita del podio y de las metas, y se descuenta del reloj el tiempo que había sumado.`)) return;
+    const recordar = e.source==='mercadopago' && !!e.pk && confirm(`¿Tampoco contar los PRÓXIMOS pagos de ${e.user}?\n(Aceptar = nunca más cuentan · Cancelar = solo este)`);
+    try{ const r = await api('/api/podio/no-es-donacion','POST',{id:e.id, recordar}); alert(`Listo: ${e.user} ya no cuenta como donación${r.result.segundos?`. Se descontaron ${Math.round(r.result.segundos/60)} min del reloj`:''}${r.result.recordado?'. Sus próximos pagos tampoco van a contar':''}.`); firma=''; cargar(); }
+    catch(err){ alert(err.message); }
+    return;
+  }
   const del = ev.target.closest('[data-del]'), ren = ev.target.closest('[data-ren]');
   if(del){
     const e = D.events.find(x=>x.id===del.dataset.del);
@@ -496,5 +508,6 @@ cargar();
 setInterval(cargar, 10000);
 try { new EventSource('/events').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
 </script>
+<script src="/pendientes.js"></script>
 </body>
 </html>
