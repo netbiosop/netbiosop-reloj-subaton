@@ -780,7 +780,9 @@ app.post('/api/reset', (req, res) => {
   d.stats = {};
   d.multiplier.manual.active = false;
   d.mpSince = Date.now();
-  d.pendientes = []; // una donación en espera del subatón anterior no puede sumar al nuevo
+  // una donación en espera del subatón anterior no puede sumar al nuevo; queda en el registro para cargarla a mano
+  for (const p of pendientes()) console.log(`🗑 Donación sin confirmar descartada al reiniciar: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''} (${p.ev.source})`);
+  d.pendientes = [];
   store.save();
   avisarPendientes();
   broadcast('reset', {});

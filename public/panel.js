@@ -774,7 +774,7 @@ function renderStats() {
   $('#stats').innerHTML = cells.join('');
 }
 $('#btnClearLog').onclick = () => confirm('¿Borrar el historial? (no cambia el reloj)') && api('POST', '/api/log/clear');
-$('#btnReset').onclick = () => confirm('¿Reiniciar el subatón?\n\nEl reloj vuelve al tiempo inicial y en pausa, y se borran historial y totales.') && api('POST', '/api/reset').then(() => toast('Subatón reiniciado'));
+$('#btnReset').onclick = () => confirm('¿Reiniciar el subatón?\n\nEl reloj vuelve al tiempo inicial y en pausa, y se borran historial y totales.\nLas donaciones sin confirmar se descartan (quedan anotadas en el registro).') && api('POST', '/api/reset').then(() => toast('Subatón reiniciado'));
 
 // ---------- carga y tiempo real ----------
 async function load() {
