@@ -149,7 +149,11 @@ class MercadoPagoClient {
     let nombre = this.nombreDe(p);
     if (!nombre || (this.userId && !cobrador(p))) {
       try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); }
-      catch (err) { console.warn(`[Mercado Pago] No se pudo pedir el pago ${p.id} completo:`, err.message); }
+      catch (err) {
+        console.warn(`[Mercado Pago] No se pudo pedir el pago ${p.id} completo:`, err.message);
+        // sin saber quién lo cobró se descartaría para siempre: se olvida para que el próximo sondeo lo reintente
+        if (this.userId && !cobrador(p)) { this.vistos.delete(String(p.id)); return; }
+      }
     }
     // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
     if (this.userId) {
