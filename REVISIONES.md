@@ -109,8 +109,41 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   "No es donación" no descuenta los patitos que sumó el pago.
 - `pendientes.js`: en vez de `window.__es` + espera, que exponga `window.pendientes = pintar` y cada página lo llame desde
   su `onmessage` (sin bucle ni global compartida).
+- Encontrados el 2026-11-05 (deciden el dueño o cambian datos guardados):
+  - **Reglas al aprobar (v2.17/2.18)**: "Es donación" aplica el multiplicador, el fin del reloj y el mes del podio del
+    momento en que se toca, no de cuando llegó el pago (`server.js` `decidirDonacion` → `onContribution(p.ev)`,
+    `engine.js:125`). PayPal $10 durante un x2 aprobado tras el x2: +10:00 en vez de +20:00; aprobado con el reloj en 0:
+    "no se sumó". Propuesta: `at: p.at` en el evento y `multiplierFor(source, ev.at)`. ¿Qué hacer si ya terminó?
+  - **Código de creador del dueño por defecto**: `src/codigo.js:13` trae `codigo: 'BYTEDEMOND'` con tarjeta y cinta
+    encendidas: otro streamer que agrega `/codigo-tarjeta` sin configurarla muestra el código de Epic del dueño. Igual que
+    `mpIgnorar.nombres`: vaciar y migrar si la config guardada es la de fábrica.
+  - "Siempre es donación" sin `payer` recuerda solo `nombre:<nombre>` y vale entre plataformas y para nombres genéricos
+    ("Anónimo", "Donación PayPal") (`server.js` `quienEs`). Agregar la fuente a la clave cambia las ya guardadas.
+  - `public/pendientes.js:37,65`: `pintar()` reemplaza todo el aviso cada 30 s y en cada evento: desmarca "no preguntar
+    más" y vuelve a habilitar botones de una decisión en curso. Actualizar por `data-key` (probar en navegador).
+  - Los mods sin "montos" igual ven importes: `/events?overlay=1` no pide contraseña y recibe `added` con "Juan donó 50
+    USD" (`http.js:146`, `auth.js:222`). ¿El overlay debe llevar montos? (es lo que se muestra en pantalla).
+  - `mpNombres` ya guardados con el dominio de un correo ("gmail", ver Historial) no se corrigen solos.
+  - Limpieza: `fmtDuration(timer.remainingMs / 1000)` 11 veces y `require('./package.json').version` 4 veces en
+    `server.js`; `esLogin` + mensaje y `normalizar` repetidos en `server.js:956,968` y `automensajes.js:288,295`; "6 horas"
+    de `vincularMP` 3 veces y `31 * 86400 * 1000` (`podio.js`); 60000/15000 de YouTube 3 veces (`multichat.js`); CSS sin
+    uso (`.prim` en `hype-panel.html`, `.card.ancho` en `multichat-panel.html`, `.src-light` en `overlay.html`); export
+    `_test` de `multichat.js` sin uso en el repo; `esc()` sin comilla simple en `automensajes-panel.html:138` y
+    `overlay.html:294` (hoy no explotable).
 
 ## Historial
+### 2026-11-05 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `server.js` `recibirDinero`: un pago ya contado (antes de activar "preguntar", p. ej. al actualizar a la 2.18) volvía
+  en el sondeo tras reiniciar como "¿Es donación?"; aprobar no hacía nada y "No es donación" mentía → `engine.procesado`.
+- `src/podio.js` `vincularMP`: `!mp.add @juan` con una donación de Mercado Pago esperando renombraba (y recordaba) la
+  anterior ya contada → se rechaza sin monto o con el monto de la pendiente.
+- `src/mercadopago.js:172` "avisame a ana@gmail.com" → la donante salía como "gmail" y se guardaba → la `@` no puede ir
+  pegada a letra, número o punto.
+- `server.js:184,751` el evento `aporte` llevaba `usd` a los mods sin "montos" (patitos no lo usa) → quitado.
+- Limpieza: catch vacíos y `try` inútil en `metas.html`, `podio.html`, `top-general.html`, `podio-panel.html`;
+  `IMPORTANTES` y 4 exports sin uso de `actualizador.js`; `actualizador.js`/`iniciar.js` ignoraban `LOG_DIR`.
+- Probado con scripts de node sin red (`fetch` simulado, podio real en carpeta temporal), el reloj aislado con
+  `/api/simulate` y Chromium sobre las 4 páginas. Revisión del propio cambio: `!mp.add` con otro monto ya no se bloquea.
 ### 2026-11-04 — revisión nocturna (PR #2, rama `revision-nocturna`, + `main` v2.17.0 y v2.18.0)
 - Merge de `main` con conflicto en `src/mercadopago.js`: lógica nueva de main + el aviso del catch de la rama.
 - `public/pendientes.js:64` abría una segunda conexión `/events` por pestaña: con menú + panel + podio Chrome llega a 6 y
