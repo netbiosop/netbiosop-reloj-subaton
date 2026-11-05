@@ -169,7 +169,7 @@ class MercadoPagoClient {
     const regla = this.nombresDe(p).map((n) => (lista.nombres || []).find((r) => coincideNombre(n, r))).find(Boolean);
     if (regla) return this.ignorar(p, nombre, `está en tu lista de "no contar" ("${regla}")`);
     // si en el motivo de la transferencia escribió su usuario de Twitch (@usuario), se usa ese
-    const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/@([A-Za-z0-9_]{3,25})/);
+    const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/(?<![\w.])@([A-Za-z0-9_]{3,25})/);   // sin letra antes: un correo no es @usuario
     const recordado = (arroba && arroba[1]) || (pk && this.store.data.mpNombres && this.store.data.mpNombres[pk]);
     if (arroba && pk) (this.store.data.mpNombres ||= {})[pk] = arroba[1];
     if (!nombre && !recordado) console.warn(`[Mercado Pago] Pago ${p.id} sin nombre del que donó (método: ${p.payment_method_id || p.payment_type_id || '?'}). Puedes ponerle el nombre en el podio y se recuerda para la próxima.`);
