@@ -9,6 +9,7 @@ const path = require('path');
 const REPO = process.env.UPDATE_REPO || 'netbiosop/netbiosop-reloj-subaton';
 const RAIZ = path.join(__dirname, '..');
 const DATA_DIR = process.env.DATA_DIR || path.join(RAIZ, 'data');
+const LOG_DIR = process.env.LOG_DIR || path.join(RAIZ, 'logs');
 const TMP = path.join(RAIZ, '.actualizacion');
 const ANTERIOR = path.join(RAIZ, '.version-anterior');
 const MARCA = path.join(DATA_DIR, 'actualizacion.json');
@@ -100,7 +101,7 @@ async function instalar(info, log = console.log) {
 
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MARCA, JSON.stringify({ de, a: info.version, at: Date.now(), notas: info.notas, archivos: cambiados.length, visto: false }, null, 2)); }
   catch (e) { console.warn('[Actualizador] No se pudo guardar el aviso de la actualización:', e.message); }
-  try { fs.mkdirSync(path.join(RAIZ, 'logs'), { recursive: true }); fs.appendFileSync(path.join(RAIZ, 'logs', 'actualizaciones.txt'), `[${new Date().toLocaleString('es')}] ${de} → ${info.version} (${cambiados.length} archivos)\r\n${info.notas ? info.notas.replace(/\n/g, '\r\n') + '\r\n' : ''}\r\n`); }
+  try { fs.mkdirSync(LOG_DIR, { recursive: true }); fs.appendFileSync(path.join(LOG_DIR, 'actualizaciones.txt'), `[${new Date().toLocaleString('es')}] ${de} → ${info.version} (${cambiados.length} archivos)\r\n${info.notas ? info.notas.replace(/\n/g, '\r\n') + '\r\n' : ''}\r\n`); }
   catch (e) { console.warn('[Actualizador] No se pudo anotar en actualizaciones.txt:', e.message); }
   return { de, a: info.version, archivos: cambiados.length };
 }
@@ -132,4 +133,4 @@ function marcarVisto() {
   try { fs.writeFileSync(MARCA, JSON.stringify(m, null, 2)); } catch (e) { console.warn('[Actualizador] No se pudo marcar el aviso como visto:', e.message); }
 }
 
-module.exports = { REPO, buscar, instalar, alAbrir, marca, marcarVisto, versionLocal, masNueva, protegido };
+module.exports = { REPO, buscar, alAbrir, marca, marcarVisto };

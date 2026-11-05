@@ -16,7 +16,7 @@ const DIR = __dirname;
 const PORT = Number(process.env.PORT || 3000);
 const BASE = `http://127.0.0.1:${PORT}`;
 const VERSION = require('./package.json').version;
-const LOG_DIR = path.join(DIR, 'logs');
+const LOG_DIR = process.env.LOG_DIR || path.join(DIR, 'logs');
 const ERR_FILE = path.join(LOG_DIR, 'errores.txt');
 const PID_FILE = path.join(process.env.DATA_DIR || path.join(DIR, 'data'), 'reloj.pid');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

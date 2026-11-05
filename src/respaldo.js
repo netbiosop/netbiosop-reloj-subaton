@@ -15,7 +15,6 @@ const DATA_DIR = process.env.DATA_DIR || path.join(RAIZ, 'data');
 const LOG_DIR = process.env.LOG_DIR || path.join(RAIZ, 'logs');
 const CONF = path.join(RAIZ, 'respaldo-config.json'); // fuera de "data" a propósito
 const ARCHIVOS = ['subaton.json', 'podio.json', 'codigo.json', 'hype.json', 'automensajes.json', 'multichat.json'];
-const IMPORTANTES = ['subaton.json', 'podio.json'];
 const RECIENTES = 100, DIAS = 60, ESPERA_SEG = 5;
 const stat = (f) => fs.statSync(f, { throwIfNoEntry: false });
 

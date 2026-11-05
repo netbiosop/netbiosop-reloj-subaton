@@ -113,7 +113,7 @@ async function cargar(){
   }catch(e){ /* reloj apagado: queda lo último */ }
 }
 cargar(); setInterval(cargar, 10000); // respaldo: los cambios llegan al instante por /events
-try { new EventSource('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
+new EventSource('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) { console.warn('[Podio]', e); } };
 document.fonts.ready.then(()=>{ if(data) encajarNombres(); });
 Iconos.auto(cardEl);
 </script>
