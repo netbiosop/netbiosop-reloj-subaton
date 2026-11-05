@@ -441,7 +441,7 @@ $('rank').addEventListener('click', async (ev)=>{
   const de = b.dataset.renom;
   const a = prompt(`Nuevo nombre para "${de}" (se cambia en todos sus aportes de ${D.month.label}).\nSi escribes un nombre que ya está en el ranking, se suman juntos.`, de);
   if(!a || a.trim()===de) return;
-  try{ const r = await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
+  try{ await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
 });
 // Reyes del mes pasado: automáticos, con opción de ponerlos a mano
 let editRey = null;
@@ -506,7 +506,7 @@ document.addEventListener('click', (ev)=>{
 
 cargar();
 setInterval(cargar, 10000);
-try { new EventSource('/events').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
+(window.__es = new EventSource('/events')).onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) { console.warn('[Podio]', e); } }; // pendientes.js la comparte
 </script>
 <script src="/pendientes.js"></script>
 </body>

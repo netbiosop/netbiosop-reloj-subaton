@@ -58,6 +58,9 @@ const monthLabel = (key) => { const [y, m] = key.split('-').map(Number); return 
 const monthName = (key) => MESES[Number(key.split('-')[1]) - 1];
 const prevKey = (key) => { const [y, m] = key.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`; };
 const round2 = (n) => Math.round(n * 100) / 100;
+const CENTAVO = 0.001; // margen para sumas con decimales: un total menor cuenta como cero
+// Lo que suma un evento al podio de su categoría (el de subs es solo de regaladas: new/resub valen 0)
+const valorPodio = (e, cat) => (cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : !e.kind || e.kind === 'gift' ? Number(e.count) || 0 : 0);
 const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ').slice(0, 40);
 
 function merge(def, val) {
@@ -78,7 +81,7 @@ function createPodio({ store }) {
   let version = Date.now();
   let saveTimer = null;
   let alCambiar = () => {}, avisoTimer = null; // avisa a los overlays apenas cambia algo (podio, metas, top general)
-  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch {} }, 150); };
+  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch (e) { console.error('[Podio] No se pudo avisar a los overlays:', e.message); } }, 150); };
 
   function save() {
     version++;
@@ -203,11 +206,11 @@ function createPodio({ store }) {
       ev.count = c;
       ev.kind = 'gift';
     }
-    const valor = (e) => (cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0);
+    const valor = (e) => valorPodio(e, cat);
     if (valor(ev) < 0) {
       const key = monthKey(when), quien = name.toLowerCase();
       const tiene = data.events.filter((e) => e.cat === cat && monthKey(e.at) === key && e.user.toLowerCase() === quien).reduce((t, e) => t + valor(e), 0);
-      if (tiene + valor(ev) < -0.001) {
+      if (tiene + valor(ev) < -CENTAVO) {
         const u = cat === 'dinero' ? `$${round2(Math.max(0, tiene))} USD` : cat === 'bits' ? `${Math.max(0, tiene)} bits` : `${Math.max(0, tiene)} subs`;
         throw new Error(`${name} tiene ${u} en ${monthLabel(key)}: no se le puede restar más que eso`);
       }
@@ -240,6 +243,8 @@ function createPodio({ store }) {
     const name = cleanName(String(nombre || '').replace(/^@/, ''));
     if (!name) throw new Error('Falta el nombre');
     const ahora = Date.now(), m = Number(String(monto || '').replace(/[.$\s]/g, '').replace(',', '.'));
+    // la que espera "¿Es donación?" aún no está en el podio: se renombraría (y recordaría) otra ya contada
+    if ((store.data.pendientes || []).some((p) => p.ev.source === 'mercadopago' && !(m > 0 && Math.abs(p.ev.amount - m) >= 0.01))) throw new Error('Hay una donación de Mercado Pago esperando "¿Es donación?" en el panel: confírmala primero');
     const mp = data.events.filter((e) => e.source === 'mercadopago' && ahora - e.at < 6 * 3600000).sort((a, b) => b.at - a.at);
     const conMonto = m > 0 ? mp.filter((e) => Math.abs(e.amount - m) < 0.01) : mp;
     const ev = conMonto.find((e) => /^donaci[oó]n mercado pago$/i.test(e.user)) || conMonto[0];
@@ -275,8 +280,7 @@ function createPodio({ store }) {
     const m = new Map();
     for (const e of data.events) {
       if (e.cat !== cat || monthKey(e.at) !== key) continue;
-      if (cat === 'subs' && e.kind && e.kind !== 'gift') continue; // el podio de subs es solo de regaladas
-      const v = cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0;
+      const v = valorPodio(e, cat);
       if (!v) continue; // los negativos (restado a mano) descuentan
       const k = e.user.toLowerCase();
       const r = m.get(k) || { name: e.user, total: 0, last: 0, auto: false };
@@ -288,7 +292,7 @@ function createPodio({ store }) {
     }
     // Empate: gana quien llegó primero a ese total
     return [...m.values()]
-      .filter((r) => r.total > 0.001)
+      .filter((r) => r.total > CENTAVO)
       .sort((a, b) => b.total - a.total || a.last - b.last)
       .slice(0, limit)
       .map((r) => ({ name: r.name, total: cat === 'dinero' ? round2(r.total) : Math.round(r.total) }));

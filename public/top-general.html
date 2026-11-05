@@ -50,7 +50,6 @@ const CATS = {
   bits:  {nombre:'Bits',           fmt:v=>Number(v).toLocaleString('es')+' bits'}
 };
 const ORDEN = ['dinero','subs','bits'];
-const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 const params = new URLSearchParams(location.search);
 const escala = parseFloat(params.get('escala'));
@@ -130,7 +129,7 @@ async function cargar(){
   }catch(e){ /* reloj apagado: queda lo último */ }
 }
 cargar(); setInterval(cargar, 10000); // respaldo: los cambios llegan al instante por /events
-try { new EventSource('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
+new EventSource('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) { console.warn('[Top]', e); } };
 document.fonts.ready.then(encajarTodos);
 Iconos.auto(colsEl);
 const repetir = parseFloat(params.get('repetir'));

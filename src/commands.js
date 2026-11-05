@@ -166,7 +166,7 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
     return reply(`🔥 x${value} activado en ${srcs}${minutes ? ` por ${fmtDuration(minutes * 60)}` : ' hasta que se apague'}`);
   }
 
-  return { handle, parseDur };
+  return { handle };
 }
 
-module.exports = { createCommands, parseDur };
+module.exports = { createCommands };

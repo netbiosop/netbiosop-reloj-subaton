@@ -254,7 +254,7 @@ const sonido = (() => {
   let ctx = null, master = null, analizador = null, datosEq = null, loop = null, nivelMusica = 1;
   let buf = null, fuente = null, fuenteGain = null, t0perf = 0, modoFin = false, cargando = null, inicioAudio = null, esCancion = false;
   const ac = () => { if (!ctx){ ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); analizador = ctx.createAnalyser(); analizador.fftSize = 64; datosEq = new Uint8Array(analizador.frequencyBinCount); master.connect(analizador); analizador.connect(ctx.destination); }
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {}); master.gain.value = cfg.volumen / 100; return ctx; };
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {}); /* el navegador bloquea el audio hasta que hay un clic */ master.gain.value = cfg.volumen / 100; return ctx; };
   const C = () => cfg.cancion || {};
   const usaCancion = () => cfg.cancion && cfg.cancion.on && cancionOk;
   const on = (k) => cfg.efectos && cfg[k] !== false;
@@ -282,7 +282,7 @@ const sonido = (() => {
     s.connect(f); f.connect(v); v.connect(master); s.start(c.currentTime + t);
   }
   const archivo = (base) => archivos.find((a) => a.toLowerCase().startsWith(base + '.'));
-  function tocarArchivo(nombre, loopear){ const a = new Audio('/sonidos/' + encodeURIComponent(nombre)); a.volume = cfg.volumen / 100; a.loop = !!loopear; a.play().catch(() => {}); return a; }
+  function tocarArchivo(nombre, loopear){ const a = new Audio('/sonidos/' + encodeURIComponent(nombre)); a.volume = cfg.volumen / 100; a.loop = !!loopear; a.play().catch(() => {}); /* el navegador bloquea el audio hasta que hay un clic */ return a; }
   const semitono = (f, s) => f * Math.pow(2, s / 12);
   function tocarBuffer(desde, conLoop){
     const c = ac(); pararFuente(0.25);
@@ -293,7 +293,7 @@ const sonido = (() => {
     s.onended = () => { if (fuente === s){ fuente = null; } };
   }
   function pararFuente(seg){ if (!fuente) return; const s = fuente, gn = fuenteGain, c = ac(); fuente = null;
-    gn.gain.setValueAtTime(gn.gain.value, c.currentTime); gn.gain.linearRampToValueAtTime(0, c.currentTime + seg); try { s.stop(c.currentTime + seg + .05); } catch (e) {} }
+    gn.gain.setValueAtTime(gn.gain.value, c.currentTime); gn.gain.linearRampToValueAtTime(0, c.currentTime + seg); try { s.stop(c.currentTime + seg + .05); } catch (e) { /* ya estaba detenido */ } }
   return {
     usaCancion, cargar, decodificar,
     // posición en la canción (s), con el loop aplicado
@@ -461,7 +461,7 @@ function recibir(m){
     if (!$('hud').classList.contains('on')) mostrarHud(e);
     if (m.subio > 0) { await subirNivel(e); await espera(900); }
     else pintarHud(e, antes && antes.id === e.id ? Math.max(0, e.total - antes.total) : 0);
-  }).catch(() => {});
+  }).catch((err) => console.warn('[Hype]', err));
 }
 // Canción nueva sin medir: la mide sola (ritmo, golpes fuertes, parte que se repite y final) y guarda los tiempos
 let midiendo = false;
@@ -474,7 +474,7 @@ async function medirSiHaceFalta(j){
     const perfil = HypeAnalisis.analizar(b);
     const r = await fetch('/api/hype/cancion/perfil', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archivo: c.archivo, bytes: c.bytes, perfil }) });
     const k = await r.json(); if (k && k.result){ cfg = k.result; cancionOk = true; }
-  } catch (e) {} finally { midiendo = false; }
+  } catch (e) { console.warn('[Hype] No se pudo medir la canción:', e); } finally { midiendo = false; }
 }
 // Al abrir (o si OBS recarga la fuente) retoma un tren que ya estaba en marcha
 fetch('/api/hype', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
@@ -483,9 +483,9 @@ fetch('/api/hype', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
   medirSiHaceFalta(j);
   const e = j.estado;
   if (e && e.fase !== 'fin' && e.expira > Date.now() + desfase){ est = e; mostrarHud(e); if (sonido.usaCancion() && cfg.musica !== false) sonido.empezarCancion().then(() => {}); else sonido.musica(e.nivel); }
-}).catch(() => {});
+}).catch((err) => console.warn('[Hype] No se pudo retomar el tren:', err));
 const es = new EventSource('/events?overlay=1');
-es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'hype') recibir(m.payload); } catch (e) {} };
+es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'hype') recibir(m.payload); } catch (e) { console.warn('[Hype]', e); } };
 // Por si el tren vence sin aviso de "fin" (se cortó la conexión): se esconde solo
 setInterval(() => { if (est && est.fase !== 'fin' && est.expira && Date.now() + desfase > est.expira + 20000){ est = null; $('hud').classList.remove('on'); sonido.parar(); } }, 5000);
 </script>

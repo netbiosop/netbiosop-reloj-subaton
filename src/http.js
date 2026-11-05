@@ -38,7 +38,11 @@ function createApp({ staticDir, guard } = {}) {
   };
 
   async function handle(req, res) {
-    const url = new URL(req.url, 'http://localhost');
+    let url;
+    try { url = new URL(req.url, 'http://localhost'); } catch {
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('Dirección inválida'); // ej. "//[x]": sin esto la petición quedaba colgada
+    }
     req.path = url.pathname;
     req.query = Object.fromEntries(url.searchParams);
     res.json = (obj, status = 200) => {
@@ -59,8 +63,8 @@ function createApp({ staticDir, guard } = {}) {
       if (r.method !== req.method) continue;
       const m = req.path.match(r.re);
       if (!m) continue;
-      req.params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
       try {
+        req.params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
         if (req.method !== 'GET') {
           // archivos (ej. subir una canción): hasta 40 MB, sin convertir a texto
           if ((req.headers['content-type'] || '').includes('application/octet-stream')) { req.rawBuffer = await readBody(req, 40 * 1024 * 1024, true); req.body = {}; await r.handler(req, res); return; }

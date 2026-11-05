@@ -168,11 +168,10 @@ class TwitchClient {
 
   stop() {
     this.stopped = true;
+    this.chatOk = false;
     clearTimeout(this.reconnectTimer);
     clearTimeout(this.watchdog);
-    for (const ws of [this.ws, this.pendingWs]) {
-      try { ws?.close(); } catch {}
-    }
+    for (const ws of [this.ws, this.pendingWs]) ws?.close();
     this.ws = null;
     this.pendingWs = null;
   }
@@ -184,7 +183,7 @@ class TwitchClient {
 
     ws.addEventListener('message', (e) => {
       let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
+      try { msg = JSON.parse(e.data); } catch { console.warn('[Twitch] Mensaje ilegible, se ignora'); return; }
       this.onMessage(ws, msg, isReconnect).catch((err) => {
         console.error('[Twitch]', err.message);
         this.setStatus('error', err.message);
@@ -207,7 +206,7 @@ class TwitchClient {
     this.watchdog = setTimeout(() => {
       console.warn('[Twitch] Sin mensajes de Twitch, reconectando…');
       this.ws = null;
-      try { ws.close(); } catch {}
+      ws.close();
       if (!this.stopped) this.connect(EVENTSUB_URL, false);
     }, ((this.keepalive || 10) + 10) * 1000);
   }
@@ -232,7 +231,7 @@ class TwitchClient {
         const old = this.ws;
         this.ws = ws;
         this.pendingWs = null;
-        try { old?.close(); } catch {}
+        old?.close();
       } else {
         await this.subscribeAll(msg.payload.session.id);
       }

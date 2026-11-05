@@ -246,4 +246,4 @@ function createAuth(store) {
   };
 }
 
-module.exports = { createAuth, COOKIE };
+module.exports = { createAuth };

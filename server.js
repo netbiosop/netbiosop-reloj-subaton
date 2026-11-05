@@ -7,6 +7,7 @@ logger.install();
 // Antes de cargar los datos: si falta un archivo o está dañado, se recupera de la última copia de seguridad
 const respaldo = require('./src/respaldo');
 const RECUPERADOS = respaldo.alInicio();
+const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
@@ -15,7 +16,7 @@ const { exec, spawn } = require('child_process');
 
 const store = require('./src/store');
 const { Timer } = require('./src/timer');
-const { createEngine, SOURCES } = require('./src/engine');
+const { createEngine, SOURCES, fmtDuration, LABELS } = require('./src/engine');
 const { TwitchClient } = require('./src/twitch');
 const { MercadoPagoClient } = require('./src/mercadopago');
 const { StreamElementsClient } = require('./src/streamelements');
@@ -27,7 +28,6 @@ const multichat = require('./src/multichat');
 const { createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
-const { fmtDuration, LABELS } = require('./src/engine');
 
 if (typeof WebSocket === 'undefined') {
   console.error('\n  ❌ Necesitas Node.js 22 o más nuevo. Descárgalo en https://nodejs.org (versión LTS)\n');
@@ -42,6 +42,16 @@ const auth = createAuth(store);
 const REMOTE = !!(d.settings.remoteAccess && auth.hasAnyLogin());
 const HOST = process.env.HOST || (REMOTE ? '0.0.0.0' : '127.0.0.1');
 const HOOKS_HOST = process.env.HOST || '127.0.0.1';
+
+// Hacer algo sin frenar lo que sigue: si falla, queda anotado en el log
+function intentar(que, fn) {
+  try { return fn(); } catch (err) { console.error(`[${que}]`, err.message); }
+}
+
+// Sin manejo de error: explorer.exe devuelve código 1 aunque haya abierto bien.
+const abrir = (win, otro) => exec(process.platform === 'win32' ? win : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} ${otro}`, () => {});
+const abrirCarpeta = (dir) => abrir(`explorer "${dir}"`, `"${dir}"`);
+const abrirNavegador = (url) => abrir(`start "" "${url}"`, `"${url}"`);
 
 // ---------- Tiempo real ----------
 const live = createLive();
@@ -102,22 +112,23 @@ const SOUNDS_DIR = path.join(__dirname, 'sonidos');
 const SOUND_EXT = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4' };
 const SOUND_EVENTS = ['sub', 'bits', 'paypal', 'mercadopago', 'grande', 'multiplicador', 'final', 'fin', 'manual'];
 let customSounds = {};
+// archivos de audio de la carpeta "sonidos"
+function listarSonidos() {
+  try { return fs.readdirSync(SOUNDS_DIR).filter((f) => SOUND_EXT[path.extname(f).toLowerCase()]); }
+  catch (err) { if (err.code !== 'ENOENT') console.error('[Sonidos]', err.message); return []; }
+}
 function scanSounds() {
-  const fs = require('fs');
-  try {
+  intentar('Sonidos', () => {
     fs.mkdirSync(SOUNDS_DIR, { recursive: true });
     const readme = path.join(SOUNDS_DIR, 'LEEME.txt');
     if (!fs.existsSync(readme)) fs.writeFileSync(readme, 'Pon aqui tus propios sonidos (mp3, wav, ogg o m4a) con estos nombres para reemplazar los que trae el reloj:\r\n\r\n' + SOUND_EVENTS.map((e) => `  ${e}.mp3`).join('\r\n') + '\r\n\r\nSi no hay archivo, se usa el sonido incluido.\r\n');
-    const found = {};
-    for (const f of fs.readdirSync(SOUNDS_DIR)) {
-      const ext = path.extname(f).toLowerCase();
-      const name = path.basename(f, path.extname(f)).toLowerCase();
-      if (SOUND_EXT[ext] && SOUND_EVENTS.includes(name)) found[name] = f;
-    }
-    customSounds = found;
-  } catch (err) {
-    console.error('[Sonidos]', err.message);
+  });
+  const found = {};
+  for (const f of listarSonidos()) {
+    const name = path.basename(f, path.extname(f)).toLowerCase();
+    if (SOUND_EVENTS.includes(name)) found[name] = f;
   }
+  customSounds = found;
 }
 scanSounds();
 setInterval(scanSounds, 30000);
@@ -164,14 +175,14 @@ podio.onCambio((v) => broadcast('podio', { v }));
 // Cada aporte real (no las pruebas) también entra al podio del mes
 const onContribution = (ev) => {
   const entry = engine.contribute(ev);
-  try { podio.record(entry); } catch (err) { console.error('[Podio]', err.message); }
+  intentar('Podio', () => podio.record(entry));
   // copia de seguridad apenas entra una donación, sub o bits (las pruebas no cuentan)
   if (entry && !entry.duplicate && !entry.test) respaldo.alAporte();
-  // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas
+  // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas.
+  // Sin el monto: patitos.html no lo usa y los mods sin permiso de "montos" también reciben este evento.
   if (entry && !entry.duplicate && (entry.source === 'paypal' || entry.source === 'mercadopago')) {
-    let usd = null;
-    try { usd = podio.toUsd(entry.amount, entry.currency); } catch {}
-    broadcast('aporte', { id: entry.id, user: entry.user, usd: usd ?? 1, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
+    const usd = podio.toUsd(entry.amount, entry.currency);
+    broadcast('aporte', { id: entry.id, user: entry.user, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
   }
   return entry;
 };
@@ -196,7 +207,8 @@ const avisarPendientes = () => broadcast('pendientes', { lista: pendientes() });
 function recibirDinero(ev) {
   if (ev.test || !DINERO.has(ev.source) || d.settings.preguntarDonaciones?.[ev.source] === false) return onContribution(ev);
   const key = `${ev.source}:${ev.id || `${ev.user}-${ev.amount}-${Date.now()}`}`;
-  if (decididos()[key] || pendientes().some((p) => p.key === key)) return { duplicate: true };
+  // engine.procesado: pagos que ya sumaron antes de activar "preguntar" y que el sondeo vuelve a traer al reiniciar
+  if (decididos()[key] || engine.procesado(key) || pendientes().some((p) => p.key === key)) return { duplicate: true };
   const quien = quienEs(ev);
   if ((d.settings.siempreDonacion || []).some((s) => s.quien === quien)) return onContribution(ev);
   pendientes().push({ key, quien, ev, at: Date.now() });
@@ -215,14 +227,15 @@ function decidirDonacion({ key, esDonacion, siempre }) {
   if (esDonacion) {
     if (siempre && !(d.settings.siempreDonacion ||= []).some((s) => s.quien === p.quien)) d.settings.siempreDonacion.push({ quien: p.quien, nombre: p.ev.user, at: Date.now() });
     entry = onContribution(p.ev);
-  } else if (siempre) {
+  } else if (siempre && p.ev.payer) {
+    // sin payer (PayPal, StreamElements) no hay a quién recordar: el nombre que se muestra ("Juan P.") en la lista
+    // de Mercado Pago descartaría a cualquier "Juan P…" que pague por Mercado Pago, y PayPal no la consulta
     const l = (d.settings.mpIgnorar ||= { nombres: [], claves: [] });
-    if (p.ev.payer) { if (!l.claves.some((c) => c.clave === p.ev.payer)) l.claves.push({ clave: p.ev.payer, nombre: p.ev.user, at: Date.now() }); }
-    else if (p.ev.user && !l.nombres.includes(p.ev.user)) l.nombres.push(p.ev.user);
+    if (!l.claves.some((c) => c.clave === p.ev.payer)) l.claves.push({ clave: p.ev.payer, nombre: p.ev.user, at: Date.now() });
   }
   store.save();
   avisarPendientes();
-  console.log(`${esDonacion ? '✔ Aprobada como donación' : '✖ No era donación (no suma nada)'}: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''}${siempre ? (esDonacion ? ' · sus próximas cuentan solas' : ' · sus próximos pagos tampoco cuentan') : ''}`);
+  console.log(`${esDonacion ? '✔ Aprobada como donación' : '✖ No era donación (no suma nada)'}: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''}${siempre ? (esDonacion ? ' · sus próximas cuentan solas' : p.ev.payer ? ' · sus próximos pagos tampoco cuentan' : '') : ''}`);
   return { entry, key };
 }
 const mp = new MercadoPagoClient({ store, onContribution: recibirDinero, onStatus: sendConnections });
@@ -244,7 +257,7 @@ function onStream(isLive, initial) {
     }
     newSession();
     console.log(initial ? '🔴 El stream ya estaba en vivo al abrir el reloj' : '🔴 ¡Stream en vivo!');
-    try { if (podio.patitosStream(true)) broadcast('aporte', { vaciar: true }); } catch (err) { console.error('[Patitos]', err.message); }
+    if (intentar('Patitos', () => podio.patitosStream(true))) broadcast('aporte', { vaciar: true });
     if (d.settings.descanso) {
       d.settings.descanso = false;
       store.save();
@@ -266,8 +279,8 @@ function onStream(isLive, initial) {
       console.log(`⚫ Stream terminado · quedan ${left()}`);
     }
     sumarHorasDiarias('al terminar el stream');
-    try { podio.patitosStream(false); } catch (err) { console.error('[Patitos]', err.message); }
-    setTimeout(() => { try { podio.saveNow(); respaldo.respaldar('fin del stream', true); } catch (err) { console.error('[Respaldo]', err.message); } }, 2000);
+    intentar('Patitos', () => podio.patitosStream(false));
+    setTimeout(() => intentar('Respaldo', () => respaldo.respaldar('fin del stream', true)), 2000);
     logger.close(['Resumen del stream:', ...sessionSummary()]);
     newSession();
     // Si el panel se cerró durante el stream, ahora sí se apaga
@@ -328,7 +341,7 @@ const app = createApp({ staticDir: path.join(__dirname, 'public'), guard: auth.g
 app.get('/', (req, res) => res.redirect('/menu'));
 // Configuración: es el mismo panel en su vista de ajustes (stream, acceso remoto, conexiones y chat)
 app.get('/configuracion', (req, res) => {
-  require('fs').readFile(path.join(__dirname, 'public', 'panel.html'), (err, buf) => res.send(err ? 'Error' : buf));
+  fs.readFile(path.join(__dirname, 'public', 'panel.html'), (err, buf) => res.send(err ? 'Error' : buf));
 });
 app.get('/api/version', (req, res) => res.json({ app: 'reloj-subaton', version: require('./package.json').version }));
 app.get('/events', (req, res) => {
@@ -372,7 +385,7 @@ function remoteInfo(req) {
 }
 app.get('/login', (req, res) => {
   if (!REMOTE) return res.send('<meta charset="utf-8"><body style="font-family:sans-serif;background:#0e0d12;color:#ecebf2;padding:40px"><h2>Acceso remoto desactivado</h2><p>Actívalo desde el panel en la PC del reloj (sección Acceso remoto).</p></body>', 403);
-  require('fs').readFile(path.join(__dirname, 'public', 'login.html'), (err, buf) => res.send(err ? 'Error' : buf));
+  fs.readFile(path.join(__dirname, 'public', 'login.html'), (err, buf) => res.send(err ? 'Error' : buf));
 });
 app.post('/api/login', (req, res) => {
   if (!REMOTE) return res.json({ error: 'El acceso remoto está desactivado' }, 403);
@@ -421,7 +434,7 @@ app.get('/sonidos/:file', (req, res) => {
   const file = path.basename(req.params.file);
   const type = SOUND_EXT[path.extname(file).toLowerCase()];
   if (!type) return res.send('No encontrado', 404, 'text/plain');
-  require('fs').readFile(path.join(SOUNDS_DIR, file), (err, buf) => {
+  fs.readFile(path.join(SOUNDS_DIR, file), (err, buf) => {
     if (err) return res.send('No encontrado', 404, 'text/plain');
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
     res.end(buf);
@@ -446,8 +459,7 @@ app.post('/api/sounds/test', (req, res) => {
 });
 app.post('/api/sounds/open-folder', (req, res) => {
   scanSounds();
-  const cmd = process.platform === 'win32' ? `explorer "${SOUNDS_DIR}"` : process.platform === 'darwin' ? `open "${SOUNDS_DIR}"` : `xdg-open "${SOUNDS_DIR}"`;
-  exec(cmd, () => {});
+  abrirCarpeta(SOUNDS_DIR);
   ok(res, { sounds: soundsMsg() });
 });
 
@@ -554,13 +566,11 @@ app.post('/api/stream-settings', (req, res) => {
 app.get('/api/logs/current', (req, res) => {
   const file = logger.latestFile();
   if (!file) return res.send('Todavía no hay registros.', 200, 'text/plain; charset=utf-8');
-  require('fs').readFile(file, 'utf8', (err, text) => res.send(err ? 'No se pudo leer el registro.' : `${path.basename(file)}\n\n${text}`, 200, 'text/plain; charset=utf-8'));
+  fs.readFile(file, 'utf8', (err, text) => res.send(err ? 'No se pudo leer el registro.' : `${path.basename(file)}\n\n${text}`, 200, 'text/plain; charset=utf-8'));
 });
 app.post('/api/logs/open-folder', (req, res) => {
-  const dir = logger.dir;
-  const cmd = process.platform === 'win32' ? `explorer "${dir}"` : process.platform === 'darwin' ? `open "${dir}"` : `xdg-open "${dir}"`;
-  exec(cmd, () => {});
-  ok(res, { dir });
+  abrirCarpeta(logger.dir);
+  ok(res, { dir: logger.dir });
 });
 
 // Apagar el programa (como corre oculto, se apaga desde el panel o con detener.bat)
@@ -704,7 +714,8 @@ app.get('/auth/twitch', (req, res) => {
   res.redirect(twitch.authUrl(oauthState));
 });
 app.get('/auth/twitch/callback', async (req, res) => {
-  const back = (msg) => res.send(`<meta charset="utf-8"><body style="font-family:sans-serif;background:#111;color:#eee;padding:40px"><h2>${msg}</h2><p>Puedes cerrar esta pestaña y volver al <a style="color:#b18cff" href="/panel">panel</a>.</p></body>`);
+  // msg lleva texto de la URL (error_description): cualquiera puede armar el enlace, así que se escapa
+  const back = (msg) => res.send(`<meta charset="utf-8"><body style="font-family:sans-serif;background:#111;color:#eee;padding:40px"><h2>${String(msg).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</h2><p>Puedes cerrar esta pestaña y volver al <a style="color:#b18cff" href="/panel">panel</a>.</p></body>`);
   if (req.query.error) return back('Twitch canceló la conexión: ' + req.query.error_description);
   if (!req.query.state || req.query.state !== oauthState) return back('La conexión expiró, inténtalo de nuevo desde el panel.');
   try {
@@ -737,7 +748,7 @@ app.post('/api/simulate', (req, res) => {
 app.post('/api/patitos/probar', (req, res) => {
   const source = req.body.source === 'paypal' ? 'paypal' : 'mercadopago';
   const usd = Math.max(0.5, Math.min(100, num(req.body.usd, 5)));
-  broadcast('aporte', { user: 'Prueba', usd, ...podio.patitosAporte(source, usd, true) });
+  broadcast('aporte', { user: 'Prueba', ...podio.patitosAporte(source, usd, true) });
   ok(res);
 });
 
@@ -771,7 +782,11 @@ app.post('/api/reset', (req, res) => {
   d.stats = {};
   d.multiplier.manual.active = false;
   d.mpSince = Date.now();
+  // una donación en espera del subatón anterior no puede sumar al nuevo; queda en el registro para cargarla a mano
+  for (const p of pendientes()) console.log(`🗑 Donación sin confirmar descartada al reiniciar: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''} (${p.ev.source})`);
+  d.pendientes = [];
   store.save();
+  avisarPendientes();
   broadcast('reset', {});
   broadcast('state', stateMsg());
   ok(res);
@@ -900,7 +915,7 @@ app.get('/api/codigo', (req, res) => res.json(codigo.publicData()));
 app.get('/api/codigo/estado', (req, res) => res.json({ ...codigo.publicData(), proximas: codigo.proximas(codigoCtx()), live: !!stream.live, descanso: !!d.settings.descanso }));
 app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
-setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { console.error('[Código]', e.message); } }, 5000);
+setInterval(() => intentar('Código', () => codigo.tick(broadcast, codigoCtx())), 5000);
 
 // ---------- Multichat (Twitch, Kick, YouTube y TikTok en un solo chat) ----------
 app.get('/api/multichat', (req, res) => res.json(multichat.publicData()));
@@ -921,6 +936,7 @@ const autoCtx = () => ({
   enviar: async (texto, responderA, como) => (como && cuentasTwitch.tiene(como) && (await cuentasTwitch.enviar(como, texto, responderA))) || (twitch.chatOk ? twitch.sendChat(texto, responderA) : false),
   tiempo: () => fmtDuration(timer.remainingMs / 1000),
   canal: () => d.secrets?.twitch?.login || '',
+  prefijo: () => d.chat?.prefix || '!',
 });
 app.get('/api/automensajes', (req, res) => res.json({ ...automensajes.estado(autoCtx()), cuentas: cuentasTwitch.resumen() }));
 // Vincular la cuenta de una persona de la lista: devuelve el código para twitch.tv/activate
@@ -962,16 +978,15 @@ const hype = require('./src/hype');
 // ¿La canción sincronizada es el mismo archivo que se midió? (si cambias el mp3, vuelve al modo normal)
 function hypeCancion() {
   const c = hype.getConfig().cancion;
-  try { const st = require('fs').statSync(path.join(SOUNDS_DIR, c.archivo)); hype.perfilPorTamano(st.size); const ok = st.size === hype.getConfig().cancion.bytes; return { ok: !!c.on && ok, medida: ok, existe: true, bytes: st.size, archivo: c.archivo }; }
-  catch { return { ok: false, medida: false, existe: false, archivo: c.archivo }; }
+  const st = c.archivo && fs.statSync(path.join(SOUNDS_DIR, c.archivo), { throwIfNoEntry: false });
+  if (!st) return { ok: false, medida: false, existe: false, archivo: c.archivo };
+  hype.perfilPorTamano(st.size);
+  const ok = st.size === hype.getConfig().cancion.bytes;
+  return { ok: !!c.on && ok, medida: ok, existe: true, bytes: st.size, archivo: c.archivo };
 }
 // todas las canciones de la carpeta "sonidos" (para elegir en el panel)
-function hypeCanciones() {
-  try { return require('fs').readdirSync(SOUNDS_DIR).filter((f) => SOUND_EXT[path.extname(f).toLowerCase()]).map((f) => ({ nombre: f, bytes: require('fs').statSync(path.join(SOUNDS_DIR, f)).size })); } catch { return []; }
-}
-function hypeArchivos() {
-  try { return require('fs').readdirSync(SOUNDS_DIR).filter((f) => /^hype-/i.test(f) && SOUND_EXT[path.extname(f).toLowerCase()]); } catch { return []; }
-}
+const hypeCanciones = () => listarSonidos().map((f) => ({ nombre: f, bytes: fs.statSync(path.join(SOUNDS_DIR, f)).size }));
+const hypeArchivos = () => listarSonidos().filter((f) => /^hype-/i.test(f));
 function onHype(fase, e, desfase) {
   try {
     const r = hype.procesar(fase, e, desfase);
@@ -988,11 +1003,10 @@ app.get('/api/hype', (req, res) => { const c = hypeCancion(); res.json({ ...hype
 app.post('/api/hype/cancion/perfil', podioRoute((req) => { const r = hype.setPerfil(req.body); broadcast('hype', { config: r, archivos: hypeArchivos(), cancionOk: hypeCancion().ok }); return r; }));
 // subir una canción desde el panel: se guarda en la carpeta "sonidos"
 app.post('/api/hype/subir', (req, res) => {
-  const fs2 = require('fs');
   const nombre = path.basename(decodeURIComponent(String(req.headers['x-nombre'] || 'cancion.mp3'))).replace(/[^\w.\- ()áéíóúñÁÉÍÓÚÑ]/g, '_').slice(0, 80);
   if (!SOUND_EXT[path.extname(nombre).toLowerCase()]) return res.json({ error: 'Tiene que ser .mp3, .wav, .ogg o .m4a' }, 400);
   if (!req.rawBuffer || req.rawBuffer.length < 1000) return res.json({ error: 'El archivo llegó vacío' }, 400);
-  try { fs2.mkdirSync(SOUNDS_DIR, { recursive: true }); fs2.writeFileSync(path.join(SOUNDS_DIR, nombre), req.rawBuffer); }
+  try { fs.mkdirSync(SOUNDS_DIR, { recursive: true }); fs.writeFileSync(path.join(SOUNDS_DIR, nombre), req.rawBuffer); }
   catch (err) { return res.json({ error: 'No se pudo guardar: ' + err.message }, 500); }
   console.log(`[Hype] Canción subida: ${nombre} (${Math.round(req.rawBuffer.length / 1024)} KB)`);
   ok(res, { nombre, bytes: req.rawBuffer.length });
@@ -1011,14 +1025,14 @@ app.post('/api/hype/probar', (req, res) => {
 
 // ---------- Copias de seguridad ----------
 if (RECUPERADOS.length) console.warn('💾 Se recuperaron de la copia de seguridad: ' + RECUPERADOS.join(', '));
-respaldo.iniciar(() => { podio.saveNow(); store.saveNow(); });
+respaldo.iniciar(guardarTodo);
 app.get('/api/respaldo', (req, res) => res.json(respaldo.info()));
 app.post('/api/respaldo/config', podioRoute((req) => respaldo.setConfig(req.body)));
-app.post('/api/respaldo/ahora', podioRoute(() => { try { podio.saveNow(); store.saveNow(); } catch {} return respaldo.respaldar('a mano', true) && respaldo.info(); }));
+app.post('/api/respaldo/ahora', podioRoute(() => respaldo.respaldar('a mano', true) && respaldo.info()));
 app.post('/api/respaldo/abrir', (req, res) => {
   const dir = respaldo.carpetas()[0];
-  try { require('fs').mkdirSync(dir, { recursive: true }); } catch {}
-  exec(process.platform === 'win32' ? `explorer "${dir}"` : process.platform === 'darwin' ? `open "${dir}"` : `xdg-open "${dir}"`, () => {});
+  intentar('Respaldo', () => fs.mkdirSync(dir, { recursive: true }));
+  abrirCarpeta(dir);
   ok(res);
 });
 // Copia oculta en GitHub (privado): solo se configura escribiendo /respaldo-github en el navegador
@@ -1027,13 +1041,12 @@ app.post('/api/respaldo-github/config', async (req, res) => {
   try { ok(res, { result: await respaldoGithub.setConfig(req.body) }); } catch (err) { res.json({ error: err.message }, 400); }
 });
 app.post('/api/respaldo-github/ahora', async (req, res) => {
-  try { podio.saveNow(); store.saveNow(); } catch {}
+  intentar('Datos', guardarTodo);
   await respaldoGithub.subir('manual');
   const i = respaldoGithub.info();
   i.error ? res.json({ error: i.error }, 400) : ok(res, { result: i });
 });
 app.post('/api/respaldo/restaurar', (req, res) => {
-  try { podio.saveNow(); store.saveNow(); codigo.save(); hype.save(); automensajes.save(); } catch {}
   try { respaldo.pedirRestaurar(String(req.body.copia || '')); } catch (err) { return res.json({ error: err.message }, 400); }
   console.log(`💾 Restaurando la copia ${req.body.copia}: el reloj se reinicia…`);
   ok(res);
@@ -1119,20 +1132,41 @@ hookServer = http.createServer(hooks.handle);
 // ---------- Arranque ----------
 function openPanel() {
   if (process.env.NO_OPEN) return;
-  const url = `http://localhost:${PORT}/menu`;
-  const cmd = process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
-  exec(cmd, () => {});
+  abrirNavegador(`http://localhost:${PORT}/menu`);
 }
 
-// Reinicia el programa (para aplicar el acceso remoto) sin abrir ventanas
-function restart() {
+// podio, código y hype anotan sus propios errores al guardar; store los lanza
+function guardarTodo() {
+  intentar('Datos', () => store.saveNow());
+  podio.saveNow();
+  codigo.save();
+  hype.save();
+  automensajes.save();
+  multichat.save();
+}
+
+// Lo que comparten reiniciar y apagar: guardar todo, soltar las conexiones y liberar los puertos
+let shuttingDown = false;
+function prepararCierre() {
   shuttingDown = true;
-  for (const c of [twitch, mp, se]) try { c.stop(); } catch {}
   persistTimer();
-  store.saveNow();
+  guardarTodo();
+  for (const c of [twitch, mp, se]) intentar('Conexiones', () => c.stop());
+  intentar('Multichat', () => multichat.parar());
+}
+function cerrarServidores(alCerrar) {
+  server.close(alCerrar);
+  server.closeAllConnections();
+  hookServer?.close();
+  hookServer?.closeAllConnections?.();
+}
+
+// Reinicia el programa (para aplicar el acceso remoto o restaurar una copia) sin abrir ventanas
+function restart() {
+  prepararCierre();
   console.log('🔄 Reiniciando el reloj…');
   logger.close();
-  server.close(() => {
+  cerrarServidores(() => {
     spawn(process.execPath, [__filename], {
       cwd: __dirname,
       detached: true,
@@ -1142,32 +1176,19 @@ function restart() {
     }).unref();
     process.exit(0);
   });
-  server.closeAllConnections();
-  hookServer.close();
-  hookServer.closeAllConnections?.();
 }
 
 // Apagado limpio: guarda, avisa a paneles y overlay, corta conexiones y libera los puertos
-let shuttingDown = false;
 function shutdown(reason) {
   if (shuttingDown) return;
-  shuttingDown = true;
-  persistTimer();
-  store.saveNow();
-  try { podio.saveNow(); } catch {}
-  try { codigo.save(); } catch {}
-  try { hype.save(); } catch {}
-  try { automensajes.save(); } catch {}
-  try { multichat.save(); multichat.parar(); } catch {}
-  try { respaldo.respaldar('al cerrar', true); } catch {}
-  const subida = Promise.race([respaldoGithub.subir('al cerrar').catch(() => {}), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
+  prepararCierre();
+  intentar('Respaldo', () => respaldo.respaldar('al cerrar', true));
+  const subida = Promise.race([respaldoGithub.subir('al cerrar'), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);
   logger.close(stream.live ? ['Resumen hasta el cierre:', ...sessionSummary()] : []);
-  try { live.broadcast('shutdown', { reason }); } catch {}
-  for (const c of [twitch, mp, se]) try { c.stop(); } catch {}
+  intentar('Paneles', () => live.broadcast('shutdown', { reason }));
   Promise.all([subida, new Promise((r) => setTimeout(r, 300))]).then(() => {
-    try { server.close(); server.closeAllConnections(); } catch {}
-    try { hookServer.close(); hookServer.closeAllConnections?.(); } catch {}
+    intentar('Servidores', () => cerrarServidores());
     removePid();
     process.exit(0);
   });
@@ -1177,12 +1198,11 @@ function shutdown(reason) {
 // Archivo con el número de proceso: si alguna vez el reloj se cuelga, iniciar.bat lo puede cerrar
 const PID_FILE = path.join(path.dirname(store.file), 'reloj.pid');
 function writePid() {
-  try { require('fs').writeFileSync(PID_FILE, String(process.pid)); } catch {}
+  intentar('PID', () => fs.writeFileSync(PID_FILE, String(process.pid)));
 }
 function removePid() {
-  try {
-    if (require('fs').readFileSync(PID_FILE, 'utf8').trim() === String(process.pid)) require('fs').unlinkSync(PID_FILE);
-  } catch {}
+  if (!fs.existsSync(PID_FILE)) return;
+  intentar('PID', () => { if (fs.readFileSync(PID_FILE, 'utf8').trim() === String(process.pid)) fs.unlinkSync(PID_FILE); });
 }
 process.on('exit', removePid);
 

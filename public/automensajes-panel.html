@@ -49,8 +49,6 @@
   .msg .como{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0}
   .msg .como select{font:inherit;font-size:12px;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:8px;padding:4px 6px;max-width:190px}
   .msg .lado{display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:170px}
-  .msg .cada{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
-  .msg .cada input{width:70px}
   .msg .cont{font-size:11px;color:var(--muted);text-align:right}
   .msg .prox{font-size:12px;color:var(--accent);font-weight:600}
   .peligro:hover{border-color:var(--bad)}
@@ -75,7 +73,6 @@
   .saleComo{margin-top:8px;padding:8px 10px;border-radius:10px;background:#0f0e14;border:1px solid var(--line);font-size:13px}
   .agregarQuien{display:flex;gap:8px} .agregarQuien input{flex:1;min-width:0}
   code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#9ff0c8}
-  ul{margin:6px 0 0;padding-left:18px} li{margin:4px 0}
   @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .msg{grid-template-columns:auto 1fr} .msg .lado{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center;min-width:0} }
 </style>
 </head>
@@ -307,7 +304,7 @@ async function seguirVinculo(u){
     pintarPersonas();
     if (j.estado === 'esperando') setTimeout(() => seguirVinculo(u), 3000);
     else if (j.estado === 'listo') { cargarEstado(); setTimeout(() => { delete vinc[u]; pintarPersonas(); }, 8000); }
-  } catch {}
+  } catch (err) { vinc[u] = { estado: 'error', mensaje: 'Se perdió el contacto con el reloj: ' + err.message }; pintarPersonas(); }
 }
 function notaQuien(t, c=''){ $('notaQuien').textContent = t; $('notaQuien').className = 'nota ' + c; }
 async function agregarQuien(){
@@ -333,7 +330,7 @@ $('personas').onclick = async (e) => {
     return;
   }
   const cb = e.target.closest('[data-cancelar]');
-  if (cb) { await api('/api/automensajes/vincular/cancelar', 'POST', { login: cb.dataset.cancelar }).catch(() => {}); delete vinc[cb.dataset.cancelar]; pintarPersonas(); return; }
+  if (cb) { await api('/api/automensajes/vincular/cancelar', 'POST', { login: cb.dataset.cancelar }).catch((err) => notaQuien(err.message, 'mal')); delete vinc[cb.dataset.cancelar]; pintarPersonas(); return; }
   const db = e.target.closest('[data-desvincular]');
   if (db) {
     const u = db.dataset.desvincular, nombre = (cfg.nombres || {})[u] || u;
@@ -347,7 +344,10 @@ $('personas').onclick = async (e) => {
   try { cfg = (await api('/api/automensajes/quitar', 'POST', { login: b.dataset.quitar })).result; pintarPersonas(); pintarLista(); notaQuien(`${nombre} ya no puede activarlo.`); } catch (err) { notaQuien(err.message, 'mal'); }
 };
 
-async function cargarEstado(){ try { pintarEstado(await api('/api/automensajes')); } catch {} }
+async function cargarEstado(){
+  try { pintarEstado(await api('/api/automensajes')); }
+  catch (e) { $('estado').className = 'estado mal'; $('estadoTxt').textContent = 'Sin conexión con el reloj'; $('estadoNota').textContent = e.message; }
+}
 (async () => {
   const j = await api('/api/automensajes');
   cfg = j.config; pintarGeneral(); pintarLista(); pintarEstado(j);

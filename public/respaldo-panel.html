@@ -90,6 +90,7 @@ async function api(path, method='GET', body){
   if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
   return j;
 }
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function nota(el, txt, cls=''){ el.textContent = txt; el.className = 'nota '+cls; }
 const fecha = (n) => { const [d, h] = n.split('_'); const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y} ${h.replace(/-/g, ':')}`; };
 const hace = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : 'hace ' + Math.round(s / 3600) + ' h'; };
@@ -100,14 +101,14 @@ function pintar(j){
   if (document.activeElement !== $('carpeta')) $('carpeta').value = j.carpeta;
   if (document.activeElement !== $('extra')) $('extra').value = j.extra;
   $('porDefecto').textContent = j.porDefecto ? 'Carpeta por defecto (en tus Documentos). Si tus Documentos están en OneDrive, las copias además quedan en la nube.' : '';
-  $('lista').innerHTML = j.copias.map((c, i) => `<tr><td>${fecha(c.nombre)}${i === 0 ? ' <span class="nota ok">· la más nueva</span>' : ''}</td><td>${c.resumen || ''}</td><td>${(c.tam / 1024).toFixed(1)} KB</td>
-    <td style="text-align:right"><button class="sm" data-r="${c.nombre}">↩ Restaurar</button></td></tr>`).join('') || '<tr><td colspan="4" class="nota">Todavía no hay copias. Toca "Hacer una copia ahora".</td></tr>';
+  $('lista').innerHTML = j.copias.map((c, i) => `<tr><td>${fecha(c.nombre)}${i === 0 ? ' <span class="nota ok">· la más nueva</span>' : ''}</td><td>${esc(c.resumen || '')}</td><td>${(c.tam / 1024).toFixed(1)} KB</td>
+    <td style="text-align:right"><button class="sm" data-r="${esc(c.nombre)}">↩ Restaurar</button></td></tr>`).join('') || '<tr><td colspan="4" class="nota">Todavía no hay copias. Toca "Hacer una copia ahora".</td></tr>';
 }
 async function cargar(){ try { pintar(await api('/api/respaldo')); } catch(e){ nota($('nota'), e.message, 'mal'); } }
 $('ahora').onclick = async ()=>{ try { const j = await api('/api/respaldo/ahora','POST',{}); pintar(j.result); nota($('nota'),'✔ Copia guardada','ok'); } catch(e){ nota($('nota'), e.message, 'mal'); } };
 $('on').onchange = async ()=>{ try { pintar((await api('/api/respaldo/config','POST',{ on: $('on').checked })).result); nota($('nota'), $('on').checked ? '✔ Copias automáticas activadas' : 'Copias automáticas apagadas', $('on').checked ? 'ok' : 'mal'); } catch(e){ nota($('nota'), e.message, 'mal'); } };
 $('guardar').onclick = async ()=>{ try { pintar((await api('/api/respaldo/config','POST',{ carpeta: $('carpeta').value, extra: $('extra').value })).result); nota($('notaC'),'✔ Carpetas guardadas','ok'); } catch(e){ nota($('notaC'), e.message, 'mal'); } };
-$('abrir').onclick = ()=> api('/api/respaldo/abrir','POST',{}).catch(()=>{});
+$('abrir').onclick = ()=> api('/api/respaldo/abrir','POST',{}).catch((e)=>console.warn('[Respaldo]', e));
 $('lista').onclick = async (e)=>{
   const b = e.target.closest('[data-r]'); if(!b) return;
   if (!confirm('¿Volver a la copia del ' + fecha(b.dataset.r) + '?\nSe reemplazan los datos actuales y el reloj se reinicia.')) return;
