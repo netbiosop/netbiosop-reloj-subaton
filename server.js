@@ -748,7 +748,7 @@ app.post('/api/simulate', (req, res) => {
 app.post('/api/patitos/probar', (req, res) => {
   const source = req.body.source === 'paypal' ? 'paypal' : 'mercadopago';
   const usd = Math.max(0.5, Math.min(100, num(req.body.usd, 5)));
-  broadcast('aporte', { user: 'Prueba', usd, ...podio.patitosAporte(source, usd, true) });
+  broadcast('aporte', { user: 'Prueba', ...podio.patitosAporte(source, usd, true) });
   ok(res);
 });
 
