@@ -206,7 +206,8 @@ const avisarPendientes = () => broadcast('pendientes', { lista: pendientes() });
 function recibirDinero(ev) {
   if (ev.test || !DINERO.has(ev.source) || d.settings.preguntarDonaciones?.[ev.source] === false) return onContribution(ev);
   const key = `${ev.source}:${ev.id || `${ev.user}-${ev.amount}-${Date.now()}`}`;
-  if (decididos()[key] || pendientes().some((p) => p.key === key)) return { duplicate: true };
+  // engine.procesado: pagos que ya sumaron antes de activar "preguntar" y que el sondeo vuelve a traer al reiniciar
+  if (decididos()[key] || engine.procesado(key) || pendientes().some((p) => p.key === key)) return { duplicate: true };
   const quien = quienEs(ev);
   if ((d.settings.siempreDonacion || []).some((s) => s.quien === quien)) return onContribution(ev);
   pendientes().push({ key, quien, ev, at: Date.now() });
