@@ -178,10 +178,11 @@ const onContribution = (ev) => {
   intentar('Podio', () => podio.record(entry));
   // copia de seguridad apenas entra una donación, sub o bits (las pruebas no cuentan)
   if (entry && !entry.duplicate && !entry.test) respaldo.alAporte();
-  // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas
+  // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas.
+  // Sin el monto: patitos.html no lo usa y los mods sin permiso de "montos" también reciben este evento.
   if (entry && !entry.duplicate && (entry.source === 'paypal' || entry.source === 'mercadopago')) {
     const usd = podio.toUsd(entry.amount, entry.currency);
-    broadcast('aporte', { id: entry.id, user: entry.user, usd: usd ?? 1, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
+    broadcast('aporte', { id: entry.id, user: entry.user, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
   }
   return entry;
 };
