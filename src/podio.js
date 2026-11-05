@@ -242,6 +242,8 @@ function createPodio({ store }) {
   function vincularMP(nombre, monto) {
     const name = cleanName(String(nombre || '').replace(/^@/, ''));
     if (!name) throw new Error('Falta el nombre');
+    // la que espera "¿Es donación?" aún no está en el podio: se renombraría (y recordaría) la anterior
+    if ((store.data.pendientes || []).some((p) => p.ev.source === 'mercadopago')) throw new Error('Hay una donación de Mercado Pago esperando "¿Es donación?" en el panel: confírmala primero');
     const ahora = Date.now(), m = Number(String(monto || '').replace(/[.$\s]/g, '').replace(',', '.'));
     const mp = data.events.filter((e) => e.source === 'mercadopago' && ahora - e.at < 6 * 3600000).sort((a, b) => b.at - a.at);
     const conMonto = m > 0 ? mp.filter((e) => Math.abs(e.amount - m) < 0.01) : mp;
