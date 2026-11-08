@@ -109,6 +109,14 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   "No es donación" no descuenta los patitos que sumó el pago.
 - `pendientes.js`: en vez de `window.__es` + espera, que exponga `window.pendientes = pintar` y cada página lo llame desde
   su `onmessage` (sin bucle ni global compartida).
+- Encontrados el 2026-11-08 (deciden el dueño o necesitan Twitch/Windows real):
+  - Si el stream termina o empieza durante un corte de EventSub, el reloj no se entera (`twitch.js:322`, `checkedLive` una sola vez). Consultar `/streams` en cada reconexión es fácil, pero `/streams` tarda en reflejar un inicio reciente y podría pausar un directo recién empezado: probar con Twitch real.
+  - Actualizador: tras un fallo a mitad quedan archivos nuevos y viejos mezclados hasta el reintento; restaurar desde `.version-anterior` (hoy nadie la lee).
+  - Copias locales con credenciales en OneDrive: la carpeta por defecto puede ser `OneDrive/Documentos` y la copia lleva `secrets` y `tiktok.apiKey` (`respaldo.js:17,24,110`, LEEME dice "solo en tu PC"). Sin secretos, restaurar en otra PC obliga a reconectar: decide el dueño.
+  - El reloj se apaga con paneles de módulo abiertos (automensajes, código, hype, respaldos no abren `/events`; `server.js:1223`). Abrir `/events` choca con el límite de 6 conexiones anotado arriba.
+  - Multiplicador desde el chat sin tope: `!x1000 60` de un mod activa x1000 (panel de mods: tope x5, `commands.js:149`). ¿Tope también en el chat?
+  - Menor: un fallo en una suscripción EventSub no se reintenta (`twitch.js:283`); `/api/menu` en verde con cualquier POST a PayPal (`server.js:806`, el panel filtra con `panel.js:318`).
+  - Limpieza: POST EventSub 4 veces (`twitch.js`), `acumular` (`engine.js:163`, `server.js:78`), mínimo de contraseña 3 veces (`auth.js`, `server.js`), `'dueño (esta PC)'` entre módulos, `PERFILES[1515791]` copiado en `DEFAULTS` y tiempos duplicados en `hype.js`.
 - Encontrados el 2026-11-05 (deciden el dueño o cambian datos guardados):
   - **Reglas al aprobar (v2.17/2.18)**: "Es donación" aplica el multiplicador, el fin del reloj y el mes del podio del
     momento en que se toca, no de cuando llegó el pago (`server.js` `decidirDonacion` → `onContribution(p.ev)`,
@@ -132,6 +140,14 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
     `overlay.html:294` (hoy no explotable).
 
 ## Historial
+### 2026-11-08 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `server.js:97,101` un subatón terminado revivía al reiniciar → `ended` se guarda y restaura (los ya terminados antes de esto siguen igual hasta el próximo final).
+- `src/respaldo.js:62` la recuperación tomaba la copia de la última carpeta → la más nueva por nombre.
+- `src/actualizador.js:89` fallo a mitad dejaba `package.json` nuevo y no reintentaba → `package.json` al final. Falta restaurar desde `.version-anterior` (ver Pendientes).
+- `server.js` webhooks PayPal/MP respondían 200 antes de procesar → 500 si falla y el emisor reintenta (el IPN sigue con 200 inmediato). `src/mercadopago.js:78` un fallo de red al arrancar decía "token inválido" y no reintentaba → reintenta cada 60 s.
+- `src/http.js` `X-Frame-Options: SAMEORIGIN` (clickjacking; las vistas previas de `codigo-panel` son iframes propios).
+- Limpieza: `MONEY` = `DINERO`, `SOURCE_LABEL` = `LABELS`, miembros sin uso del motor y `store.defaults`, condiciones que no cambiaban nada.
+- Probado con scripts de node sin red y el reloj aislado (simulate con `ended`, encabezado y webhooks).
 ### 2026-11-05 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `server.js` `recibirDinero`: un pago ya contado (antes de activar "preguntar", p. ej. al actualizar a la 2.18) volvía
   en el sondeo tras reiniciar como "¿Es donación?"; aprobar no hacía nada y "No es donación" mentía → `engine.procesado`.
