@@ -108,7 +108,6 @@ const store = {
     fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
     fs.renameSync(tmp, FILE);
   },
-  defaults: DEFAULTS,
   file: FILE,
 };
 

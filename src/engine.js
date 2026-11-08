@@ -199,7 +199,7 @@ function createEngine({ store, timer, broadcast }) {
     return entry;
   }
 
-  return { contribute, procesado: (key) => processed.has(key), manualAdjust, logNote, multiplierFor, multiplierStatus, activeMultipliers, SOURCES, LABELS };
+  return { contribute, procesado: (key) => processed.has(key), manualAdjust, logNote, multiplierStatus };
 }
 
 module.exports = { createEngine, fmtDuration, LABELS, SOURCES };

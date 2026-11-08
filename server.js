@@ -181,7 +181,7 @@ const onContribution = (ev) => {
   if (entry && !entry.duplicate && !entry.test) respaldo.alAporte();
   // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas.
   // Sin el monto: patitos.html no lo usa y los mods sin permiso de "montos" también reciben este evento.
-  if (entry && !entry.duplicate && (entry.source === 'paypal' || entry.source === 'mercadopago')) {
+  if (entry && !entry.duplicate && DINERO.has(entry.source)) {
     const usd = podio.toUsd(entry.amount, entry.currency);
     broadcast('aporte', { id: entry.id, user: entry.user, ...podio.patitosAporte(entry.source, usd ?? 1, entry.test) });
   }
@@ -215,7 +215,7 @@ function recibirDinero(ev) {
   pendientes().push({ key, quien, ev, at: Date.now() });
   store.save();
   avisarPendientes();
-  console.log(`❓ Donación por confirmar: ${ev.user} · ${ev.amount} ${ev.currency || ''} (${ev.source === 'paypal' ? 'PayPal' : 'Mercado Pago'}). Toca "Es donación" o "No es donación" en el panel.`);
+  console.log(`❓ Donación por confirmar: ${ev.user} · ${ev.amount} ${ev.currency || ''} (${LABELS[ev.source]}). Toca "Es donación" o "No es donación" en el panel.`);
   return { pendiente: true };
 }
 function decidirDonacion({ key, esDonacion, siempre }) {
@@ -352,9 +352,8 @@ app.get('/events', (req, res) => {
   const transform = mode === 'mod' && !perms.money ? (type, p) => (type === 'log' ? redactLog(p) : type === 'added' ? redactAdded(p) : p) : null;
   live.attach(req, res, [['state', stateMsg()]], mode, transform);
 });
-const MONEY = new Set(['paypal', 'mercadopago']);
-const redactLog = (e) => (MONEY.has(e.source) ? { ...e, amount: null, currency: null, note: '', text: `${e.user || 'Alguien'} donó${e.via ? ` (vía ${e.via})` : ''}` } : e);
-const redactAdded = (a) => (MONEY.has(a.source) ? { ...a, text: `${a.user || 'Alguien'} donó` } : a);
+const redactLog = (e) => (DINERO.has(e.source) ? { ...e, amount: null, currency: null, note: '', text: `${e.user || 'Alguien'} donó${e.via ? ` (vía ${e.via})` : ''}` } : e);
+const redactAdded = (a) => (DINERO.has(a.source) ? { ...a, text: `${a.user || 'Alguien'} donó` } : a);
 // Quién hizo un cambio (para el historial y el log), cuando no es el dueño en esta PC
 const actor = (req) => (req.role === 'mod' ? `${req.user} (mod)` : req.user && req.user !== 'dueño (esta PC)' ? `${req.user} (remoto)` : null);
 
@@ -1096,11 +1095,11 @@ hooks.post('/webhooks/paypal', async (req, res) => {
     ppStatus.detail = result.error || result.ignored || 'Último webhook OK';
     logHook('PayPal', result);
     if (result.event) recibirDinero(result.event);
-    res.send('OK', 200, 'text/plain');
     sendConnections();
+    res.send('OK', 200, 'text/plain');
   } catch (err) {
-    res.send('Error', 500, 'text/plain'); // PayPal reintenta; el motor descarta duplicados por id
     console.error('[PayPal]', err.message);
+    res.send('Error', 500, 'text/plain'); // PayPal reintenta; el motor descarta duplicados por id
   }
 });
 
@@ -1122,11 +1121,11 @@ hooks.post('/webhooks/paypal-ipn', async (req, res) => {
 hooks.post('/webhooks/mercadopago', async (req, res) => {
   const body = raw(req);
   try {
-    res.send('OK', 200, 'text/plain');
     logHook('Mercado Pago', await mp.handleWebhook(req.query, req.headers, body));
+    res.send('OK', 200, 'text/plain');
   } catch (err) {
-    res.send('Error', 500, 'text/plain');
     console.error('[Mercado Pago]', err.message);
+    res.send('Error', 500, 'text/plain');
   }
 });
 

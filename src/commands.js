@@ -1,5 +1,5 @@
 // Comandos del chat de Twitch para controlar el reloj (solo tú, mods, supermods y la gente que elijas)
-const { fmtDuration } = require('./engine');
+const { fmtDuration, LABELS } = require('./engine');
 
 // "10" = 10 minutos · "1:30" = 1 min 30 s · "2:00:00" = 2 horas · también "30s", "10m", "2h", "1h30m"
 function parseDur(str) {
@@ -24,7 +24,6 @@ const SOURCE_WORDS = {
   bits: 'bits', bit: 'bits',
   subs: 'subs', sub: 'subs',
 };
-const SOURCE_LABEL = { paypal: 'PayPal', mercadopago: 'Mercado Pago', bits: 'Bits', subs: 'Subs' };
 
 function createCommands({ store, timer, engine, twitch, setManualMultiplier, podio }) {
   const d = () => store.data;
@@ -161,7 +160,7 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
     const appliesTo = { paypal: false, mercadopago: false, bits: false, subs: false };
     (picked.length ? picked : Object.keys(appliesTo)).forEach((k) => (appliesTo[k] = true));
     setManualMultiplier({ active: true, value, minutes, appliesTo });
-    const srcs = picked.length ? [...new Set(picked)].map((k) => SOURCE_LABEL[k]).join(', ') : 'todo';
+    const srcs = picked.length ? [...new Set(picked)].map((k) => LABELS[k]).join(', ') : 'todo';
     log(`activó x${value} en ${srcs}${minutes ? ` por ${fmtDuration(minutes * 60)}` : ''}`);
     return reply(`🔥 x${value} activado en ${srcs}${minutes ? ` por ${fmtDuration(minutes * 60)}` : ' hasta que se apague'}`);
   }

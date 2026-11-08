@@ -123,7 +123,7 @@ class StreamElementsClient {
 
   handleTip(t) {
     const status = String(t.status || 'success').toLowerCase();
-    if (status && !['success', 'completed', 'approved'].includes(status)) {
+    if (!['success', 'completed', 'approved'].includes(status)) {
       console.log(`[StreamElements] Donación con estado "${t.status}" ignorada`);
       return;
     }
