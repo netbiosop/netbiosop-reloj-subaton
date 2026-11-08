@@ -95,10 +95,11 @@ function sessionSummary() {
 // ---------- Reloj ----------
 const wasRunning = d.timer.running;
 const timer = new Timer(d.timer.remainingMs);
+timer.ended = !!d.timer.ended;
 const engine = createEngine({ store, timer, broadcast });
 
 function persistTimer() {
-  d.timer = { remainingMs: timer.remainingMs, running: timer.running };
+  d.timer = { remainingMs: timer.remainingMs, running: timer.running, ended: timer.ended };
   store.save();
 }
 const stream = { live: null, since: null }; // null = todavía no se sabe (Twitch sin conectar)
