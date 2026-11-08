@@ -58,8 +58,12 @@ function alInicio() {
     const existe = fs.existsSync(dest);
     if (existe && valido(dest)) continue;
     // buscar la copia más nueva que esté sana
-    let origen = null;
-    for (const base of carpetas()) for (const c of copias(base)) { const p = path.join(base, c, f); if (fs.existsSync(p) && valido(p)) { origen = p; break; } }
+    let origen = null, masNueva = '';
+    for (const base of carpetas()) for (const c of copias(base)) {
+      if (c <= masNueva) continue; // los nombres son sello(): ordenan por fecha
+      const p = path.join(base, c, f);
+      if (fs.existsSync(p) && valido(p)) { origen = p; masNueva = c; }
+    }
     if (!origen) continue;
     try {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -190,7 +194,7 @@ function setConfig(b = {}) {
   return info();
 }
 function pedirRestaurar(copia) {
-  if (!copias(carpetas()[0]).includes(copia) && !carpetas().some((b) => copias(b).includes(copia))) throw new Error('No encuentro esa copia');
+  if (!carpetas().some((b) => copias(b).includes(copia))) throw new Error('No encuentro esa copia');
   respaldar('antes de restaurar', true);
   fs.writeFileSync(path.join(DATA_DIR, 'restaurar.json'), JSON.stringify({ copia }));
 }
