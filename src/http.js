@@ -57,6 +57,7 @@ function createApp({ staticDir, guard } = {}) {
       res.writeHead(302, { Location: to });
       res.end();
     };
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // las vistas previas de codigo-panel son iframes propios
     if (guard && !guard(req, res)) return;
 
     for (const r of routes) {
