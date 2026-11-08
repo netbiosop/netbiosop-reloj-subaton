@@ -85,6 +85,8 @@ async function instalar(info, log = console.log) {
     if (fs.existsSync(actual)) { const b = path.join(ANTERIOR, f.path); fs.mkdirSync(path.dirname(b), { recursive: true }); fs.copyFileSync(actual, b); }
     cambiados.push(f.path);
   }
+  // package.json al final: si algo falla antes, el próximo arranque sigue viendo la versión vieja y reintenta
+  cambiados.sort((a, b) => (a === 'package.json') - (b === 'package.json'));
   // 3) reemplazar (los .bat que se están usando se cambian unos segundos después, al cerrarse esta ventana)
   for (const rel of cambiados) {
     if (LANZADORES.has(rel) && process.platform === 'win32') { lanzadoresPendientes.push(rel); continue; }
