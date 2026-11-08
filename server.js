@@ -1090,15 +1090,16 @@ hooks.get('/', (req, res) => res.send('Reloj de subatón: webhooks activos ✅')
 
 hooks.post('/webhooks/paypal', async (req, res) => {
   const body = raw(req);
-  res.send('OK', 200, 'text/plain');
   try {
     const result = await paypal.handleWebhook(d.secrets.paypal, req.headers, body);
     ppStatus.last = Date.now();
     ppStatus.detail = result.error || result.ignored || 'Último webhook OK';
     logHook('PayPal', result);
     if (result.event) recibirDinero(result.event);
+    res.send('OK', 200, 'text/plain');
     sendConnections();
   } catch (err) {
+    res.send('Error', 500, 'text/plain'); // PayPal reintenta; el motor descarta duplicados por id
     console.error('[PayPal]', err.message);
   }
 });
@@ -1120,10 +1121,11 @@ hooks.post('/webhooks/paypal-ipn', async (req, res) => {
 
 hooks.post('/webhooks/mercadopago', async (req, res) => {
   const body = raw(req);
-  res.send('OK', 200, 'text/plain');
   try {
+    res.send('OK', 200, 'text/plain');
     logHook('Mercado Pago', await mp.handleWebhook(req.query, req.headers, body));
   } catch (err) {
+    res.send('Error', 500, 'text/plain');
     console.error('[Mercado Pago]', err.message);
   }
 });

@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 
 const API = 'https://api.mercadopago.com';
+const START_RETRY_MS = 60 * 1000;
 
 // "Luis Villa" coincide con "LUIS MARÍA VILLA" (las palabras de la regla, en orden, empezando por el primer nombre);
 // una sola letra vale como inicial: "Luis V" coincide con "Luis Villa" y "Luis Valdez". "Luisa Villa" no coincide con "Luis Villa".
@@ -74,13 +75,16 @@ class MercadoPagoClient {
       }
       console.log(`[Mercado Pago] Conectado como ${this.nickname} (modo ${this.s.mode})`);
     } catch (err) {
-      this.setStatus('error', 'Token inválido: ' + err.message);
       console.error('[Mercado Pago]', err.message);
+      if (err.status >= 400 && err.status < 500 && err.status !== 429) return this.setStatus('error', 'Token inválido: ' + err.message);
+      this.setStatus('reconectando', 'Sin conexión con Mercado Pago, reintentando: ' + err.message);
+      this.retryTimer = setTimeout(() => this.start(), START_RETRY_MS);
     }
   }
 
   stop() {
     clearInterval(this.pollTimer);
+    clearTimeout(this.retryTimer);
   }
 
   async poll() {
