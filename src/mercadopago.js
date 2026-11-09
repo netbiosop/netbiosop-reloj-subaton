@@ -54,12 +54,14 @@ class MercadoPagoClient {
 
   async start() {
     this.stop();
+    const gen = this.gen;
     if (!this.s.accessToken) {
       this.setStatus('desconectado');
       return;
     }
     try {
       const me = await this.api('/users/me');
+      if (gen !== this.gen) return; // otro start() o un stop() mientras se esperaba: su sondeo quedaría sin referencia
       this.userId = me.id;
       this.nickname = me.nickname || '';
       if (!this.store.data.mpSince) {
@@ -75,6 +77,7 @@ class MercadoPagoClient {
       }
       console.log(`[Mercado Pago] Conectado como ${this.nickname} (modo ${this.s.mode})`);
     } catch (err) {
+      if (gen !== this.gen) return;
       console.error('[Mercado Pago]', err.message);
       if (err.status >= 400 && err.status < 500 && err.status !== 429) return this.setStatus('error', 'Token inválido: ' + err.message);
       this.setStatus('reconectando', 'Sin conexión con Mercado Pago, reintentando: ' + err.message);
@@ -83,6 +86,7 @@ class MercadoPagoClient {
   }
 
   stop() {
+    this.gen = (this.gen || 0) + 1;
     clearInterval(this.pollTimer);
     clearTimeout(this.retryTimer);
   }
