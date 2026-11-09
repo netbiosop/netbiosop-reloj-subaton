@@ -139,7 +139,22 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
     `_test` de `multichat.js` sin uso en el repo; `esc()` sin comilla simple en `automensajes-panel.html:138` y
     `overlay.html:294` (hoy no explotable).
 
+- Encontrados el 2026-11-09 (decide el dueño):
+  - Apagar "Hacer copias automáticas" no las apaga: `src/respaldo.js:102` deja pasar `forzar`, y lo usan `respaldo.js:158` (al abrir), `server.js:~288` (fin del stream) y `:~1190` (al cerrar). ¿La copia al cerrar debe respetar el interruptor? Cambia relojes instalados.
+  - Restaurar una copia revive mods y contraseñas revocadas (`respaldo.js:85` también restaura `secrets.panel`). Conservar el `secrets.panel` actual impide recuperar una contraseña olvidada.
+  - `/events?overlay=1` anónimo sin tope de conexiones con acceso remoto (`auth.js:222`, `http.js:132`). ¿Tope de ~100?
+  - Limpieza: ruta `POST /api/podio/vincular-mp` sin cliente en el repo (`server.js:904`); `ipnReady` sin lector (`server.js:323`, ver pendiente de IPN); backoff 2000/1000 y tope 60000 repetidos en `streamelements.js` y `twitch.js`.
+
 ## Historial
+### 2026-11-09 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `server.js:610` `currency` sin validar + `innerHTML` (`panel.js:257,770`, `mod.js:194`, `podio-panel.html:343`): un mod con "tarifas" ejecutaba JS como dueño → 3 letras o vacío, y `esc()` (lo ya guardado queda escapado).
+- `server.js:52` `abrirCarpeta` por shell: ruta elegida en el panel con `$(…)` ejecutaba comandos (Linux/Mac) → `execFile`.
+- `src/http.js:71` 40 MB sin autenticar en cualquier POST (webhooks, login) → solo `/api/hype/subir`.
+- `server.js` "No era donación" mostraba el monto a mods sin permiso → solo el nombre. `/api/reset` sin `newSession()`: overlay con el total anterior.
+- `src/store.js` y otros 5: JSON dañado sin copia se pisaba al primer guardado → `src/danado.js` (`.danado-<fecha>`, solo `SyntaxError`).
+- `src/mercadopago.js` dos `start()` dejaban un sondeo sin referencia → `gen`.
+- Limpieza: `renderTo`/`unlock`, `multiplier.sources`, `mpCurrency`, `MAX_PROCESADOS`, comentarios en catch.
+- Probado con reloj aislado (simulate, currency, reset, subir, webhook), `fetch` simulado y Chromium (menu, panel, podio-panel, overlay sin errores).
 ### 2026-11-08 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `server.js:97,101` un subatón terminado revivía al reiniciar → `ended` se guarda y restaura (los ya terminados antes de esto siguen igual hasta el próximo final).
 - `src/respaldo.js:62` la recuperación tomaba la copia de la última carpeta → la más nueva por nombre.
