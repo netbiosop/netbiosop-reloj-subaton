@@ -37,7 +37,7 @@ window.Multichat = (() => {
     fetch('/api/multichat').then((r) => r.json()).then((j) => { alInicio?.(j); alEstado?.(j.estado); alConfig?.(j.config); }).catch((e) => console.error('[Multichat] No se pudo leer /api/multichat:', e));
     const es = new EventSource('/events');
     es.onmessage = (ev) => {
-      let d; try { d = JSON.parse(ev.data); } catch { return; }
+      let d; try { d = JSON.parse(ev.data); } catch { return; /* trama que no es JSON: se ignora */ }
       if (d.type !== 'multichat') return;
       if (d.payload.mensaje) alMensaje?.(d.payload.mensaje);
       if (d.payload.estado) alEstado?.(d.payload.estado);

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const SOURCES = ['paypal', 'mercadopago', 'bits', 'subs'];
 const LABELS = { paypal: 'PayPal', mercadopago: 'Mercado Pago', bits: 'Bits', subs: 'Subs', manual: 'Manual' };
+const MAX_PROCESADOS = 3000;
 
 function fmtDuration(totalSeconds) {
   const s = Math.max(0, Math.round(Math.abs(totalSeconds)));
@@ -19,8 +20,8 @@ function createEngine({ store, timer, broadcast }) {
   function remember(key) {
     processed.add(key);
     d().processed.push(key);
-    if (d().processed.length > 3000) {
-      const removed = d().processed.splice(0, d().processed.length - 3000);
+    if (d().processed.length > MAX_PROCESADOS) {
+      const removed = d().processed.splice(0, d().processed.length - MAX_PROCESADOS);
       removed.forEach((k) => processed.delete(k));
     }
   }
@@ -60,7 +61,6 @@ function createEngine({ store, timer, broadcast }) {
     return {
       value: top,
       bySource,
-      sources,
       labels: sources.map((s) => LABELS[s]),
       until: top > 1 && !indefinite && ends.length ? Math.max(...ends) : null,
       since: top > 1 ? Math.min(...active.filter((a) => a.value === top && a.since).map((a) => a.since), Date.now()) : null,

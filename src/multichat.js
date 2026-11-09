@@ -114,14 +114,14 @@ async function conectarKick() {
   const ws = new WebSocket(KICK_WS);
   kick.ws = ws;
   ws.onmessage = (ev) => {
-    let j; try { j = JSON.parse(ev.data); } catch { return; }
+    let j; try { j = JSON.parse(ev.data); } catch { return; /* trama que no es JSON: se ignora */ }
     if (j.event === 'pusher:connection_established') {
       ws.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${id}.v2` } }));
       clearInterval(kick.ping); kick.ping = setInterval(() => { try { ws.send(JSON.stringify({ event: 'pusher:ping', data: {} })); } catch {} }, 60000);
     } else if (j.event === 'pusher:ping') ws.send(JSON.stringify({ event: 'pusher:pong', data: {} }));
     else if (j.event === 'pusher_internal:subscription_succeeded') { kick.intento = 0; setEstado('kick', 'conectado', slug); }
     else if (j.event === 'App\\Events\\ChatMessageEvent') {
-      let d; try { d = typeof j.data === 'string' ? JSON.parse(j.data) : j.data; } catch { return; }
+      let d; try { d = typeof j.data === 'string' ? JSON.parse(j.data) : j.data; } catch { return; /* trama que no es JSON: se ignora */ }
       const s = d.sender || {}, badges = (s.identity?.badges || []).map((b) => b.type);
       publicar({ id: d.id, plataforma: 'kick', autor: s.username || 'alguien', color: s.identity?.color || '', partes: partesKick(d.content), tipo: 'mensaje',
         rol: badges.includes('broadcaster') ? 'dueño' : badges.includes('moderator') ? 'mod' : badges.includes('vip') ? 'vip' : badges.includes('subscriber') ? 'sub' : '' });
@@ -248,7 +248,7 @@ function conectarTT() {
   tt.ws = ws;
   ws.onopen = () => { tt.intento = 0; setEstado('tiktok', 'conectado', '@' + u); };
   ws.onmessage = (ev) => {
-    let j; try { j = JSON.parse(ev.data); } catch { return; }
+    let j; try { j = JSON.parse(ev.data); } catch { return; /* trama que no es JSON: se ignora */ }
     for (const m of j.messages || [j]) mensajeTT(m);
   };
   ws.onclose = (ev) => {

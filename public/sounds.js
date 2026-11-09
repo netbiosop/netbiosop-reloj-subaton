@@ -110,13 +110,5 @@
     }
   }
 
-  // Dibuja un sonido en cualquier AudioContext (lo usa la vista previa)
-  function renderTo(c, event, opts = {}) {
-    const master = c.createGain();
-    master.gain.value = (opts.volume ?? 70) / 100;
-    master.connect(c.destination);
-    SYNTH[event](master, opts);
-  }
-
-  window.SubSounds = { play, renderTo, EVENTS, unlock: () => { try { ac(); } catch (e) { console.warn('[Sonidos] Audio no disponible:', e); } } };
+  window.SubSounds = { play, EVENTS };
 })();

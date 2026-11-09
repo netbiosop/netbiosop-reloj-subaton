@@ -429,7 +429,6 @@ function createPodio({ store }) {
       top: board(key, 10),
       events: data.events.filter((e) => monthKey(e.at) === key).slice().reverse(),
       currencies: currencies.map((c) => ({ code: c, auto: Number(data.rates.rates[c]) || null, manual: Number(data.config.manualRates[c]) || null })),
-      mpCurrency: mpCur,
       ratesAt: data.rates.fetchedAt,
       fullConfig: data.config,
       ajusteMes: data.config.ajustes[key] || { subs: 0, bits: 0, dinero: 0 },
