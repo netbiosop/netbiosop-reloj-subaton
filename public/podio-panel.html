@@ -340,7 +340,7 @@ function pintar(){
   const lista = D.events.filter(e=>!filtro || e.cat===filtro);
   $('eventos').innerHTML = lista.map(e=>{
     const neg = (e.amount ?? e.count) < 0;
-    let det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${e.currency}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
+    let det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${esc(e.currency)}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
               : e.cat==='bits' ? `${fmtNum(e.amount)} bits` : e.kind==='new' ? 'sub nueva (solo meta)' : e.kind==='resub' ? 'resub (solo meta)' : `${e.count} sub${Math.abs(e.count)>1?'s':''} regalada${Math.abs(e.count)>1?'s':''}`;
     if (neg) det = `<span class="neg">${det.replace(/^-/, '−')}</span>`;
     const h = new Date(e.at).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});

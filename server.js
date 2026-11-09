@@ -12,7 +12,7 @@ const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
-const { exec, spawn } = require('child_process');
+const { exec, execFile, spawn } = require('child_process');
 
 const store = require('./src/store');
 const { Timer } = require('./src/timer');
@@ -49,9 +49,9 @@ function intentar(que, fn) {
 }
 
 // Sin manejo de error: explorer.exe devuelve código 1 aunque haya abierto bien.
-const abrir = (win, otro) => exec(process.platform === 'win32' ? win : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} ${otro}`, () => {});
-const abrirCarpeta = (dir) => abrir(`explorer "${dir}"`, `"${dir}"`);
-const abrirNavegador = (url) => abrir(`start "" "${url}"`, `"${url}"`);
+const ABRIDOR = process.platform === 'darwin' ? 'open' : 'xdg-open';
+const abrirCarpeta = (dir) => execFile(process.platform === 'win32' ? 'explorer' : ABRIDOR, [dir], () => {}); // sin shell: la ruta la puede elegir el panel remoto
+const abrirNavegador = (url) => exec(process.platform === 'win32' ? `start "" "${url}"` : `${ABRIDOR} "${url}"`, () => {});
 
 // ---------- Tiempo real ----------
 const live = createLive();
@@ -607,7 +607,10 @@ app.post('/api/config', (req, res) => {
         proportional: !!r.proportional,
         minAmount: Math.max(0, num(r.minAmount, 0)),
       });
-      if (src !== 'bits' && typeof r.currency === 'string') d.rates[src].currency = r.currency.trim().toUpperCase();
+      if (src !== 'bits' && typeof r.currency === 'string') {
+        const moneda = r.currency.trim().toUpperCase();
+        if (/^([A-Z]{3})?$/.test(moneda)) d.rates[src].currency = moneda; // se inserta como HTML en los paneles; vacío = sin filtro de moneda
+      }
     }
     if (rates.subs) {
       const r = rates.subs;
@@ -782,6 +785,7 @@ app.post('/api/reset', (req, res) => {
   d.stats = {};
   d.multiplier.manual.active = false;
   d.mpSince = Date.now();
+  newSession();
   // una donación en espera del subatón anterior no puede sumar al nuevo; queda en el registro para cargarla a mano
   for (const p of pendientes()) console.log(`🗑 Donación sin confirmar descartada al reiniciar: ${p.ev.user} · ${p.ev.amount} ${p.ev.currency || ''} (${p.ev.source})`);
   d.pendientes = [];
@@ -887,7 +891,7 @@ app.post('/api/podio/no-es-donacion', (req, res) => {
     const log = ev.ref ? d.log.find((e) => e.id === ev.ref) : null;
     const secs = log && !log.anulado ? Number(log.seconds) || 0 : 0;
     const que = `${ev.user} · ${ev.amount} ${ev.currency}`;
-    if (secs > 0) engine.manualAdjust(-secs, `No era donación (${que}): se descuenta lo que sumó`);
+    if (secs > 0) engine.manualAdjust(-secs, `No era donación (${ev.user}): se descuenta lo que sumó`); // sin monto: los mods sin "montos" ven este registro
     if (log && !log.anulado) {
       log.anulado = true; log.note = 'No era donación: se quitó del reloj, el podio y las metas';
       const st = d.stats[log.source];

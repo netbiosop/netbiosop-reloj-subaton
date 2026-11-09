@@ -68,7 +68,7 @@ function createApp({ staticDir, guard } = {}) {
         req.params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
         if (req.method !== 'GET') {
           // archivos (ej. subir una canción): hasta 40 MB, sin convertir a texto
-          if ((req.headers['content-type'] || '').includes('application/octet-stream')) { req.rawBuffer = await readBody(req, 40 * 1024 * 1024, true); req.body = {}; await r.handler(req, res); return; }
+          if (req.path === '/api/hype/subir' && (req.headers['content-type'] || '').includes('application/octet-stream')) { req.rawBuffer = await readBody(req, 40 * 1024 * 1024, true); req.body = {}; await r.handler(req, res); return; }
           req.rawBody = await readBody(req);
           const isJson = (req.headers['content-type'] || '').includes('application/json');
           req.body = {};

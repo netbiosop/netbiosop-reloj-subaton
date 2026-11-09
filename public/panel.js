@@ -248,7 +248,7 @@ function renderExamples() {
   for (const src of ['paypal', 'mercadopago', 'bits']) {
     const r = rates[src];
     const ex = $(`.rate[data-src="${src}"] [data-ex]`);
-    const unit = src === 'bits' ? 'bits' : r.currency;
+    const unit = src === 'bits' ? 'bits' : esc(r.currency);
     const sample = r.amount * (src === 'bits' ? 10 : 5) || 0;
     const half = r.amount * 2.5;
     const calc = (a) => (a < r.minAmount ? 0 : (r.proportional ? a / r.amount : Math.floor(a / r.amount)) * r.seconds);
@@ -767,7 +767,7 @@ function renderStats() {
   const total = Object.values(st).reduce((a, s) => a + (s.seconds || 0), 0);
   const cells = SOURCES.map((s) => {
     const x = st[s] || { count: 0, amount: 0, seconds: 0 };
-    const main = s === 'subs' ? `${x.count} subs` : s === 'bits' ? `${x.amount} bits` : `${x.amount} ${data.rates[s].currency}`;
+    const main = s === 'subs' ? `${x.count} subs` : s === 'bits' ? `${x.amount} bits` : `${x.amount} ${esc(data.rates[s].currency)}`;
     return `<div class="stat"><div class="k">${LABELS[s]}</div><div class="v">${main}</div><div class="s">+${fmtDur(x.seconds)}</div></div>`;
   });
   cells.push(`<div class="stat"><div class="k">Total sumado</div><div class="v">${fmtDur(total)}</div><div class="s">sin contar pruebas</div></div>`);

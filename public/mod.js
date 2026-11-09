@@ -185,13 +185,14 @@ function renderLog() {
 }
 
 // ---------- tarifas (permiso "rates") ----------
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const RATE_SRC = [['paypal', 'PayPal'], ['mercadopago', 'Mercado Pago'], ['bits', 'Bits']];
 function renderRates() {
   if (!data.rates) return;
   const r = data.rates;
   const money = ([k, name]) => `<div class="rate" data-src="${k}">
       <div class="rate-head"><span class="tag ${k}">${name}</span><label class="switch"><input type="checkbox" data-f="enabled" ${r[k].enabled ? 'checked' : ''}><span></span></label></div>
-      <div class="rate-line">Por cada <input type="number" step="any" min="0" data-f="amount" value="${r[k].amount}"> ${k === 'bits' ? 'bits' : `<input class="cur" data-f="currency" maxlength="3" value="${r[k].currency || ''}">`} suma <input class="dur" data-f="seconds" data-dur value="${fmtDur(r[k].seconds)}"></div>
+      <div class="rate-line">Por cada <input type="number" step="any" min="0" data-f="amount" value="${r[k].amount}"> ${k === 'bits' ? 'bits' : `<input class="cur" data-f="currency" maxlength="3" value="${esc(r[k].currency || '')}">`} suma <input class="dur" data-f="seconds" data-dur value="${fmtDur(r[k].seconds)}"></div>
       <div class="rate-line small">Mínimo <input type="number" step="any" min="0" data-f="minAmount" value="${r[k].minAmount}"> <label class="check"><input type="checkbox" data-f="proportional" ${r[k].proportional ? 'checked' : ''}> Proporcional</label></div>
     </div>`;
   const s = r.subs;
