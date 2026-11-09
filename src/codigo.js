@@ -3,6 +3,7 @@
 // El servidor decide cuándo sale cada cosa (cada X minutos) y avisa a los overlays por /events.
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'codigo.json');
@@ -36,6 +37,7 @@ try {
   if (config.cinta.velocidad === 90) config.cinta.velocidad = 55;
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Código] No se pudo leer', FILE, '-', err.message);
+  apartarDanado(FILE, err);
 }
 
 function save() {

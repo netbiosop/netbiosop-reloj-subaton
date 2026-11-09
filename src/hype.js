@@ -2,6 +2,7 @@
 // Twitch avisa con 3 eventos (versión 2): begin (empieza), progress (suma puntos / sube de nivel) y end (termina).
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'hype.json');
@@ -45,6 +46,7 @@ try {
   estado = j.estado || null;
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Hype] No se pudo leer', FILE, '-', err.message);
+  apartarDanado(FILE, err);
 }
 // Si el programa estuvo cerrado y el tren ya venció, no se retoma
 if (estado && estado.fase !== 'fin' && estado.expira && estado.expira < Date.now() - 60000) estado = null;

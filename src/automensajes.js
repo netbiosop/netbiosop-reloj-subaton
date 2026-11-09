@@ -8,6 +8,7 @@
 //  • Se guarda en data/automensajes.json. Solo con el stream en vivo (opcional) y nunca durante el descanso.
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'automensajes.json');
@@ -56,6 +57,7 @@ try {
   config.mensajes = config.mensajes.map((m) => ({ como: '', autor: '', ...m }));
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Automensajes] No se pudo leer', FILE, '-', err.message);
+  apartarDanado(FILE, err);
 }
 delete config.on; delete config.activadoPor;
 config.version = 3;

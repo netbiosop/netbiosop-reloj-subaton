@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'podio.json');
@@ -76,6 +77,7 @@ function createPodio({ store }) {
   try { data = merge(DEFAULTS, JSON.parse(fs.readFileSync(FILE, 'utf8'))); }
   catch (err) {
     if (err.code !== 'ENOENT') console.error('[Podio] No se pudo leer', FILE, '-', err.message);
+    apartarDanado(FILE, err);
     data = merge(DEFAULTS, {});
   }
   let version = Date.now();

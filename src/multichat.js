@@ -7,6 +7,7 @@
 //   • TikTok: TikTok no tiene una forma oficial; se usa Euler Stream (pide una clave gratis en eulerstream.com).
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'multichat.json');
@@ -36,6 +37,7 @@ try {
   for (const p of PLATAFORMAS) config[p] = { ...DEFAULTS[p], ...(j[p] || {}) };
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Multichat] No se pudo leer', FILE, '-', err.message);
+  apartarDanado(FILE, err);
 }
 function save() {
   try {

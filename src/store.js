@@ -1,6 +1,7 @@
 // Guarda toda la configuración y el estado en data/subaton.json
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'subaton.json');
@@ -90,6 +91,7 @@ function load() {
     return merge(DEFAULTS, raw);
   } catch (err) {
     if (err.code !== 'ENOENT') console.error('[datos] No se pudo leer', FILE, '-', err.message);
+    apartarDanado(FILE, err);
     return merge(DEFAULTS, {});
   }
 }
