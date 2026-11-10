@@ -820,7 +820,7 @@ app.get('/api/menu', (req, res) => {
       { nombre: 'PayPal', estado: pp, detalle: c.streamelements.status === 'conectado' ? 'vía StreamElements' : c.paypal.last ? 'avisos directos' : 'sin conectar' },
       { nombre: 'Mercado Pago', estado: okStatus(c.mercadopago.status), detalle: c.mercadopago.status },
     ],
-    modulos: MODULOS.filter((m) => !m.oculto),
+    modulos: MODULOS,
     metas: p.metas,
     mes: p.mes,
     ultimos: d.log.filter((e) => e.source !== 'manual').slice(0, 8).map((e) => ({ at: e.at, source: e.source, text: e.text, seconds: e.seconds, test: !!e.test, note: e.note })),
@@ -1018,12 +1018,11 @@ app.post('/api/hype/subir', (req, res) => {
 app.post('/api/hype/config', podioRoute((req) => hype.setConfig(req.body)));
 app.post('/api/hype/probar', (req, res) => {
   try {
-    const before = hype.publicEstado().estado;
     const r = hype.probar(req.body.accion);
     const fase = r.estado.fase === 'inicio' ? 'begin' : r.estado.fase === 'fin' ? 'end' : 'progress';
     if (hype.getConfig().on) broadcast('hype', { ...r, prueba: true, config: hype.getConfig(), archivos: hypeArchivos(), cancionOk: hypeCancion().ok });
     console.log(`[Hype] Prueba: ${fase === 'begin' ? 'empieza el tren' : fase === 'end' ? 'termina el tren' : r.subio ? 'sube al nivel ' + r.estado.nivel : 'suma puntos'}`);
-    ok(res, { result: r, antes: !!before });
+    ok(res, { result: r });
   } catch (err) { res.json({ error: err.message }, 400); }
 });
 
@@ -1061,7 +1060,7 @@ app.post('/api/respaldo/restaurar', (req, res) => {
 const actualizador = require('./src/actualizador');
 { const m = actualizador.marca(); if (m && !m.visto) console.log(`✅ Reloj actualizado de la versión ${m.de} a la ${m.a}. Tus datos quedaron igual.`); }
 let ultimaBusqueda = null;
-app.get('/api/actualizar', (req, res) => res.json({ version: require('./package.json').version, repo: actualizador.REPO, auto: d.settings.actualizarAuto !== false, marca: actualizador.marca(), ultima: ultimaBusqueda, live: !!stream.live }));
+app.get('/api/actualizar', (req, res) => res.json({ version: require('./package.json').version, auto: d.settings.actualizarAuto !== false, marca: actualizador.marca(), ultima: ultimaBusqueda }));
 app.post('/api/actualizar/config', (req, res) => { if ('auto' in req.body) d.settings.actualizarAuto = !!req.body.auto; store.save(); ok(res, { auto: d.settings.actualizarAuto !== false }); });
 app.post('/api/actualizar/visto', (req, res) => { actualizador.marcarVisto(); ok(res); });
 app.post('/api/actualizar/buscar', async (req, res) => {
@@ -1079,7 +1078,6 @@ app.post('/api/actualizar/ahora', (req, res) => {
 });
 
 const server = http.createServer(app.handle);
-let hookServer;
 
 // ---------- Servidor de webhooks (el único que va al túnel) ----------
 const hooks = createApp();
@@ -1133,7 +1131,7 @@ hooks.post('/webhooks/mercadopago', async (req, res) => {
   }
 });
 
-hookServer = http.createServer(hooks.handle);
+const hookServer = http.createServer(hooks.handle);
 
 // ---------- Arranque ----------
 function openPanel() {
@@ -1163,8 +1161,8 @@ function prepararCierre() {
 function cerrarServidores(alCerrar) {
   server.close(alCerrar);
   server.closeAllConnections();
-  hookServer?.close();
-  hookServer?.closeAllConnections?.();
+  hookServer.close();
+  hookServer.closeAllConnections();
 }
 
 // Reinicia el programa (para aplicar el acceso remoto o restaurar una copia) sin abrir ventanas

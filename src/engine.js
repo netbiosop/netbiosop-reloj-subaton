@@ -6,7 +6,7 @@ const LABELS = { paypal: 'PayPal', mercadopago: 'Mercado Pago', bits: 'Bits', su
 const MAX_PROCESADOS = 3000;
 
 function fmtDuration(totalSeconds) {
-  const s = Math.max(0, Math.round(Math.abs(totalSeconds)));
+  const s = Math.round(Math.abs(totalSeconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;

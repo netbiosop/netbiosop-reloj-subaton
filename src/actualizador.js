@@ -135,4 +135,4 @@ function marcarVisto() {
   try { fs.writeFileSync(MARCA, JSON.stringify(m, null, 2)); } catch (e) { console.warn('[Actualizador] No se pudo marcar el aviso como visto:', e.message); }
 }
 
-module.exports = { REPO, buscar, alAbrir, marca, marcarVisto };
+module.exports = { buscar, alAbrir, marca, marcarVisto };

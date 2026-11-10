@@ -48,7 +48,6 @@
 <header>
   <h1>🚂 Tren del hype</h1>
   <span class="sp"></span>
-  <span class="nota" id="notaG" style="margin:0"></span>
   <a class="btn sm" href="/menu">🏠 Menú</a>
 </header>
 <main>
@@ -154,7 +153,7 @@ function pintarConfig(c){
   $('volumen').value = c.volumen; $('volTxt').textContent = c.volumen; $('posicion').value = c.posicion; $('titulo').value = c.titulo;
 }
 function pintarEstado(j){
-  const e = j.estado, ahora = Date.now() + ((j.ahora||Date.now()) - Date.now());
+  const e = j.estado, ahora = j.ahora || Date.now();
   if (!e) { $('estado').innerHTML = '<span class="nota">No hay ningún tren todavía.</span>'; return; }
   const activo = e.fase !== 'fin' && e.expira > ahora;
   $('estado').innerHTML = `<div><span class="nota">Estado</span><b>${activo ? '🟢 En marcha' : '🏁 Terminado'}</b></div>
