@@ -87,7 +87,10 @@ async function subir(motivo = 'automática') {
     return null;
   } finally {
     estado.subiendo = false;
-    if (otraVez) { pedir(otraVez); otraVez = null; }
+    // lo pedido durante la subida se vuelve a programar con ultimaSubida nueva (respeta el mínimo entre copias)
+    const motivoNuevo = otraVez || (pendiente && motivoPendiente);
+    otraVez = null;
+    if (motivoNuevo) { clearTimeout(pendiente); pendiente = null; pedir(motivoNuevo); }
   }
 }
 
