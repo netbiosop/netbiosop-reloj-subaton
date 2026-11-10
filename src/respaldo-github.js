@@ -24,7 +24,7 @@ try { conf = { ...conf, ...JSON.parse(fs.readFileSync(CONF, 'utf8')) }; } catch 
   if (e.code !== 'ENOENT') anotar('No se pudo leer respaldo-github.json (la copia en GitHub queda apagada): ' + e.message);
 }
 let estado = { ultima: null, error: '', subiendo: false };
-let ultimoContenido = '', ultimaSubida = 0, pendiente = null, otraVez = null;
+let ultimoContenido = '', ultimaSubida = 0, pendiente = null, motivoPendiente = '', otraVez = null;
 const configurado = () => !!(conf.repo && conf.token);
 
 async function gh(method, ruta, body) {
@@ -94,9 +94,10 @@ async function subir(motivo = 'automática') {
 // Pedido de copia: se junta con otros y sale como mucho una cada 5 minutos (subir() no rechaza: anota sus errores)
 function pedir(motivo) {
   if (!configurado()) return;
-  clearTimeout(pendiente);
+  motivoPendiente = motivo;
+  if (pendiente) return; // no se pospone: en una racha de aportes la copia igual sale
   const espera = Math.max(10000, ultimaSubida + MIN_ENTRE_COPIAS - Date.now());
-  pendiente = setTimeout(() => subir(motivo), espera);
+  pendiente = setTimeout(() => { pendiente = null; subir(motivoPendiente); }, espera);
 }
 
 function info() {

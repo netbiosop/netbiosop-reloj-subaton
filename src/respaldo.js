@@ -158,11 +158,13 @@ function iniciar(guardar) {
   setTimeout(() => respaldar('al abrir', true), 15000);
 }
 // cada donación, sub o bits: espera unos segundos por si llegan más juntos y hace una sola copia
+// (la espera no se reinicia: en una racha de aportes igual sale una copia cada ESPERA_SEG)
 function alAporte() {
   if (!conf.on) { guardarAntes(); respaldoGithub.pedir('aporte nuevo'); return; }
   aportesJuntos++;
-  clearTimeout(timerAporte);
+  if (timerAporte) return;
   timerAporte = setTimeout(() => {
+    timerAporte = null;
     const n = aportesJuntos; aportesJuntos = 0;
     respaldar(n > 1 ? `${n} aportes nuevos` : 'aporte nuevo', true);
   }, ESPERA_SEG * 1000);
