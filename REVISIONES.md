@@ -145,7 +145,38 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   - `/events?overlay=1` anónimo sin tope de conexiones con acceso remoto (`auth.js:222`, `http.js:132`). ¿Tope de ~100?
   - Limpieza: ruta `POST /api/podio/vincular-mp` sin cliente en el repo (`server.js:904`); `ipnReady` sin lector (`server.js:323`, ver pendiente de IPN); backoff 2000/1000 y tope 60000 repetidos en `streamelements.js` y `twitch.js`.
 
+- Encontrados el 2026-11-10 (deciden el dueño o necesitan Windows):
+  - **`iniciar.js:34-53,68-75` puede cerrar otro programa**: `killStale` mata el PID de `data/reloj.pid` si existe y el
+    puerto está ocupado, sin comprobar que sea el reloj (PID reutilizado tras un corte de luz); `probe()` toma cualquier
+    respuesta no 2xx como "reloj viejo" y le manda `POST /api/shutdown`. Probado en Linux (`sleep` cualquiera + otro
+    servidor en el 3000 → muerto). Propuesta: `probe()` exige `app: 'reloj-subaton'`; `killStale` comprueba la imagen
+    (`tasklist /FI "PID eq N"` = node.exe). Sin Windows para probar.
+  - `src/actualizador.js:98-101` copia de `.bat` con `spawn('cmd.exe', ['/c', '… copy /y "a" "b"'])` sin
+    `windowsVerbatimArguments: true`: Node escapa las comillas como `\"` y `copy` recibe rutas inválidas; falla en silencio
+    (`>nul`) la primera vez que cambie un lanzador. Agregar la opción y probar en Windows antes de subir versión.
+  - Mercado Pago (`mercadopago.js:180-182`): la primera `@palabra` del motivo se toma como donante y se recuerda en
+    `mpNombres`: "Fuerza @micanal" deja al propio canal como Top donador. ¿Ignorar `secrets.twitch.login` / no recordarlo solo?
+  - "Horas diarias una vez por día" (`server.js:298-311`) anota el día en que termina el stream: un stream de 21:00 a 00:30
+    bloquea el del día siguiente. ¿Usar el día de inicio?
+  - Podio (`podio.js:281-301`): "Anónimo", "Donación PayPal" y "Donación Mercado Pago" se suman como una sola persona y
+    pueden salir #1. ¿Agrupar por evento o dejarlos fuera del podio?
+  - Copias locales: desde 2026-11-10 una racha hace una copia cada 5 s; `limpiar` guarda 100 + una por día anterior, así
+    que un tren de ~8 min borra las de hoy anteriores (incluida "al abrir"). ¿Conservar también la más vieja de hoy?
+  - Menores: `hype.html:475` el overlay en OBS de otra PC recibe 401 al guardar la medición; `vincularMP` lee "1500.50"
+    como 150050; `btnDailyNow` (`panel.js:222`) cancela un guardado de tarifas pendiente.
+  - Limpieza: campos de la canción 4 veces en `hype-panel.html:153,206,207,237`; `commands.js:90` (`!podio` nunca),
+    `:160` (repite `SOURCES`), `:70-72` (`permission(e)` dos veces, 15000); `esc()` en 13 archivos con 4 variantes y
+    `nota()` 5 veces (sumar a `public/comun.js`).
+
 ## Historial
+### 2026-11-10 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `src/respaldo.js:161` y `src/respaldo-github.js:95`: cada aporte reiniciaba la espera; en un tren del hype no salía
+  ninguna copia hasta que paraban (11 aportes cada 2 s → 0 copias) → la espera no se reinicia (ahora 3 copias). Lo pedido
+  durante una subida a GitHub se reprograma al terminar para respetar el mínimo de 5 min.
+- Limpieza: `antes` de `/api/hype/probar`, `repo`/`live` de `/api/actualizar` y export `REPO`, filtro `oculto` de
+  módulos, `hookServer` con `?.`, `#notaG` y `ahora` en `hype-panel.html`, `Math.max` en `fmtDuration`.
+- Probado con el reloj aislado (probar, actualizar, menú, apagado), Chromium sin errores de JS y scripts con `fetch`
+  simulado. Revisión del propio cambio: el mínimo entre subidas (arriba). Pendientes nuevos arriba.
 ### 2026-11-09 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `server.js:610` `currency` sin validar + `innerHTML` (`panel.js:257,770`, `mod.js:194`, `podio-panel.html:343`): un mod con "tarifas" ejecutaba JS como dueño → 3 letras o vacío, y `esc()` (lo ya guardado queda escapado).
 - `server.js:52` `abrirCarpeta` por shell: ruta elegida en el panel con `$(…)` ejecutaba comandos (Linux/Mac) → `execFile`.
