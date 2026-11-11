@@ -105,7 +105,7 @@ function persistTimer() {
 const stream = { live: null, since: null }; // null = todavía no se sabe (Twitch sin conectar)
 // Lo que necesita el overlay (sin montos de dinero: el overlay es público)
 function recentForOverlay() {
-  return d.log.filter((e) => e.source !== 'manual' && e.seconds > 0).slice(0, 3).map((e) => ({ user: e.user || 'Alguien', seconds: e.seconds, source: e.source }));
+  return d.log.filter((e) => e.source !== 'manual' && e.seconds > 0 && !e.anulado).slice(0, 3).map((e) => ({ user: e.user || 'Alguien', seconds: e.seconds, source: e.source }));
 }
 const addedThisStream = () => Object.values(session?.bySource || {}).reduce((a, s) => a + (s.seconds || 0), 0);
 // ---------- Sonidos ----------
