@@ -10,7 +10,8 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
 - Los relojes instalados se actualizan solos desde `main` cuando sube `version` en `package.json`. Las correcciones
   NO suben la versión: lo hace el dueño cuando quiere publicar.
 - Nunca arrancar `server.js` o `iniciar.js` para probar sin `UPDATE_API=http://127.0.0.1:9`, `NO_OPEN=1` y
-  `DATA_DIR`, `LOG_DIR`, `BACKUP_DIR` y `HOME` en una carpeta temporal.
+  `DATA_DIR`, `LOG_DIR`, `BACKUP_DIR` y `HOME` en una carpeta temporal. Ojo: `respaldo-config.json` y `respaldo-github.json` se escriben en la raíz
+  del programa (no en `DATA_DIR`): borrarlos después de probar (están en `.gitignore`).
 - `console.*` es el registro de la app (`src/logger.js` lo escribe en `logs/`): no es "print de depuración".
 - Parámetros `req` sin usar en rutas `(req, res) =>` son la firma normal, no código muerto.
 - Emojis en los mensajes del registro (🔴, ⏸, 💾…) son indicadores de estado que el dueño usa: se dejan.
@@ -168,7 +169,33 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
     `:160` (repite `SOURCES`), `:70-72` (`permission(e)` dos veces, 15000); `esc()` en 13 archivos con 4 variantes y
     `nota()` 5 veces (sumar a `public/comun.js`).
 
+- Encontrados el 2026-11-11 (decide el dueño):
+  - "⚫ Simular fin de stream" (`server.js:773` → `onStream(false)`) suma las horas diarias de verdad, anota `ultimoDia` (el fin
+    real de ese día ya no suma) y, en vivo con Twitch, deja `stream.live=false`: el `stream.offline` real se ignora y el reloj se
+    apaga al cerrar el panel. ¿Un modo prueba que no sume horas ni toque `stream.live`?
+  - `!fijar` (`commands.js:111`) se salta "Máximo por comando" y el tiempo máximo (`!fijar 999:00:00` de un mod → 999 h).
+    ¿Respetar topes o solo dueño/lista?
+  - `session` solo en memoria (`server.js:68`): un reinicio en pleno stream (acceso remoto, restaurar, actualizar) deja en 0 "La
+    comunidad sumó" y el resumen. Guardarla cambia los datos guardados.
+  - "La comunidad sumó" (`addedThisStream`, `server.js:110`) sigue contando una donación anulada (el recorte de recientes ya se
+    corrigió); descontarla de `session.bySource` solo si es de esta sesión.
+  - `hypeCancion()` (`server.js:983`) guarda `hype.json` y escribe el registro en cada `GET /api/hype` (ruta abierta del overlay).
+    Reconocer la canción al elegirla no reconocería un archivo copiado a mano.
+  - Limpieza: `message` de los bits sin lector (`twitch.js:344,348`); tope 2000/1000 de `seen`/`vistos` repetido.
+
 ## Historial
+### 2026-11-11 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `server.js:/api/reset`: con tiempo inicial 0 tras terminar, `timer.set()` guardaba `ended:true` y `timer.ended = false` solo
+  cambiaba la memoria → al reabrir, "Terminado" y sin sumar donaciones → se limpia antes de `set()`.
+- `src/respaldo.js:123`, `server.js:1034`: "Guardar copia ahora" decía "✔ Copia guardada" sin haber escrito ninguna (carpeta
+  imposible) → `respaldar()` devuelve `null` y la ruta responde con error.
+- `server.js:108`: el overlay seguía mostrando una donación marcada "No era donación" → filtro `!e.anulado`.
+- `public/podio-panel.html:289,293`: monedas sin escapar en `innerHTML`; `podio.addManual` aceptaba cualquier texto → `esc()` y
+  3 letras.
+- Limpieza: `DEFAULTS` copiado solo en el primer nivel (`hype.js`, `codigo.js`; `setConfig` modificaba los de fábrica);
+  `podio.version` sin uso; `vistos` de Mercado Pago sin tope (como `twitch.js`).
+- Revisión del propio cambio: clon de más en `codigo.js`.
+- Probado con el reloj aislado (antes/después: reset, copia imposible, moneda) y `node --check`. Pendientes nuevos arriba.
 ### 2026-11-10 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `src/respaldo.js:161` y `src/respaldo-github.js:95`: cada aporte reiniciaba la espera; en un tren del hype no salía
   ninguna copia hasta que paraban (11 aportes cada 2 s → 0 copias) → la espera no se reinicia (ahora 3 copias). Lo pedido
