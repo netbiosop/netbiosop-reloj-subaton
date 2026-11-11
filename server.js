@@ -779,8 +779,8 @@ app.post('/api/simulate-stream', (req, res) => {
 // Reiniciar todo el subatón
 app.post('/api/reset', (req, res) => {
   timer.pause();
+  timer.ended = false; // antes de set(): su evento "change" guarda ended en disco
   timer.set(d.settings.initialSeconds * 1000);
-  timer.ended = false;
   d.log = [];
   d.stats = {};
   d.multiplier.manual.active = false;
