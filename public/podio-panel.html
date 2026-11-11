@@ -286,12 +286,12 @@ function pintar(){
   // Monedas
   const curs = ['USD', ...D.currencies.map(c=>c.code)];
   const sel = $('addCur').value;
-  $('addCur').innerHTML = curs.map(c=>`<option ${c===(sel||'USD')?'selected':''}>${c}</option>`).join('');
+  $('addCur').innerHTML = curs.map(c=>`<option ${c===(sel||'USD')?'selected':''}>${esc(c)}</option>`).join('');
   const enfocado = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.rate;
   if(!enfocado){
     $('tasas').innerHTML = `<div class="tasa"><span>Moneda</span><span>Automática</span><span>Mi tasa (1 USD =)</span></div>` +
-      D.currencies.map(c=>`<div class="tasa"><b>${c.code}</b><span>${c.auto?'1 USD = '+fmtNum(c.auto)+' '+c.code:'sin datos'}</span>
-        <input type="number" min="0" step="any" data-rate="${c.code}" value="${c.manual||''}" placeholder="automática"></div>`).join('');
+      D.currencies.map(c=>`<div class="tasa"><b>${esc(c.code)}</b><span>${c.auto?'1 USD = '+fmtNum(c.auto)+' '+esc(c.code):'sin datos'}</span>
+        <input type="number" min="0" step="any" data-rate="${esc(c.code)}" value="${c.manual||''}" placeholder="automática"></div>`).join('');
   }
   $('ratesNota').textContent = D.ratesAt ? 'Cotización automática del '+new Date(D.ratesAt).toLocaleString('es') : 'Sin cotización automática todavía (¿sin internet?).';
 

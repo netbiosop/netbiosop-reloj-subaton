@@ -195,7 +195,8 @@ function createPodio({ store }) {
       const a = Number(amount);
       if (!a || !Number.isFinite(a)) throw new Error('Monto inválido');
       ev.amount = a;
-      ev.currency = String(currency || 'USD').toUpperCase();
+      ev.currency = String(currency || 'USD').trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(ev.currency)) throw new Error('Moneda inválida (3 letras, p. ej. USD)');
       ev.usd = toUsd(a, ev.currency);
       if (ev.usd == null) throw new Error(`No hay cotización para ${ev.currency}: pon tu tasa en el panel`);
     } else if (cat === 'bits') {
