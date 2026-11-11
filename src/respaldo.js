@@ -120,7 +120,8 @@ function respaldar(motivo = 'automática', forzar = false) {
       hechas.push(base);
     } catch (e) { console.error(`[Respaldo] No se pudo copiar en ${base}:`, e.message); }
   }
-  if (hechas.length) { ultimaHuella = h; ultima = { at: Date.now(), nombre, motivo, carpetas: hechas }; console.log(`💾 Copia de seguridad (${motivo})`); }
+  if (!hechas.length) return null;
+  ultimaHuella = h; ultima = { at: Date.now(), nombre, motivo, carpetas: hechas }; console.log(`💾 Copia de seguridad (${motivo})`);
   return ultima;
 }
 // los registros de cada stream: se copian los nuevos o los que crecieron

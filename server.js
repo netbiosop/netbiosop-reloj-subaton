@@ -1031,7 +1031,10 @@ if (RECUPERADOS.length) console.warn('💾 Se recuperaron de la copia de segurid
 respaldo.iniciar(guardarTodo);
 app.get('/api/respaldo', (req, res) => res.json(respaldo.info()));
 app.post('/api/respaldo/config', podioRoute((req) => respaldo.setConfig(req.body)));
-app.post('/api/respaldo/ahora', podioRoute(() => respaldo.respaldar('a mano', true) && respaldo.info()));
+app.post('/api/respaldo/ahora', podioRoute(() => {
+  if (!respaldo.respaldar('a mano', true)) throw new Error('No se pudo guardar la copia en ninguna carpeta (mira el registro)');
+  return respaldo.info();
+}));
 app.post('/api/respaldo/abrir', (req, res) => {
   const dir = respaldo.carpetas()[0];
   intentar('Respaldo', () => fs.mkdirSync(dir, { recursive: true }));
