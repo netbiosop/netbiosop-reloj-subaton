@@ -152,6 +152,7 @@ class MercadoPagoClient {
     if (!(amount > 0)) return;
     if ((this.vistos ||= new Set()).has(String(p.id))) return;
     this.vistos.add(String(p.id));
+    if (this.vistos.size > 2000) this.vistos = new Set([...this.vistos].slice(-1000)); // igual que twitch.js: el reloj puede quedar abierto semanas
     // la búsqueda de pagos a veces viene sin el nombre o sin quién lo cobró: se pide el pago completo
     const cobrador = (x) => x.collector_id ?? x.collector?.id;
     let nombre = this.nombreDe(p);

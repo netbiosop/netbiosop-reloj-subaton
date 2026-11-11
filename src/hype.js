@@ -38,7 +38,7 @@ const PERFILES = {
   1515791: { bpm: 128, golpe: 0.125, entrada: 2.0, barra: 9.5, loopDesde: 17.0, loopHasta: 47.0, drop: [32.0], finDesde: 47.0 },
   2943958: { bpm: 128, golpe: 0.02, entrada: 1.9, barra: 7.52, loopDesde: 61.88, loopHasta: 90.005, drop: [15.02, 61.88], finDesde: 106.86 },
 };
-let config = { ...DEFAULTS };
+let config = structuredClone(DEFAULTS); // setConfig cambia config.cancion en su lugar
 let estado = null;   // tren activo (o el último que terminó, con fase 'fin')
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));

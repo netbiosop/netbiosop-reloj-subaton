@@ -29,7 +29,8 @@ const num = (v, min, max, def) => { const n = Number(v); return Number.isFinite(
 let config = clone(DEFAULTS);
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  config = { ...clone(DEFAULTS), ...j, tarjeta: { ...DEFAULTS.tarjeta, ...j.tarjeta }, cinta: { ...DEFAULTS.cinta, ...j.cinta } };
+  const base = clone(DEFAULTS);
+  config = { ...base, ...j, tarjeta: { ...base.tarjeta, ...j.tarjeta }, cinta: { ...base.cinta, ...j.cinta } };
   if (!Array.isArray(config.plataformas)) config.plataformas = clone(DEFAULTS.plataformas);
   if (!Array.isArray(config.cinta.mensajes)) config.cinta.mensajes = [];
   // valores viejos de fábrica → estilo noticiero y más lento
