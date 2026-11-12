@@ -895,7 +895,7 @@ app.post('/api/podio/no-es-donacion', (req, res) => {
     if (log && !log.anulado) {
       log.anulado = true; log.note = 'No era donación: se quitó del reloj, el podio y las metas';
       const st = d.stats[log.source];
-      if (st && !log.test) { st.count = Math.max(0, st.count - 1); st.amount = Math.round((st.amount - (Number(log.amount) || 0)) * 100) / 100; st.seconds = Math.max(0, st.seconds - secs); }
+      if (st && !log.test) { st.count = Math.max(0, st.count - 1); if (!otraMoneda(d.rates[log.source], log)) st.amount = Math.round((st.amount - (Number(log.amount) || 0)) * 100) / 100; st.seconds = Math.max(0, st.seconds - secs); }
     }
     podio.removeEvent(ev.id);
     const clave = ev.pk || log?.payer;

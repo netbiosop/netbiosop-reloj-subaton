@@ -40,8 +40,12 @@ const logger = {
   // Nunca lanza: si falla, el apagado y el reinicio de server.js quedaban a medias con el puerto ocupado
   _append(text) {
     try {
-      fs.mkdirSync(LOG_DIR, { recursive: true });
-      fs.appendFileSync(this.file, text);
+      try { fs.appendFileSync(this.file, text); }
+      catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+        fs.mkdirSync(LOG_DIR, { recursive: true }); // carpeta borrada con el reloj abierto
+        fs.appendFileSync(this.file, text);
+      }
     } catch (err) {
       // No se puede anotar en el archivo: al menos que quede en la consola original
       this._orig.error?.('[Log] No se pudo escribir en', this.file, '-', err.message);

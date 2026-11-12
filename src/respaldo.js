@@ -91,6 +91,8 @@ function alInicio() {
 
 // ---------- Hacer una copia ----------
 let ultimaHuella = '', ultima = null;
+// Una copia no cambia después de hecha: sin esto el panel (cada 15 s) parseaba hasta 80 podio.json y frenaba el servidor
+const resumenes = new Map();
 function huella() {
   return ARCHIVOS.map((f) => { const s = stat(path.join(DATA_DIR, f)); return s ? f + s.size + ':' + s.mtimeMs : f + '-'; }).join('|');
 }
@@ -143,7 +145,7 @@ function limpiar(base) {
     let queda = i < RECIENTES;
     if (!queda && !dias.has(dia) && fecha >= limite) queda = true;
     dias.add(dia);
-    if (!queda) try { fs.rmSync(path.join(base, n), { recursive: true, force: true }); } catch (e) { console.warn(`[Respaldo] No se pudo borrar la copia vieja ${n}:`, e.message); }
+    if (!queda) try { fs.rmSync(path.join(base, n), { recursive: true, force: true }); resumenes.delete(path.join(base, n)); } catch (e) { console.warn(`[Respaldo] No se pudo borrar la copia vieja ${n}:`, e.message); }
   });
 }
 
@@ -169,14 +171,12 @@ function alAporte() {
   }, ESPERA_SEG * 1000);
 }
 
-// Una copia no cambia después de hecha: sin esto el panel (cada 15 s) parseaba hasta 80 podio.json y frenaba el servidor
-const resumenes = new Map();
 function resumenCopia(dir) {
-  if (!resumenes.has(dir)) {
-    const p = leeJSON(path.join(dir, 'podio.json'));
-    resumenes.set(dir, p && Array.isArray(p.events) ? p.events.length + ' aportes en el podio' : '');
-  }
-  return resumenes.get(dir);
+  if (resumenes.has(dir)) return resumenes.get(dir);
+  const p = leeJSON(path.join(dir, 'podio.json'));
+  const resumen = p && Array.isArray(p.events) ? p.events.length + ' aportes en el podio' : '';
+  if (p) resumenes.set(dir, resumen); // una lectura fallida (OneDrive, antivirus) se reintenta la próxima vez
+  return resumen;
 }
 
 function info() {
