@@ -13,6 +13,10 @@ function fmtDuration(totalSeconds) {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+// Una donación en otra moneda no suma tiempo ni monto: sumar 5000 JPY a dólares falseaba las estadísticas
+const otraMoneda = (rate, ev) => ev.source !== 'bits' && !!rate?.currency && !!ev.currency
+  && rate.currency.toUpperCase() !== String(ev.currency).toUpperCase();
+
 function createEngine({ store, timer, broadcast }) {
   const d = () => store.data;
   const processed = new Set(d().processed);
@@ -82,7 +86,7 @@ function createEngine({ store, timer, broadcast }) {
     const amount = Number(ev.amount) || 0;
     const block = Number(r.amount) || 0;
     if (block <= 0) return { secs: 0, note: 'Tarifa sin monto configurado' };
-    if (ev.source !== 'bits' && r.currency && ev.currency && r.currency.toUpperCase() !== String(ev.currency).toUpperCase()) {
+    if (otraMoneda(r, ev)) {
       return { secs: 0, note: `Moneda ${ev.currency} distinta de ${r.currency} (no se sumó)` };
     }
     if (amount < (Number(r.minAmount) || 0)) return { secs: 0, note: 'Por debajo del mínimo' };
@@ -161,7 +165,7 @@ function createEngine({ store, timer, broadcast }) {
     if (!entry.test) {
       const st = (d().stats[ev.source] ||= { count: 0, amount: 0, seconds: 0 });
       st.count += ev.source === 'subs' ? ev.count || 1 : 1;
-      if (ev.source !== 'subs') st.amount = Math.round((st.amount + (Number(ev.amount) || 0)) * 100) / 100;
+      if (ev.source !== 'subs' && !otraMoneda(d().rates[ev.source], ev)) st.amount = Math.round((st.amount + (Number(ev.amount) || 0)) * 100) / 100;
       st.seconds += entry.seconds;
     }
 
@@ -202,4 +206,4 @@ function createEngine({ store, timer, broadcast }) {
   return { contribute, procesado: (key) => processed.has(key), manualAdjust, logNote, multiplierStatus };
 }
 
-module.exports = { createEngine, fmtDuration, LABELS, SOURCES };
+module.exports = { createEngine, fmtDuration, LABELS, SOURCES, otraMoneda };

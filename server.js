@@ -16,7 +16,7 @@ const { exec, execFile, spawn } = require('child_process');
 
 const store = require('./src/store');
 const { Timer } = require('./src/timer');
-const { createEngine, SOURCES, fmtDuration, LABELS } = require('./src/engine');
+const { createEngine, SOURCES, fmtDuration, LABELS, otraMoneda } = require('./src/engine');
 const { TwitchClient } = require('./src/twitch');
 const { MercadoPagoClient } = require('./src/mercadopago');
 const { StreamElementsClient } = require('./src/streamelements');
@@ -76,7 +76,7 @@ function trackSession(e) {
   else {
     const s = (session.bySource[e.source] ||= { count: 0, amount: 0, seconds: 0 });
     s.count += e.source === 'subs' ? e.count || 1 : 1;
-    if (e.source !== 'subs') s.amount = Math.round((s.amount + (Number(e.amount) || 0)) * 100) / 100;
+    if (e.source !== 'subs' && !otraMoneda(d.rates[e.source], e)) s.amount = Math.round((s.amount + (Number(e.amount) || 0)) * 100) / 100;
     s.seconds += e.seconds || 0;
   }
 }
