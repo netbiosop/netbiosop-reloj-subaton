@@ -39,6 +39,9 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   anota en el registro.
 - Mercado Pago: si falla pedir el pago completo y falta el cobrador, se reintenta en el próximo sondeo solo si el fallo
   es pasajero (red, 429, 5xx).
+- Moneda: `otraMoneda(rate, ev)` (`engine.js`) decide si una donación está en otra moneda que la tarifa; esas no suman
+  tiempo ni monto en `stats`/resumen del stream (sí entran al podio, que convierte a USD). Usarla en todo lo que sume o
+  reste montos (`engine.js`, `trackSession` y "No era donación" en `server.js`).
 
 ## Pendientes
 - `public/eventos.js` común para el `EventSource` de los cinco overlays (hoy repetido).
@@ -183,7 +186,30 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
     Reconocer la canción al elegirla no reconocería un archivo copiado a mano.
   - Limpieza: `message` de los bits sin lector (`twitch.js:344,348`); tope 2000/1000 de `seen`/`vistos` repetido.
 
+- **Seguridad (urgente, decide el dueño):** el repo es público y este archivo describe con detalle fallos aún sin
+  corregir (IPN de PayPal sin email receptor, `cf-connecting-ip` inventado en el login remoto, token de GitHub). Pasarlos a
+  un aviso privado (GitHub Security Advisory) o corregirlos antes; si este archivo llega a `main`, el actualizador también
+  lo baja a cada reloj (`protegido()` no excluye `.md`).
+- `src/streamelements.js:136`: un tip sin `_id`/`transactionId`/`id` queda como `se:undefined` y bloquearía como duplicados
+  los siguientes sin id (no confirmado que Astro los mande así).
+- Duplicación menor: cuatro formateadores de fecha local (`logger.stamp`, `respaldo.sello`, `server.hoyLocal`,
+  `podio.monthKey`); juntarlos con el pendiente de `src/datos.js` sin cambiar el formato de `sello`.
+- Al mover `shutdown`/`restart` a `src/ciclo.js`: programar el `process.exit` de seguridad antes de cualquier otro paso.
+
 ## Historial
+### 2026-11-12 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `src/logger.js:37,57`: `open()`/`close()` sin try; sin la carpeta `logs`, `logger.close()` lanzaba en `shutdown()`/`restart()`
+  y el reloj quedaba vivo con el puerto ocupado → `_append()` recrea la carpeta ante ENOENT y nunca lanza.
+- `src/multichat.js:146`: "https://youtube.com/@Canal?si=…" (Compartir de la app) pedía `.../@Canal?si=…/live` y nunca
+  conectaba → se corta en `?`/`#`.
+- `src/engine.js:164`, `server.js:79,898`: una donación en otra moneda sumaba al monto de las estadísticas ("5010 USD") →
+  `otraMoneda()` (ver Decisiones); "No era donación" ya no resta lo que no se sumó.
+- `src/respaldo.js:178`: `/api/respaldo` (cada 15 s con el panel abierto) parseaba hasta 80 `podio.json` (~1 s con 20.000
+  eventos) → resumen en caché por carpeta (se olvida al borrar o reescribir la copia; una lectura fallida no se guarda).
+  `alInicio`: restaurar una copia que ya no existe ahora deja aviso en el registro.
+- Limpieza: `merge()` de `podio.js` era copia de la de `store.js` → `store.merge`.
+- Revisión del propio cambio (ponytail-review + Thermos): "No era donación" en otra moneda, caché y mkdir por línea.
+- Comprobado: `node --check` de todos los .js y scripts sin red sobre logger, motor, respaldo, podio y `urlYouTube`.
 ### 2026-11-11 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `server.js:/api/reset`: con tiempo inicial 0 tras terminar, `timer.set()` guardaba `ended:true` y `timer.ended = false` solo
   cambiaba la memoria → al reabrir, "Terminado" y sin sumar donaciones → se limpia antes de `set()`.
