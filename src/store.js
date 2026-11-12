@@ -111,6 +111,7 @@ const store = {
     fs.renameSync(tmp, FILE);
   },
   file: FILE,
+  merge,
 };
 
 module.exports = store;

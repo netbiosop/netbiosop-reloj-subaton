@@ -64,15 +64,8 @@ const CENTAVO = 0.001; // margen para sumas con decimales: un total menor cuenta
 const valorPodio = (e, cat) => (cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : !e.kind || e.kind === 'gift' ? Number(e.count) || 0 : 0);
 const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ').slice(0, 40);
 
-function merge(def, val) {
-  if (!def || typeof def !== 'object' || Array.isArray(def)) return val === undefined ? def : val;
-  const out = {};
-  const src = val && typeof val === 'object' && !Array.isArray(val) ? val : {};
-  for (const k of new Set([...Object.keys(def), ...Object.keys(src)])) out[k] = k in def ? merge(def[k], src[k]) : src[k];
-  return out;
-}
-
 function createPodio({ store }) {
+  const { merge } = store;
   let data;
   try { data = merge(DEFAULTS, JSON.parse(fs.readFileSync(FILE, 'utf8'))); }
   catch (err) {
