@@ -76,15 +76,12 @@ function alInicio() {
   const pedido = path.join(DATA_DIR, 'restaurar.json');
   const r = leeJSON(pedido);
   if (r && r.copia) {
-    for (const base of carpetas()) {
-      const dir = path.join(base, r.copia);
-      if (!fs.existsSync(dir)) continue;
-      for (const f of ARCHIVOS) {
-        const src = path.join(dir, f), dest = path.join(DATA_DIR, f);
-        if (!fs.existsSync(src) || !valido(src)) continue;
-        try { if (fs.existsSync(dest)) fs.copyFileSync(dest, dest + '.antes-de-restaurar-' + sello()); fs.copyFileSync(src, dest); recuperados.push(`${f} (restaurado de ${r.copia})`); } catch (e) { console.error('[Respaldo]', e.message); }
-      }
-      break;
+    const dir = carpetas().map((base) => path.join(base, r.copia)).find((d) => fs.existsSync(d));
+    if (!dir) console.warn('[Respaldo] No encontré la copia', r.copia, '- no se restauró nada');
+    else for (const f of ARCHIVOS) {
+      const src = path.join(dir, f), dest = path.join(DATA_DIR, f);
+      if (!fs.existsSync(src) || !valido(src)) continue;
+      try { if (fs.existsSync(dest)) fs.copyFileSync(dest, dest + '.antes-de-restaurar-' + sello()); fs.copyFileSync(src, dest); recuperados.push(`${f} (restaurado de ${r.copia})`); } catch (e) { console.error('[Respaldo]', e.message); }
     }
     // si el pedido no se borra, se volvería a restaurar en cada arranque
     try { fs.unlinkSync(pedido); } catch (e) { console.error('[Respaldo] No se pudo borrar restaurar.json; bórralo a mano:', e.message); }
@@ -108,6 +105,7 @@ function respaldar(motivo = 'automática', forzar = false) {
     try {
       const dir = path.join(base, nombre);
       fs.mkdirSync(dir, { recursive: true });
+      resumenes.delete(dir); // dos copias en el mismo segundo comparten carpeta
       let n = 0;
       for (const f of ARCHIVOS) {
         const src = path.join(DATA_DIR, f);
@@ -171,19 +169,27 @@ function alAporte() {
   }, ESPERA_SEG * 1000);
 }
 
+// Una copia no cambia después de hecha: sin esto el panel (cada 15 s) parseaba hasta 80 podio.json y frenaba el servidor
+const resumenes = new Map();
+function resumenCopia(dir) {
+  if (!resumenes.has(dir)) {
+    const p = leeJSON(path.join(dir, 'podio.json'));
+    resumenes.set(dir, p && Array.isArray(p.events) ? p.events.length + ' aportes en el podio' : '');
+  }
+  return resumenes.get(dir);
+}
+
 function info() {
   const base = carpetas()[0];
+  const todas = copias(base);
   return {
     on: conf.on, carpeta: base, porDefecto: !conf.carpeta, extra: conf.extra || '', ultima,
-    copias: copias(base).slice(0, 80).map((n) => {
+    copias: todas.slice(0, 80).map((n) => {
       const dir = path.join(base, n);
       const tam = ARCHIVOS.reduce((t, f) => t + (stat(path.join(dir, f))?.size || 0), 0);
-      let resumen = '';
-      const p = leeJSON(path.join(dir, 'podio.json'));
-      if (p && Array.isArray(p.events)) resumen = p.events.length + ' aportes en el podio';
-      return { nombre: n, tam, resumen };
+      return { nombre: n, tam, resumen: resumenCopia(dir) };
     }),
-    total: copias(base).length,
+    total: todas.length,
   };
 }
 function setConfig(b = {}) {
