@@ -147,6 +147,7 @@ function urlYouTube(v) {
   v = String(v || '').trim();
   const vid = v.match(/(?:v=|youtu\.be\/|\/live\/|\/shorts\/)([\w-]{11})/);
   if (vid) return { video: vid[1] };
+  v = v.split(/[?#]/)[0]; // el enlace de "Compartir" trae ?si=…; con eso el /live quedaba dentro de la consulta
   const h = v.replace(/^(https?:\/\/)?([\w-]+\.)?youtube\.com\//i, '').replace(/\/(live|streams|featured)?\/?$/, '');
   if (!h) return null;
   return { canal: h.startsWith('@') || h.startsWith('channel/') || h.startsWith('c/') ? h : '@' + h };
