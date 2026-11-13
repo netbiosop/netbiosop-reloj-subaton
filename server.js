@@ -1251,7 +1251,10 @@ server.on('error', (err) => {
     process.stdout.write(`El reloj ya está funcionando, abriendo el panel…\n`);
     openPanel();
     setTimeout(() => process.exit(0), 500);
-  } else throw err;
+  } else {
+    console.error(`No se pudo abrir el reloj en ${HOST}:${PORT}:`, err.message); // un throw aquí lo traga logger.js y el proceso queda vivo sin servidor
+    process.exit(1);
+  }
 });
 
 server.listen(PORT, HOST, () => {
