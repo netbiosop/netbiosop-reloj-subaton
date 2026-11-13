@@ -901,8 +901,8 @@ app.post('/api/podio/no-es-donacion', (req, res) => {
     const clave = ev.pk || log?.payer;
     if (req.body.recordar && clave && !mpIgnorar().claves.some((c) => c.clave === clave)) mpIgnorar().claves.push({ clave, nombre: ev.user, at: Date.now() });
     store.save();
-    console.log(`🚫 No era donación: ${que}${secs ? ` (se descontaron ${fmtDuration(secs)} del reloj)` : ''}${req.body.recordar && clave ? ' · sus próximos pagos tampoco cuentan' : ''}`);
-    ok(res, { result: { segundos: secs, recordado: !!(req.body.recordar && clave) } });
+    console.log(`🚫 No era donación: ${que}${secs ? ` (se descontaron ${fmtDuration(secs)} del reloj)` : ''}${log ? '' : ' (ya no estaba en el historial: no se descontó tiempo)'}${req.body.recordar && clave ? ' · sus próximos pagos tampoco cuentan' : ''}`);
+    ok(res, { result: { segundos: secs, recordado: !!(req.body.recordar && clave), sinHistorial: !log } });
   } catch (err) { res.json({ error: err.message }, 400); }
 });
 app.post('/api/podio/vincular-mp', podioRoute((req) => podio.vincularMP(req.body.nombre, req.body.monto)));

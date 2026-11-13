@@ -401,7 +401,7 @@ $('eventos').addEventListener('click', async (ev)=>{
     const e = D.events.find(x=>x.id===nd.dataset.nodon);
     if(!confirm(`¿${e.user} (${fmtNum(e.amount)} ${e.currency}) NO es una donación?\n\nSe quita del podio y de las metas, y se descuenta del reloj el tiempo que había sumado.`)) return;
     const recordar = e.source==='mercadopago' && !!e.pk && confirm(`¿Tampoco contar los PRÓXIMOS pagos de ${e.user}?\n(Aceptar = nunca más cuentan · Cancelar = solo este)`);
-    try{ const r = await api('/api/podio/no-es-donacion','POST',{id:e.id, recordar}); alert(`Listo: ${e.user} ya no cuenta como donación${r.result.segundos?`. Se descontaron ${Math.round(r.result.segundos/60)} min del reloj`:''}${r.result.recordado?'. Sus próximos pagos tampoco van a contar':''}.`); firma=''; cargar(); }
+    try{ const r = await api('/api/podio/no-es-donacion','POST',{id:e.id, recordar}); alert(`Listo: ${e.user} ya no cuenta como donación${r.result.segundos?`. Se descontaron ${Math.round(r.result.segundos/60)} min del reloj`:''}${r.result.recordado?'. Sus próximos pagos tampoco van a contar':''}.${r.result.sinHistorial?'\n\nNo está en el historial: el tiempo NO se descontó; quítalo a mano si hace falta.':''}`); firma=''; cargar(); }
     catch(err){ alert(err.message); }
     return;
   }
