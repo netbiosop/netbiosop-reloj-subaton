@@ -244,7 +244,7 @@ function readRates() {
 
 function renderExamples() {
   if (!data) return;
-  const rates = readRatesSafe();
+  const rates = readRates();
   for (const src of ['paypal', 'mercadopago', 'bits']) {
     const r = rates[src];
     const ex = $(`.rate[data-src="${src}"] [data-ex]`);
@@ -258,9 +258,6 @@ function renderExamples() {
       ? `${sample} ${unit} = <b>+${fmtDur(calc(sample))}</b>${multTxt} · ${half} ${unit} = <b>+${fmtDur(calc(half))}</b>`
       : 'Pon un monto mayor a 0';
   }
-}
-function readRatesSafe() {
-  try { return readRates(); } catch { return data.rates; }
 }
 
 let saveTimer;

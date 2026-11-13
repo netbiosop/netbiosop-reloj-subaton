@@ -192,9 +192,9 @@ const twitch = new TwitchClient({
   store,
   onContribution,
   onChat: (e) => { try { multichat.deTwitch(e); } catch (err) { console.error('[Multichat]', err.message); } automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
-  onStream: (isLive, initial) => onStream(isLive, initial),
+  onStream,
   onStatus: () => { sendConnections(); multichat.estadoTwitch(twitch.chatOk); },
-  onHype: (fase, e, desfase) => onHype(fase, e, desfase),
+  onHype,
   redirectUri: `http://localhost:${PORT}/auth/twitch/callback`,
 });
 // ---------- Donaciones por confirmar ----------
@@ -1142,7 +1142,7 @@ function openPanel() {
   abrirNavegador(`http://localhost:${PORT}/menu`);
 }
 
-// podio, código y hype anotan sus propios errores al guardar; store los lanza
+// los módulos anotan sus propios errores al guardar; store los lanza
 function guardarTodo() {
   intentar('Datos', () => store.saveNow());
   podio.saveNow();

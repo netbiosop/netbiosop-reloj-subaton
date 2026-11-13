@@ -42,7 +42,7 @@ let config = structuredClone(DEFAULTS); // setConfig cambia config.cancion en su
 let estado = null;   // tren activo (o el último que terminó, con fase 'fin')
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  config = { ...DEFAULTS, ...(j.config || {}), cancion: { ...DEFAULTS.cancion, ...((j.config || {}).cancion || {}) } };
+  config = { ...config, ...j.config, cancion: { ...config.cancion, ...j.config?.cancion } }; // config: ya es una copia de DEFAULTS
   estado = j.estado || null;
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Hype] No se pudo leer', FILE, '-', err.message);
