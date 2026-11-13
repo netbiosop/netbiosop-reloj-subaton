@@ -830,7 +830,7 @@ function connect() {
       const ul = $('#log');
       ul.querySelector('.empty')?.remove();
       ul.prepend(logItem(payload, true));
-      if (!payload.test && payload.source !== 'manual') {
+      if (!payload.test) {
         const r = await api('GET', '/api/data');
         data.stats = r.stats;
         renderStats();

@@ -295,10 +295,9 @@ function connect() {
       data.log.unshift(payload);
       $('#log .empty')?.remove();
       $('#log').prepend(logItem(payload, true));
-      if (!payload.test && payload.source !== 'manual') {
-        data.totalAdded += payload.seconds || 0;
-        if (data.stats) api('GET', '/api/mod/data').then((r) => { data.stats = r.stats; renderStats(); }).catch((err) => console.warn('[Estadísticas]', err));
-      }
+      if (!payload.test && payload.source !== 'manual') data.totalAdded += payload.seconds || 0;
+      // "No era donación" llega como 'manual' y cambia stats y el total
+      if (!payload.test && data.stats) api('GET', '/api/mod/data').then((r) => { data.stats = r.stats; renderStats(); data.totalAdded = r.totalAdded; $('#totalAdded').textContent = fmtDur(data.totalAdded); }).catch((err) => console.warn('[Estadísticas]', err));
       $('#totalAdded').textContent = fmtDur(data.totalAdded);
     } else if (type === 'multiplier') {
       data.multiplier = payload;
