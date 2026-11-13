@@ -155,6 +155,7 @@ function createEngine({ store, timer, broadcast }) {
       months: ev.months || null,
       via: ev.via || null,
       payer: ev.payer || null,
+      montoFuera: otraMoneda(d().rates[ev.source], ev), // se guarda: la moneda de la tarifa puede cambiar antes de anularla
       multiplier: mult,
       seconds: Math.round(addedMs / 1000),
       note,
@@ -165,7 +166,7 @@ function createEngine({ store, timer, broadcast }) {
     if (!entry.test) {
       const st = (d().stats[ev.source] ||= { count: 0, amount: 0, seconds: 0 });
       st.count += ev.source === 'subs' ? ev.count || 1 : 1;
-      if (ev.source !== 'subs' && !otraMoneda(d().rates[ev.source], ev)) st.amount = Math.round((st.amount + (Number(ev.amount) || 0)) * 100) / 100;
+      if (ev.source !== 'subs' && !entry.montoFuera) st.amount = Math.round((st.amount + (Number(ev.amount) || 0)) * 100) / 100;
       st.seconds += entry.seconds;
     }
 

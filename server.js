@@ -76,7 +76,7 @@ function trackSession(e) {
   else {
     const s = (session.bySource[e.source] ||= { count: 0, amount: 0, seconds: 0 });
     s.count += e.source === 'subs' ? e.count || 1 : 1;
-    if (e.source !== 'subs' && !otraMoneda(d.rates[e.source], e)) s.amount = Math.round((s.amount + (Number(e.amount) || 0)) * 100) / 100;
+    if (e.source !== 'subs' && !(e.montoFuera ?? otraMoneda(d.rates[e.source], e))) s.amount = Math.round((s.amount + (Number(e.amount) || 0)) * 100) / 100;
     s.seconds += e.seconds || 0;
   }
 }
@@ -895,7 +895,7 @@ app.post('/api/podio/no-es-donacion', (req, res) => {
     if (log && !log.anulado) {
       log.anulado = true; log.note = 'No era donación: se quitó del reloj, el podio y las metas';
       const st = d.stats[log.source];
-      if (st && !log.test) { st.count = Math.max(0, st.count - 1); if (!otraMoneda(d.rates[log.source], log)) st.amount = Math.round((st.amount - (Number(log.amount) || 0)) * 100) / 100; st.seconds = Math.max(0, st.seconds - secs); }
+      if (st && !log.test) { st.count = Math.max(0, st.count - 1); if (!(log.montoFuera ?? otraMoneda(d.rates[log.source], log))) st.amount = Math.round((st.amount - (Number(log.amount) || 0)) * 100) / 100; st.seconds = Math.max(0, st.seconds - secs); }
     }
     podio.removeEvent(ev.id);
     const clave = ev.pk || log?.payer;
