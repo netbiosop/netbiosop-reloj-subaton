@@ -161,7 +161,7 @@ function iniciar(guardar) {
 // cada donación, sub o bits: espera unos segundos por si llegan más juntos y hace una sola copia
 // (la espera no se reinicia: en una racha de aportes igual sale una copia cada ESPERA_SEG)
 function alAporte() {
-  if (!conf.on) { guardarAntes(); respaldoGithub.pedir('aporte nuevo'); return; }
+  if (!conf.on) { respaldoGithub.pedir('aporte nuevo'); return; } // sube ≥10 s después: los módulos ya guardaron solos
   aportesJuntos++;
   if (timerAporte) return;
   timerAporte = setTimeout(() => {
