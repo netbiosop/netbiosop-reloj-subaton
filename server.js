@@ -892,6 +892,7 @@ app.post('/api/podio/no-es-donacion', (req, res) => {
     const secs = log && !log.anulado ? Number(log.seconds) || 0 : 0;
     const que = `${ev.user} · ${ev.amount} ${ev.currency}`;
     if (secs > 0) engine.manualAdjust(-secs, `No era donación (${ev.user}): se descuenta lo que sumó`); // sin monto: los mods sin "montos" ven este registro
+    else if (log && !log.anulado) engine.logNote(`No era donación (${ev.user}): no había sumado tiempo`); // el log avisa a los paneles que cambiaron las estadísticas
     if (log && !log.anulado) {
       log.anulado = true; log.note = 'No era donación: se quitó del reloj, el podio y las metas';
       const st = d.stats[log.source];
