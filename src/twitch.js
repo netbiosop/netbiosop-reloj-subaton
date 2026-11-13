@@ -99,11 +99,12 @@ class TwitchClient {
       }),
     });
     const j = await r.json();
-    if (!r.ok) {
+    if (r.status === 400 || r.status === 401) {
       this.s.accessToken = '';
       this.store.save();
       throw new Error('La sesión de Twitch expiró, vuelve a conectar (' + (j.message || r.status) + ')');
     }
+    if (!r.ok) throw new Error('Twitch no pudo renovar la sesión (' + (j.message || r.status) + ')'); // 429/5xx pasajero: el token sigue
     this.s.accessToken = j.access_token;
     this.s.refreshToken = j.refresh_token || this.s.refreshToken;
     this.store.save();
