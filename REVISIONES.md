@@ -40,8 +40,9 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
 - Mercado Pago: si falla pedir el pago completo y falta el cobrador, se reintenta en el próximo sondeo solo si el fallo
   es pasajero (red, 429, 5xx).
 - Moneda: `otraMoneda(rate, ev)` (`engine.js`) decide si una donación está en otra moneda que la tarifa; esas no suman
-  tiempo ni monto en `stats`/resumen del stream (sí entran al podio, que convierte a USD). Usarla en todo lo que sume o
-  reste montos (`engine.js`, `trackSession` y "No era donación" en `server.js`).
+  tiempo ni monto en `stats`/resumen del stream (sí entran al podio, que convierte a USD). Se decide una vez, al sumar:
+  `contribute` guarda `montoFuera` en la entrada del log, y `trackSession` y "No era donación" usan
+  `log.montoFuera ?? otraMoneda(...)` (el `??` es para entradas anteriores al 2026-11-13).
 
 ## Pendientes
 - `public/eventos.js` común para el `EventSource` de los cinco overlays (hoy repetido).
@@ -113,6 +114,12 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   "No es donación" no descuenta los patitos que sumó el pago.
 - `pendientes.js`: en vez de `window.__es` + espera, que exponga `window.pendientes = pintar` y cada página lo llame desde
   su `onmessage` (sin bucle ni global compartida).
+- Encontrados el 2026-11-13:
+  - `src/respaldo-github.js`: `otraVez`, `pendiente` y `motivoPendiente` son tres variables para un solo "falta subir".
+  - `src/respaldo.js`: la caché `resumenes` se invalida a mano en 2 sitios; usar tamaño/mtime de `podio.json` en la clave.
+  - `server.js:57-65`: `trackSession` va colgado del envoltorio `broadcast` (cualquier `broadcast('log')` cuenta para la sesión).
+  - `public/mod.js:~300`: un mod sin "montos" no ve bajar "Tiempo sumado por la comunidad" tras "No era donación" (solo
+    se refresca con `stats`); `montoFuera` llega a esos mods en el log (solo dice que la moneda no coincidía).
 - Encontrados el 2026-11-08 (deciden el dueño o necesitan Twitch/Windows real):
   - Si el stream termina o empieza durante un corte de EventSub, el reloj no se entera (`twitch.js:322`, `checkedLive` una sola vez). Consultar `/streams` en cada reconexión es fácil, pero `/streams` tarda en reflejar un inicio reciente y podría pausar un directo recién empezado: probar con Twitch real.
   - Actualizador: tras un fallo a mitad quedan archivos nuevos y viejos mezclados hasta el reintento; restaurar desde `.version-anterior` (hoy nadie la lee).
@@ -197,6 +204,23 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
 - Al mover `shutdown`/`restart` a `src/ciclo.js`: programar el `process.exit` de seguridad antes de cualquier otro paso.
 
 ## Historial
+### 2026-11-13 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `server.js:~891` "No era donación" con la entrada ya fuera de `d.log` (500 o "Borrar historial") no descontaba tiempo y
+  decía "Listo" → `sinHistorial: true`, aviso en `podio-panel.html` y en el registro.
+- `src/engine.js:168`, `server.js:79,898`: la moneda se decidía con la tarifa del momento; cambiarla entre la donación y la
+  anulación dejaba `stats.amount` inflado o negativo → `montoFuera` en la entrada (ver Decisiones).
+- `src/twitch.js:102`: un 429/5xx al renovar el token borraba `accessToken` y desconectaba Twitch → solo con 400/401.
+- `server.js:1254`: un error de `listen` que no fuera EADDRINUSE hacía `throw`, `logger.js` lo tragaba y el proceso quedaba
+  vivo sin servidor → `console.error` y `process.exit(1)`.
+- `public/panel.js:832`, `public/mod.js:298`: las estadísticas no se refrescaban tras "No era donación" (log `manual`) →
+  se refrescan con todo log que no sea de prueba; si la donación no había sumado tiempo, la anulación anota un log.
+- `src/respaldo.js:164`: con copias locales apagadas, cada aporte reescribía todos los JSON antes de pedir la subida a
+  GitHub (que sale ≥10 s después; store/podio guardan a los 250/300 ms; "Subir ahora" y el cierre guardan antes) → quitado.
+- Limpieza: `readRatesSafe`, envoltorios `onStream`/`onHype`, carga de `hype.json` sobre la copia de `DEFAULTS`,
+  comentario de `guardarTodo`.
+- Revisión del propio cambio (ponytail-review): anular una donación sin tiempo sumado no refrescaba los paneles.
+- Probado: scripts de node sin red (reloj aislado con `fetch` simulado, Twitch, respaldo, hype), Chromium sobre `/panel` y
+  `/mod`, `node --check`. Pendientes nuevos arriba.
 ### 2026-11-12 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `src/logger.js:37,57`: `open()`/`close()` sin try; sin la carpeta `logs`, `logger.close()` lanzaba en `shutdown()`/`restart()`
   y el reloj quedaba vivo con el puerto ocupado → `_append()` recrea la carpeta ante ENOENT y nunca lanza.
