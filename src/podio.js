@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'podio.json');
@@ -58,27 +59,24 @@ const monthLabel = (key) => { const [y, m] = key.split('-').map(Number); return 
 const monthName = (key) => MESES[Number(key.split('-')[1]) - 1];
 const prevKey = (key) => { const [y, m] = key.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`; };
 const round2 = (n) => Math.round(n * 100) / 100;
+const CENTAVO = 0.001; // margen para sumas con decimales: un total menor cuenta como cero
+// Lo que suma un evento al podio de su categoría (el de subs es solo de regaladas: new/resub valen 0)
+const valorPodio = (e, cat) => (cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : !e.kind || e.kind === 'gift' ? Number(e.count) || 0 : 0);
 const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ').slice(0, 40);
 
-function merge(def, val) {
-  if (!def || typeof def !== 'object' || Array.isArray(def)) return val === undefined ? def : val;
-  const out = {};
-  const src = val && typeof val === 'object' && !Array.isArray(val) ? val : {};
-  for (const k of new Set([...Object.keys(def), ...Object.keys(src)])) out[k] = k in def ? merge(def[k], src[k]) : src[k];
-  return out;
-}
-
 function createPodio({ store }) {
+  const { merge } = store;
   let data;
   try { data = merge(DEFAULTS, JSON.parse(fs.readFileSync(FILE, 'utf8'))); }
   catch (err) {
     if (err.code !== 'ENOENT') console.error('[Podio] No se pudo leer', FILE, '-', err.message);
+    apartarDanado(FILE, err);
     data = merge(DEFAULTS, {});
   }
   let version = Date.now();
   let saveTimer = null;
   let alCambiar = () => {}, avisoTimer = null; // avisa a los overlays apenas cambia algo (podio, metas, top general)
-  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch {} }, 150); };
+  const avisar = () => { clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { try { alCambiar(version); } catch (e) { console.error('[Podio] No se pudo avisar a los overlays:', e.message); } }, 150); };
 
   function save() {
     version++;
@@ -190,7 +188,8 @@ function createPodio({ store }) {
       const a = Number(amount);
       if (!a || !Number.isFinite(a)) throw new Error('Monto inválido');
       ev.amount = a;
-      ev.currency = String(currency || 'USD').toUpperCase();
+      ev.currency = String(currency || 'USD').trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(ev.currency)) throw new Error('Moneda inválida (3 letras, p. ej. USD)');
       ev.usd = toUsd(a, ev.currency);
       if (ev.usd == null) throw new Error(`No hay cotización para ${ev.currency}: pon tu tasa en el panel`);
     } else if (cat === 'bits') {
@@ -203,11 +202,11 @@ function createPodio({ store }) {
       ev.count = c;
       ev.kind = 'gift';
     }
-    const valor = (e) => (cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0);
+    const valor = (e) => valorPodio(e, cat);
     if (valor(ev) < 0) {
       const key = monthKey(when), quien = name.toLowerCase();
       const tiene = data.events.filter((e) => e.cat === cat && monthKey(e.at) === key && e.user.toLowerCase() === quien).reduce((t, e) => t + valor(e), 0);
-      if (tiene + valor(ev) < -0.001) {
+      if (tiene + valor(ev) < -CENTAVO) {
         const u = cat === 'dinero' ? `$${round2(Math.max(0, tiene))} USD` : cat === 'bits' ? `${Math.max(0, tiene)} bits` : `${Math.max(0, tiene)} subs`;
         throw new Error(`${name} tiene ${u} en ${monthLabel(key)}: no se le puede restar más que eso`);
       }
@@ -240,6 +239,8 @@ function createPodio({ store }) {
     const name = cleanName(String(nombre || '').replace(/^@/, ''));
     if (!name) throw new Error('Falta el nombre');
     const ahora = Date.now(), m = Number(String(monto || '').replace(/[.$\s]/g, '').replace(',', '.'));
+    // la que espera "¿Es donación?" aún no está en el podio: se renombraría (y recordaría) otra ya contada
+    if ((store.data.pendientes || []).some((p) => p.ev.source === 'mercadopago' && !(m > 0 && Math.abs(p.ev.amount - m) >= 0.01))) throw new Error('Hay una donación de Mercado Pago esperando "¿Es donación?" en el panel: confírmala primero');
     const mp = data.events.filter((e) => e.source === 'mercadopago' && ahora - e.at < 6 * 3600000).sort((a, b) => b.at - a.at);
     const conMonto = m > 0 ? mp.filter((e) => Math.abs(e.amount - m) < 0.01) : mp;
     const ev = conMonto.find((e) => /^donaci[oó]n mercado pago$/i.test(e.user)) || conMonto[0];
@@ -275,8 +276,7 @@ function createPodio({ store }) {
     const m = new Map();
     for (const e of data.events) {
       if (e.cat !== cat || monthKey(e.at) !== key) continue;
-      if (cat === 'subs' && e.kind && e.kind !== 'gift') continue; // el podio de subs es solo de regaladas
-      const v = cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0;
+      const v = valorPodio(e, cat);
       if (!v) continue; // los negativos (restado a mano) descuentan
       const k = e.user.toLowerCase();
       const r = m.get(k) || { name: e.user, total: 0, last: 0, auto: false };
@@ -288,7 +288,7 @@ function createPodio({ store }) {
     }
     // Empate: gana quien llegó primero a ese total
     return [...m.values()]
-      .filter((r) => r.total > 0.001)
+      .filter((r) => r.total > CENTAVO)
       .sort((a, b) => b.total - a.total || a.last - b.last)
       .slice(0, limit)
       .map((r) => ({ name: r.name, total: cat === 'dinero' ? round2(r.total) : Math.round(r.total) }));
@@ -423,7 +423,6 @@ function createPodio({ store }) {
       top: board(key, 10),
       events: data.events.filter((e) => monthKey(e.at) === key).slice().reverse(),
       currencies: currencies.map((c) => ({ code: c, auto: Number(data.rates.rates[c]) || null, manual: Number(data.config.manualRates[c]) || null })),
-      mpCurrency: mpCur,
       ratesAt: data.rates.fetchedAt,
       fullConfig: data.config,
       ajusteMes: data.config.ajustes[key] || { subs: 0, bits: 0, dinero: 0 },
@@ -502,7 +501,7 @@ function createPodio({ store }) {
 
   return {
     record, addManual, removeEvent, renameEvent, renamePerson, vincularMP, setRey, setConfig, refreshRates, toUsd, patitosAporte, vaciarPatitos, patitosStream,
-    publicData, adminData, saveNow, evento: (id) => data.events.find((e) => e.id === id) || null, version: () => version, onCambio: (fn) => { alCambiar = fn; },
+    publicData, adminData, saveNow, evento: (id) => data.events.find((e) => e.id === id) || null, onCambio: (fn) => { alCambiar = fn; },
   };
 }
 

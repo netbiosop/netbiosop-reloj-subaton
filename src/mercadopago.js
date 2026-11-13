@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 
 const API = 'https://api.mercadopago.com';
+const START_RETRY_MS = 60 * 1000;
 
 // "Luis Villa" coincide con "LUIS MARÍA VILLA" (las palabras de la regla, en orden, empezando por el primer nombre);
 // una sola letra vale como inicial: "Luis V" coincide con "Luis Villa" y "Luis Valdez". "Luisa Villa" no coincide con "Luis Villa".
@@ -47,18 +48,20 @@ class MercadoPagoClient {
   async api(path) {
     const r = await fetch(API + path, { headers: { Authorization: 'Bearer ' + this.s.accessToken } });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(`${r.status} ${j.message || j.error || ''}`.trim());
+    if (!r.ok) throw Object.assign(new Error(`${r.status} ${j.message || j.error || ''}`.trim()), { status: r.status });
     return j;
   }
 
   async start() {
     this.stop();
+    const gen = this.gen;
     if (!this.s.accessToken) {
       this.setStatus('desconectado');
       return;
     }
     try {
       const me = await this.api('/users/me');
+      if (gen !== this.gen) return; // otro start() o un stop() mientras se esperaba: su sondeo quedaría sin referencia
       this.userId = me.id;
       this.nickname = me.nickname || '';
       if (!this.store.data.mpSince) {
@@ -74,13 +77,18 @@ class MercadoPagoClient {
       }
       console.log(`[Mercado Pago] Conectado como ${this.nickname} (modo ${this.s.mode})`);
     } catch (err) {
-      this.setStatus('error', 'Token inválido: ' + err.message);
+      if (gen !== this.gen) return;
       console.error('[Mercado Pago]', err.message);
+      if (err.status >= 400 && err.status < 500 && err.status !== 429) return this.setStatus('error', 'Token inválido: ' + err.message);
+      this.setStatus('reconectando', 'Sin conexión con Mercado Pago, reintentando: ' + err.message);
+      this.retryTimer = setTimeout(() => this.start(), START_RETRY_MS);
     }
   }
 
   stop() {
+    this.gen = (this.gen || 0) + 1;
     clearInterval(this.pollTimer);
+    clearTimeout(this.retryTimer);
   }
 
   async poll() {
@@ -144,10 +152,20 @@ class MercadoPagoClient {
     if (!(amount > 0)) return;
     if ((this.vistos ||= new Set()).has(String(p.id))) return;
     this.vistos.add(String(p.id));
+    if (this.vistos.size > 2000) this.vistos = new Set([...this.vistos].slice(-1000)); // igual que twitch.js: el reloj puede quedar abierto semanas
     // la búsqueda de pagos a veces viene sin el nombre o sin quién lo cobró: se pide el pago completo
     const cobrador = (x) => x.collector_id ?? x.collector?.id;
     let nombre = this.nombreDe(p);
-    if (!nombre || (this.userId && !cobrador(p))) { try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); } catch {} }
+    if (!nombre || (this.userId && !cobrador(p))) {
+      try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); }
+      catch (err) {
+        console.warn(`[Mercado Pago] No se pudo pedir el pago ${p.id} completo:`, err.message);
+        // sin saber quién lo cobró se descartaría: si el fallo es pasajero (red, 429, 5xx) se olvida para que el
+        // próximo sondeo lo reintente; un 4xx fijo no se reintenta (serían un pedido y un aviso cada sondeo para siempre)
+        const fijo = err.status >= 400 && err.status < 500 && err.status !== 429;
+        if (this.userId && !cobrador(p) && !fijo) { this.vistos.delete(String(p.id)); return; }
+      }
+    }
     // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
     if (this.userId) {
       if (String(cobrador(p) ?? '') !== String(this.userId)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
@@ -160,7 +178,7 @@ class MercadoPagoClient {
     const regla = this.nombresDe(p).map((n) => (lista.nombres || []).find((r) => coincideNombre(n, r))).find(Boolean);
     if (regla) return this.ignorar(p, nombre, `está en tu lista de "no contar" ("${regla}")`);
     // si en el motivo de la transferencia escribió su usuario de Twitch (@usuario), se usa ese
-    const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/@([A-Za-z0-9_]{3,25})/);
+    const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/(?<![\w.])@([A-Za-z0-9_]{3,25})/);   // sin letra antes: un correo no es @usuario
     const recordado = (arroba && arroba[1]) || (pk && this.store.data.mpNombres && this.store.data.mpNombres[pk]);
     if (arroba && pk) (this.store.data.mpNombres ||= {})[pk] = arroba[1];
     if (!nombre && !recordado) console.warn(`[Mercado Pago] Pago ${p.id} sin nombre del que donó (método: ${p.payment_method_id || p.payment_type_id || '?'}). Puedes ponerle el nombre en el podio y se recuerda para la próxima.`);
@@ -188,7 +206,7 @@ class MercadoPagoClient {
 
   async handleWebhook(query, headers, rawBody) {
     let body = {};
-    try { body = JSON.parse(rawBody || '{}'); } catch {}
+    try { body = JSON.parse(rawBody || '{}'); } catch { /* Mercado Pago también manda tipo e id en la URL */ }
     const type = body.type || query.type || query.topic;
     const id = query['data.id'] || body.data?.id || query.id;
     if (type !== 'payment' || !id) return { ignored: `Aviso de tipo ${type || '?'} ignorado` };
@@ -200,4 +218,4 @@ class MercadoPagoClient {
   }
 }
 
-module.exports = { coincideNombre, MercadoPagoClient };
+module.exports = { MercadoPagoClient };

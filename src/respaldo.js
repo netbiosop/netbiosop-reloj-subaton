@@ -8,25 +8,27 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const respaldoGithub = require('./respaldo-github');
 
 const RAIZ = path.join(__dirname, '..');
 const DATA_DIR = process.env.DATA_DIR || path.join(RAIZ, 'data');
 const LOG_DIR = process.env.LOG_DIR || path.join(RAIZ, 'logs');
 const CONF = path.join(RAIZ, 'respaldo-config.json'); // fuera de "data" a propósito
 const ARCHIVOS = ['subaton.json', 'podio.json', 'codigo.json', 'hype.json', 'automensajes.json', 'multichat.json'];
-const IMPORTANTES = ['subaton.json', 'podio.json'];
 const RECIENTES = 100, DIAS = 60, ESPERA_SEG = 5;
+const stat = (f) => fs.statSync(f, { throwIfNoEntry: false });
 
 function carpetaPorDefecto() {
   if (process.env.BACKUP_DIR) return process.env.BACKUP_DIR;
   const h = os.homedir();
   const cands = [path.join(h, 'OneDrive', 'Documentos'), path.join(h, 'OneDrive', 'Documents'), path.join(h, 'Documentos'), path.join(h, 'Documents')];
-  const base = cands.find((c) => { try { return fs.statSync(c).isDirectory(); } catch { return false; } }) || path.join(h, 'Documents');
+  const base = cands.find((c) => stat(c)?.isDirectory()) || path.join(h, 'Documents');
   return path.join(base, 'Reloj Subaton - Respaldos');
 }
 
 let conf = { carpeta: '', extra: '', on: true };
-try { conf = { ...conf, ...JSON.parse(fs.readFileSync(CONF, 'utf8')) }; } catch {}
+try { conf = { ...conf, ...JSON.parse(fs.readFileSync(CONF, 'utf8')) }; }
+catch (e) { if (e.code !== 'ENOENT') console.warn('[Respaldo] respaldo-config.json ilegible, se usan los valores por defecto:', e.message); }
 const carpetas = () => [conf.carpeta || carpetaPorDefecto(), conf.extra].filter(Boolean);
 function guardarConf() { try { fs.writeFileSync(CONF, JSON.stringify(conf, null, 2)); } catch (e) { console.error('[Respaldo] No se pudo guardar la configuración:', e.message); } }
 
@@ -39,10 +41,13 @@ const valido = (f) => leeJSON(f) !== null;
 
 function copias(base) {
   try {
-    return fs.readdirSync(base).filter((n) => /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d/.test(n))
-      .filter((n) => { try { return fs.statSync(path.join(base, n)).isDirectory(); } catch { return false; } })
+    return fs.readdirSync(base).filter((n) => /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d$/.test(n))
+      .filter((n) => stat(path.join(base, n))?.isDirectory())
       .sort().reverse();
-  } catch { return []; }
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.warn(`[Respaldo] No se pudo leer la carpeta ${base}:`, e.message);
+    return [];
+  }
 }
 
 // ---------- Al abrir: recuperar archivos borrados o dañados ----------
@@ -53,8 +58,12 @@ function alInicio() {
     const existe = fs.existsSync(dest);
     if (existe && valido(dest)) continue;
     // buscar la copia más nueva que esté sana
-    let origen = null;
-    for (const base of carpetas()) for (const c of copias(base)) { const p = path.join(base, c, f); if (fs.existsSync(p) && valido(p)) { origen = p; break; } }
+    let origen = null, masNueva = '';
+    for (const base of carpetas()) for (const c of copias(base)) {
+      if (c <= masNueva) continue; // los nombres son sello(): ordenan por fecha
+      const p = path.join(base, c, f);
+      if (fs.existsSync(p) && valido(p)) { origen = p; masNueva = c; }
+    }
     if (!origen) continue;
     try {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -67,29 +76,30 @@ function alInicio() {
   const pedido = path.join(DATA_DIR, 'restaurar.json');
   const r = leeJSON(pedido);
   if (r && r.copia) {
-    for (const base of carpetas()) {
-      const dir = path.join(base, r.copia);
-      if (!fs.existsSync(dir)) continue;
-      for (const f of ARCHIVOS) {
-        const src = path.join(dir, f), dest = path.join(DATA_DIR, f);
-        if (!fs.existsSync(src) || !valido(src)) continue;
-        try { if (fs.existsSync(dest)) fs.copyFileSync(dest, dest + '.antes-de-restaurar-' + sello()); fs.copyFileSync(src, dest); recuperados.push(`${f} (restaurado de ${r.copia})`); } catch (e) { console.error('[Respaldo]', e.message); }
-      }
-      break;
+    const dir = carpetas().map((base) => path.join(base, r.copia)).find((d) => fs.existsSync(d));
+    if (!dir) console.warn('[Respaldo] No encontré la copia', r.copia, '- no se restauró nada');
+    else for (const f of ARCHIVOS) {
+      const src = path.join(dir, f), dest = path.join(DATA_DIR, f);
+      if (!fs.existsSync(src) || !valido(src)) continue;
+      try { if (fs.existsSync(dest)) fs.copyFileSync(dest, dest + '.antes-de-restaurar-' + sello()); fs.copyFileSync(src, dest); recuperados.push(`${f} (restaurado de ${r.copia})`); } catch (e) { console.error('[Respaldo]', e.message); }
     }
-    try { fs.unlinkSync(pedido); } catch {}
+    // si el pedido no se borra, se volvería a restaurar en cada arranque
+    try { fs.unlinkSync(pedido); } catch (e) { console.error('[Respaldo] No se pudo borrar restaurar.json; bórralo a mano:', e.message); }
   }
   return recuperados;
 }
 
 // ---------- Hacer una copia ----------
 let ultimaHuella = '', ultima = null;
+// Una copia no cambia después de hecha: sin esto el panel (cada 15 s) parseaba hasta 80 podio.json y frenaba el servidor
+const resumenes = new Map();
 function huella() {
-  return ARCHIVOS.map((f) => { try { const s = fs.statSync(path.join(DATA_DIR, f)); return f + s.size + ':' + s.mtimeMs; } catch { return f + '-'; } }).join('|');
+  return ARCHIVOS.map((f) => { const s = stat(path.join(DATA_DIR, f)); return s ? f + s.size + ':' + s.mtimeMs : f + '-'; }).join('|');
 }
 function respaldar(motivo = 'automática', forzar = false) {
-  try { require('./respaldo-github').pedir(motivo); } catch {} // copia silenciosa en GitHub (si está configurada)
+  respaldoGithub.pedir(motivo); // copia silenciosa en GitHub (si está configurada)
   if (!conf.on && !forzar) return null;
+  guardarAntes();
   const h = huella();
   if (!forzar && h === ultimaHuella) return null;
   const nombre = sello(), hechas = [];
@@ -97,6 +107,7 @@ function respaldar(motivo = 'automática', forzar = false) {
     try {
       const dir = path.join(base, nombre);
       fs.mkdirSync(dir, { recursive: true });
+      resumenes.delete(dir); // dos copias en el mismo segundo comparten carpeta
       let n = 0;
       for (const f of ARCHIVOS) {
         const src = path.join(DATA_DIR, f);
@@ -109,7 +120,8 @@ function respaldar(motivo = 'automática', forzar = false) {
       hechas.push(base);
     } catch (e) { console.error(`[Respaldo] No se pudo copiar en ${base}:`, e.message); }
   }
-  if (hechas.length) { ultimaHuella = h; ultima = { at: Date.now(), nombre, motivo, carpetas: hechas }; console.log(`💾 Copia de seguridad (${motivo})`); }
+  if (!hechas.length) return null;
+  ultimaHuella = h; ultima = { at: Date.now(), nombre, motivo, carpetas: hechas }; console.log(`💾 Copia de seguridad (${motivo})`);
   return ultima;
 }
 // los registros de cada stream: se copian los nuevos o los que crecieron
@@ -119,12 +131,12 @@ function copiarLogs(base) {
     for (const f of fs.readdirSync(LOG_DIR)) {
       if (!f.endsWith('.log')) continue;
       const a = path.join(LOG_DIR, f), b = path.join(dest, f);
-      const sa = fs.statSync(a); let sb = null; try { sb = fs.statSync(b); } catch {}
-      if (!sb || sb.size !== sa.size) fs.copyFileSync(a, b);
+      const sb = stat(b);
+      if (!sb || sb.size !== fs.statSync(a).size) fs.copyFileSync(a, b);
     }
-  } catch {}
+  } catch (e) { console.warn(`[Respaldo] No se pudieron copiar los registros a ${base}:`, e.message); }
 }
-// deja las últimas 48 copias y una por día de los últimos 60 días
+// deja las últimas RECIENTES copias y una por día de los últimos DIAS días
 function limpiar(base) {
   const lista = copias(base), dias = new Set();
   const limite = Date.now() - DIAS * 86400000;
@@ -133,40 +145,51 @@ function limpiar(base) {
     let queda = i < RECIENTES;
     if (!queda && !dias.has(dia) && fecha >= limite) queda = true;
     dias.add(dia);
-    if (!queda) try { fs.rmSync(path.join(base, n), { recursive: true, force: true }); } catch {}
+    if (!queda) try { fs.rmSync(path.join(base, n), { recursive: true, force: true }); resumenes.delete(path.join(base, n)); } catch (e) { console.warn(`[Respaldo] No se pudo borrar la copia vieja ${n}:`, e.message); }
   });
 }
 
-// antesDeCopiar: lo pone el servidor para guardar en disco lo último antes de copiar
+// antesDeCopiar: lo pone el servidor para escribir a disco lo pendiente antes de cada copia
 let antesDeCopiar = () => {}, timerAporte = null, aportesJuntos = 0;
+function guardarAntes() {
+  try { antesDeCopiar(); } catch (e) { console.warn('[Respaldo] No se pudo guardar antes de copiar; se copia lo que hay en disco:', e.message); }
+}
 function iniciar(guardar) {
   if (guardar) antesDeCopiar = guardar;
-  setTimeout(() => { try { antesDeCopiar(); } catch {} respaldar('al abrir', true); }, 15000);
+  setTimeout(() => respaldar('al abrir', true), 15000);
 }
 // cada donación, sub o bits: espera unos segundos por si llegan más juntos y hace una sola copia
+// (la espera no se reinicia: en una racha de aportes igual sale una copia cada ESPERA_SEG)
 function alAporte() {
-  if (!conf.on) { try { antesDeCopiar(); require('./respaldo-github').pedir('aporte nuevo'); } catch {} return; }
+  if (!conf.on) { respaldoGithub.pedir('aporte nuevo'); return; } // sube ≥10 s después: los módulos ya guardaron solos
   aportesJuntos++;
-  clearTimeout(timerAporte);
+  if (timerAporte) return;
   timerAporte = setTimeout(() => {
+    timerAporte = null;
     const n = aportesJuntos; aportesJuntos = 0;
-    try { antesDeCopiar(); } catch {}
     respaldar(n > 1 ? `${n} aportes nuevos` : 'aporte nuevo', true);
   }, ESPERA_SEG * 1000);
 }
 
+function resumenCopia(dir) {
+  if (resumenes.has(dir)) return resumenes.get(dir);
+  const p = leeJSON(path.join(dir, 'podio.json'));
+  const resumen = p && Array.isArray(p.events) ? p.events.length + ' aportes en el podio' : '';
+  if (p) resumenes.set(dir, resumen); // una lectura fallida (OneDrive, antivirus) se reintenta la próxima vez
+  return resumen;
+}
+
 function info() {
   const base = carpetas()[0];
+  const todas = copias(base);
   return {
     on: conf.on, carpeta: base, porDefecto: !conf.carpeta, extra: conf.extra || '', ultima,
-    copias: copias(base).slice(0, 80).map((n) => {
+    copias: todas.slice(0, 80).map((n) => {
       const dir = path.join(base, n);
-      const tam = ARCHIVOS.reduce((t, f) => { try { return t + fs.statSync(path.join(dir, f)).size; } catch { return t; } }, 0);
-      let resumen = '';
-      try { const p = leeJSON(path.join(dir, 'podio.json')); if (p && Array.isArray(p.events)) resumen = p.events.length + ' aportes en el podio'; } catch {}
-      return { nombre: n, tam, resumen };
+      const tam = ARCHIVOS.reduce((t, f) => t + (stat(path.join(dir, f))?.size || 0), 0);
+      return { nombre: n, tam, resumen: resumenCopia(dir) };
     }),
-    total: copias(base).length,
+    total: todas.length,
   };
 }
 function setConfig(b = {}) {
@@ -180,7 +203,7 @@ function setConfig(b = {}) {
   return info();
 }
 function pedirRestaurar(copia) {
-  if (!copias(carpetas()[0]).includes(copia) && !carpetas().some((b) => copias(b).includes(copia))) throw new Error('No encuentro esa copia');
+  if (!carpetas().some((b) => copias(b).includes(copia))) throw new Error('No encuentro esa copia');
   respaldar('antes de restaurar', true);
   fs.writeFileSync(path.join(DATA_DIR, 'restaurar.json'), JSON.stringify({ copia }));
 }

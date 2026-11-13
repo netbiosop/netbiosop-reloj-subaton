@@ -150,13 +150,14 @@ function pintar(c){
   $('ocultarComandos').checked = c.ocultarComandos;
   if (!editando($('ocultar'))) $('ocultar').value = c.ocultar.join(', ');
 }
+function nota(texto, ok){ $('notaGuardado').textContent = texto; $('notaGuardado').className = ok ? 'nota ok' : 'nota mal'; }
 async function guardar(cambios, aviso = '✔ Guardado'){
-  try { const j = await api('/api/multichat/config', 'POST', cambios); pintar(j.result.config); pintarEstado(j.result.estado); $('notaGuardado').textContent = aviso; $('notaGuardado').className = 'nota ok'; }
-  catch(e){ $('notaGuardado').textContent = e.message; $('notaGuardado').className = 'nota mal'; }
+  try { const j = await api('/api/multichat/config', 'POST', cambios); pintar(j.result.config); pintarEstado(j.result.estado); nota(aviso, true); }
+  catch(e){ nota(e.message, false); }
 }
 document.querySelectorAll('[data-on]').forEach((b) => b.onclick = () => guardar({ [b.dataset.on]: { on: !cfg[b.dataset.on].on } }));
-document.querySelectorAll('[data-reconectar]').forEach((b) => b.onclick = async () => { try { pintarEstado((await api('/api/multichat/reconectar', 'POST', { plataforma: b.dataset.reconectar })).result.estado); } catch {} });
-document.querySelectorAll('[data-probar]').forEach((b) => b.onclick = () => api('/api/multichat/probar', 'POST', { plataforma: b.dataset.probar }).catch(() => {}));
+document.querySelectorAll('[data-reconectar]').forEach((b) => b.onclick = async () => { try { pintarEstado((await api('/api/multichat/reconectar', 'POST', { plataforma: b.dataset.reconectar })).result.estado); } catch(e){ nota(e.message, false); } });
+document.querySelectorAll('[data-probar]').forEach((b) => b.onclick = () => api('/api/multichat/probar', 'POST', { plataforma: b.dataset.probar }).catch((e) => nota(e.message, false)));
 $('kickCanal').onchange = () => guardar({ kick: { canal: $('kickCanal').value, on: true } });
 $('kickChatroom').onchange = () => guardar({ kick: { chatroomId: $('kickChatroom').value } });
 $('ytCanal').onchange = () => guardar({ youtube: { canal: $('ytCanal').value, on: true } });

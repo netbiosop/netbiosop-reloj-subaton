@@ -2,6 +2,7 @@
 // Twitch avisa con 3 eventos (versión 2): begin (empieza), progress (suma puntos / sube de nivel) y end (termina).
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'hype.json');
@@ -37,14 +38,15 @@ const PERFILES = {
   1515791: { bpm: 128, golpe: 0.125, entrada: 2.0, barra: 9.5, loopDesde: 17.0, loopHasta: 47.0, drop: [32.0], finDesde: 47.0 },
   2943958: { bpm: 128, golpe: 0.02, entrada: 1.9, barra: 7.52, loopDesde: 61.88, loopHasta: 90.005, drop: [15.02, 61.88], finDesde: 106.86 },
 };
-let config = { ...DEFAULTS };
+let config = structuredClone(DEFAULTS); // setConfig cambia config.cancion en su lugar
 let estado = null;   // tren activo (o el último que terminó, con fase 'fin')
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  config = { ...DEFAULTS, ...(j.config || {}), cancion: { ...DEFAULTS.cancion, ...((j.config || {}).cancion || {}) } };
+  config = { ...config, ...j.config, cancion: { ...config.cancion, ...j.config?.cancion } }; // config: ya es una copia de DEFAULTS
   estado = j.estado || null;
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Hype] No se pudo leer', FILE, '-', err.message);
+  apartarDanado(FILE, err);
 }
 // Si el programa estuvo cerrado y el tren ya venció, no se retoma
 if (estado && estado.fase !== 'fin' && estado.expira && estado.expira < Date.now() - 60000) estado = null;

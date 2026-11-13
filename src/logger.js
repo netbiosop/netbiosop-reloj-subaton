@@ -34,7 +34,22 @@ const logger = {
 
   open(title = 'Sesión iniciada') {
     this.file = path.join(LOG_DIR, `stream_${fileStamp()}.log`);
-    fs.appendFileSync(this.file, `==================== ${title} · ${stamp()} ====================\n`);
+    this._append(`==================== ${title} · ${stamp()} ====================\n`);
+  },
+
+  // Nunca lanza: si falla, el apagado y el reinicio de server.js quedaban a medias con el puerto ocupado
+  _append(text) {
+    try {
+      try { fs.appendFileSync(this.file, text); }
+      catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+        fs.mkdirSync(LOG_DIR, { recursive: true }); // carpeta borrada con el reloj abierto
+        fs.appendFileSync(this.file, text);
+      }
+    } catch (err) {
+      // No se puede anotar en el archivo: al menos que quede en la consola original
+      this._orig.error?.('[Log] No se pudo escribir en', this.file, '-', err.message);
+    }
   },
 
   write(level, text) {
@@ -42,22 +57,15 @@ const logger = {
     const tag = level === 'error' ? 'ERROR ' : level === 'warn' ? 'AVISO ' : '';
     const clean = String(text).replace(/^\s*\n/, '').trimEnd();
     if (!clean) return;
-    try {
-      fs.appendFileSync(this.file, `[${stamp()}] ${tag}${clean}\n`);
-    } catch {}
+    this._append(`[${stamp()}] ${tag}${clean}\n`);
   },
 
   // Cierra el archivo actual (fin del stream). El siguiente mensaje abre uno nuevo.
   close(summaryLines = []) {
     if (!this.file) return;
     const body = summaryLines.map((l) => `   ${l}`).join('\n');
-    fs.appendFileSync(this.file, `${body ? body + '\n' : ''}==================== Fin · ${stamp()} ====================\n`);
+    this._append(`${body ? body + '\n' : ''}==================== Fin · ${stamp()} ====================\n`);
     this.file = null;
-  },
-
-  currentText() {
-    if (!this.file) return null;
-    try { return fs.readFileSync(this.file, 'utf8'); } catch { return null; }
   },
 
   latestFile() {

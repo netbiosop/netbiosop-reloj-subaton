@@ -129,7 +129,6 @@ async function api(path, method='GET', body){
 }
 function nota(el, txt, cls=''){ el.textContent = txt; el.className = 'nota '+cls; }
 let cfg = null, cambios = false;
-const AVISO_EPIC = 'Código de creador de Epic · recibo una comisión por tus compras';
 
 function pintarPlats(){
   $('plats').innerHTML = cfg.plataformas.map((p,i)=>`
@@ -181,7 +180,7 @@ function pintarEstado(e){
     el.textContent = p.estado==='activa' ? 'próxima en '+fmt(p.enSeg) : p.estado;
   }
 }
-async function estado(){ try { pintarEstado(await api('/api/codigo/estado')); } catch(e){} }
+async function estado(){ try { pintarEstado(await api('/api/codigo/estado')); } catch(e){ console.warn('[Código] Estado:', e); } }
 
 document.addEventListener('input', (e)=>{ if(e.target.closest('main')) marcar(); if(e.target.dataset.k==='on') e.target.closest('.plat').classList.toggle('off', !e.target.checked); });
 $('plats').addEventListener('click', (e)=>{
