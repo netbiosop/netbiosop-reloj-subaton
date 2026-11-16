@@ -46,6 +46,8 @@ async function handleWebhook(cfg, headers, rawBody) {
   if (!cfg.clientId || !cfg.clientSecret || !cfg.webhookId) {
     return { error: 'Webhook de PayPal recibido pero faltan Client ID / Secret / Webhook ID en el panel (no se sumó por seguridad)' };
   }
+  // sin firma no es de PayPal: se corta antes de pedir un token (un POST anónimo al túnel no gasta llamadas a PayPal)
+  if (!headers['paypal-transmission-id'] || !headers['paypal-transmission-sig']) return { error: 'Webhook de PayPal sin firma (ignorado)' };
   const ok = await verifyWebhook(cfg, headers, rawBody);
   if (!ok) return { error: 'Webhook de PayPal con firma inválida (ignorado)' };
 
