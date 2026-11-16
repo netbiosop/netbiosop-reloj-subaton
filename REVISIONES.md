@@ -43,8 +43,27 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   tiempo ni monto en `stats`/resumen del stream (sí entran al podio, que convierte a USD). Se decide una vez, al sumar:
   `contribute` guarda `montoFuera` en la entrada del log, y `trackSession` y "No era donación" usan
   `log.montoFuera ?? otraMoneda(...)` (el `??` es para entradas anteriores al 2026-11-13).
+- Carpetas de respaldo (`carpeta`/`extra`, lista `CARPETAS` de `respaldo.js`) solo se cambian desde la PC del reloj
+  (`req.localOwner`): la copia lleva `secrets`. El admin remoto sí puede prender/apagar las copias.
+- El log que reciben los mods (`logParaMod`) nunca lleva `payer`; sin "montos" tampoco monto ni `montoFuera`.
+- Mercado Pago: sin `userId` confirmado `processPayment` lanza error (el webhook responde 500 y Mercado Pago reintenta);
+  `start()` vacía `userId` y un `poll()` en curso se corta si cambia `gen`.
+- IPN de PayPal: los valores se decodifican con su `charset` (windows-1252 por defecto); la verificación reenvía el
+  cuerpo original. Webhook REST sin `paypal-transmission-id/sig` se descarta sin llamar a PayPal.
 
 ## Pendientes
+- Encontrados el 2026-11-16:
+  - PayPal REST pide un token OAuth nuevo en cada aviso firmado (`paypal.js:getToken`): guardarlo hasta `expires_in`.
+  - Estructura (decide el dueño): permisos de cada ruta en 4 sitios (`auth.js` OPEN_PATHS/MOD_GET/MOD_POST, `http.js`
+    forOverlay/forMod, ramas `req.role` en `server.js`) → declararlos al registrar la ruta; patitos dentro de `podio.js`
+    y coordinados desde 4 sitios de `server.js` → `src/patitos.js`; estado verde/amarillo/rojo calculado en servidor
+    (`okStatus`) y en `panel.js` (`statusOf`) con reglas distintas; `activeMultipliers` (`engine.js:34`) guarda desde
+    una lectura y `server.js:162` sondea cada segundo para notar cambios → `setTimeout` al próximo límite; cada módulo
+    recibe `broadcast` de una forma distinta.
+  - Limpieza: `http.js:71` el router genérico compara `'/api/hype/subir'` a mano (opción por ruta); el paquete del hype
+    se arma 3 veces (`server.js:~1002-1024`) y `/api/hype/probar` recalcula `fase`; `hype.js:65` `desfaseTwitch` global
+    del módulo; `/api/codigo/estado` repite lo que ya da `codigoCtx()`; `timer.ended` se toca desde `server.js:98,782`
+    (`new Timer(ms, {ended})` y `timer.reiniciar(ms)`).
 - `public/eventos.js` común para el `EventSource` de los cinco overlays (hoy repetido).
 - Bajar `server.js` (1.274 líneas el 2026-11-04, sigue creciendo): ciclo de vida (reinicio, apagado, PID) a `src/ciclo.js` y webhooks a
   `src/webhooks.js` (los handlers de PayPal y PayPal IPN se parecen mucho).
@@ -204,6 +223,19 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
 - Al mover `shutdown`/`restart` a `src/ciclo.js`: programar el `process.exit` de seguridad antes de cualquier otro paso.
 
 ## Historial
+### 2026-11-16 — revisión nocturna (PR #2, rama `revision-nocturna`)
+- `server.js:1034`/`respaldo.js:195`: con la sesión admin remota se podía poner cualquier carpeta de respaldo (UNC
+  incluida) y cada aporte copiaba ahí `subaton.json` con las claves → solo desde la PC del reloj.
+- `paypal.js:71`: IPN leído como UTF-8; `first_name=Jos%E9` → "Jos�" en overlay/podio → decodificar con `charset`.
+- `mercadopago.js:170`: sin `userId` (reloj recién abierto sin conexión, modo webhook) una compra del dueño sumaba
+  tiempo y podio; al cambiar de token quedaba el id anterior → error/reintento y `userId = null` en `start()`.
+- `server.js:355,489`: `payer` (sha256 sin sal del id/DNI) llegaba a todos los mods por `/events` y `/api/mod/data`.
+- `panel.js:432`: el prefijo del chat (lo cambia un mod) se pintaba sin escapar → `esc()`.
+- `paypal.js`: cada POST anónimo a `/webhooks/paypal` pedía token y verificación a PayPal → sin firma se descarta.
+- `commands.js:149`: `!multi 1`/`!x1.0` apagaban el multiplicador sin registro → `apagarMulti()` común.
+- `server.js:322`: `webhookReady` sin lector, borrado.
+- Probado: `node --check` de todos los .js; scripts sin red (IPN, Mercado Pago, PayPal, comandos) y reloj aislado
+  (respaldo remoto, mods con y sin "montos", panel en Chromium).
 ### 2026-11-13 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
 - `server.js:~891` "No era donación" con la entrada ya fuera de `d.log` (500 o "Borrar historial") no descontaba tiempo y
   decía "Listo" → `sinHistorial: true`, aviso en `podio-panel.html` y en el registro.
