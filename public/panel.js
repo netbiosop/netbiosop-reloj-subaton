@@ -429,7 +429,7 @@ $('#btnPpSave').onclick = async () => {
 
 // ---------- comandos del chat ----------
 function renderCmdTable() {
-  const p = data.chat.prefix || '!';
+  const p = esc(data.chat.prefix || '!'); // lo puede cambiar un mod con permiso de chat
   const rows = [
     ['tiempo', 'Muestra el tiempo que queda (también <code>' + p + 'reloj</code>)'],
     ['sumar 10', 'Suma 10 minutos · acepta <code>1:30</code>, <code>2h</code>, <code>45s</code>'],
