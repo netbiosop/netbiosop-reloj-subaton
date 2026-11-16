@@ -192,9 +192,10 @@ function info() {
     total: todas.length,
   };
 }
+const CARPETAS = ['carpeta', 'extra'];
 function setConfig(b = {}) {
   if ('on' in b) conf.on = !!b.on;
-  for (const k of ['carpeta', 'extra']) if (k in b) {
+  for (const k of CARPETAS) if (k in b) {
     const v = String(b[k] || '').trim();
     if (v) { if (!path.isAbsolute(v)) throw new Error('Escribe la ruta completa de la carpeta (ej. D:\\Respaldos)'); fs.mkdirSync(v, { recursive: true }); }
     conf[k] = v;
@@ -208,4 +209,4 @@ function pedirRestaurar(copia) {
   fs.writeFileSync(path.join(DATA_DIR, 'restaurar.json'), JSON.stringify({ copia }));
 }
 
-module.exports = { alInicio, iniciar, alAporte, respaldar, info, setConfig, pedirRestaurar, carpetas };
+module.exports = { alInicio, iniciar, alAporte, respaldar, info, setConfig, pedirRestaurar, carpetas, CARPETAS };

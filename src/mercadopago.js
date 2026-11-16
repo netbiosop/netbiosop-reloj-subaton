@@ -93,10 +93,14 @@ class MercadoPagoClient {
   }
 
   async poll() {
+    const gen = this.gen;
     try {
       const q = new URLSearchParams({ sort: 'date_created', criteria: 'desc', limit: '50' });
       const res = await this.api('/v1/payments/search?' + q);
-      for (const p of (res.results || []).reverse()) await this.processPayment(p);
+      for (const p of (res.results || []).reverse()) {
+        if (gen !== this.gen) return; // otro start() o un stop(): la cuenta pudo cambiar
+        await this.processPayment(p);
+      }
       this.setStatus('conectado', 'Revisando pagos cada ' + (this.s.pollSeconds || 15) + ' s');
     } catch (err) {
       this.setStatus('error', 'Error consultando pagos: ' + err.message);
@@ -151,27 +155,27 @@ class MercadoPagoClient {
     if (approvedAt && approvedAt < (this.store.data.mpSince || 0) - 60_000) return;
     const amount = Number(p.transaction_amount);
     if (!(amount > 0)) return;
+    // sin saber cuál es tu cuenta no se puede filtrar lo que pagaste tú: en un webhook el error (500) hace que Mercado Pago lo reintente
+    if (!this.userId) throw new Error('Todavía no se confirmó tu cuenta de Mercado Pago; el aviso se reintentará');
     if ((this.vistos ||= new Set()).has(String(p.id))) return;
     this.vistos.add(String(p.id));
     if (this.vistos.size > 2000) this.vistos = new Set([...this.vistos].slice(-1000)); // igual que twitch.js: el reloj puede quedar abierto semanas
     // la búsqueda de pagos a veces viene sin el nombre o sin quién lo cobró: se pide el pago completo
     const cobrador = (x) => x.collector_id ?? x.collector?.id;
     let nombre = this.nombreDe(p);
-    if (!nombre || (this.userId && !cobrador(p))) {
+    if (!nombre || !cobrador(p)) {
       try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); }
       catch (err) {
         console.warn(`[Mercado Pago] No se pudo pedir el pago ${p.id} completo:`, err.message);
         // sin saber quién lo cobró se descartaría: si el fallo es pasajero (red, 429, 5xx) se olvida para que el
         // próximo sondeo lo reintente; un 4xx fijo no se reintenta (serían un pedido y un aviso cada sondeo para siempre)
         const fijo = err.status >= 400 && err.status < 500 && err.status !== 429;
-        if (this.userId && !cobrador(p) && !fijo) { this.vistos.delete(String(p.id)); return; }
+        if (!cobrador(p) && !fijo) { this.vistos.delete(String(p.id)); return; }
       }
     }
     // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
-    if (this.userId) {
-      if (String(cobrador(p) ?? '') !== String(this.userId)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
-      if (p.payer?.id && String(p.payer.id) === String(this.userId)) return this.ignorar(p, nombre, 'lo pagaste tú');
-    }
+    if (String(cobrador(p) ?? '') !== String(this.userId)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
+    if (p.payer?.id && String(p.payer.id) === String(this.userId)) return this.ignorar(p, nombre, 'lo pagaste tú');
     const pk = this.clave(p);
     // Personas de "no contar" (ej. el sueldo): por nombre o porque marcaste un pago suyo como "No es donación"
     const lista = this.store.data.settings.mpIgnorar || {};
@@ -213,8 +217,6 @@ class MercadoPagoClient {
     if (type !== 'payment' || !id) return { ignored: `Aviso de tipo ${type || '?'} ignorado` };
     if (!this.verifySignature(headers, String(id))) return { error: 'Webhook de Mercado Pago con firma inválida (ignorado)' };
     if (!this.s.accessToken) return { error: 'Falta el Access Token de Mercado Pago en el panel' };
-    // sin saber cuál es tu cuenta no se puede filtrar lo que pagaste tú: el error (500) hace que Mercado Pago lo reintente
-    if (!this.userId) throw new Error('Todavía no se confirmó tu cuenta de Mercado Pago; el aviso se reintentará');
     const p = await this.api('/v1/payments/' + encodeURIComponent(id));
     await this.processPayment(p);
     return { ok: true };

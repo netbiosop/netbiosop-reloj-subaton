@@ -350,9 +350,13 @@ app.get('/events', (req, res) => {
   const transform = mode !== 'mod' ? null : (type, p) => (type === 'log' ? logParaMod(p, perms.money) : type === 'added' && !perms.money ? redactAdded(p) : p);
   live.attach(req, res, [['state', stateMsg()]], mode, transform);
 });
-const redactLog = (e) => (DINERO.has(e.source) ? { ...e, amount: null, currency: null, montoFuera: undefined, note: '', text: `${e.user || 'Alguien'} donó${e.via ? ` (vía ${e.via})` : ''}` } : e);
-// payer es el hash del id o DNI del que pagó (se puede revertir por fuerza bruta): ningún mod lo necesita
-const logParaMod = ({ payer, ...e }, verMontos) => (verMontos ? e : redactLog(e));
+// payer es el hash del id o DNI del que pagó (se puede revertir por fuerza bruta): ningún mod lo necesita.
+// Sin permiso de "montos" tampoco ve cuánto donó cada uno ni si la moneda coincidía (montoFuera).
+const logParaMod = ({ payer, ...e }, verMontos) => {
+  if (verMontos || !DINERO.has(e.source)) return e;
+  const { montoFuera, ...sinMonto } = e;
+  return { ...sinMonto, amount: null, currency: null, note: '', text: `${e.user || 'Alguien'} donó${e.via ? ` (vía ${e.via})` : ''}` };
+};
 const redactAdded = (a) => (DINERO.has(a.source) ? { ...a, text: `${a.user || 'Alguien'} donó` } : a);
 // Quién hizo un cambio (para el historial y el log), cuando no es el dueño en esta PC
 const actor = (req) => (req.role === 'mod' ? `${req.user} (mod)` : req.user && req.user !== 'dueño (esta PC)' ? `${req.user} (remoto)` : null);
@@ -1033,7 +1037,7 @@ respaldo.iniciar(guardarTodo);
 app.get('/api/respaldo', (req, res) => res.json(respaldo.info()));
 app.post('/api/respaldo/config', podioRoute((req) => {
   // La copia lleva las claves (secrets): desde el panel remoto se podría mandar a una carpeta de red ajena
-  if (!req.localOwner && ('carpeta' in req.body || 'extra' in req.body)) throw new Error('Las carpetas de respaldo solo se cambian desde la PC del reloj');
+  if (!req.localOwner && respaldo.CARPETAS.some((k) => k in req.body)) throw new Error('Las carpetas de respaldo solo se cambian desde la PC del reloj');
   return respaldo.setConfig(req.body);
 }));
 app.post('/api/respaldo/ahora', podioRoute(() => {
