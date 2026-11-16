@@ -1031,7 +1031,11 @@ app.post('/api/hype/probar', (req, res) => {
 if (RECUPERADOS.length) console.warn('💾 Se recuperaron de la copia de seguridad: ' + RECUPERADOS.join(', '));
 respaldo.iniciar(guardarTodo);
 app.get('/api/respaldo', (req, res) => res.json(respaldo.info()));
-app.post('/api/respaldo/config', podioRoute((req) => respaldo.setConfig(req.body)));
+app.post('/api/respaldo/config', podioRoute((req) => {
+  // La copia lleva las claves (secrets): desde el panel remoto se podría mandar a una carpeta de red ajena
+  if (!req.localOwner && ('carpeta' in req.body || 'extra' in req.body)) throw new Error('Las carpetas de respaldo solo se cambian desde la PC del reloj');
+  return respaldo.setConfig(req.body);
+}));
 app.post('/api/respaldo/ahora', podioRoute(() => {
   if (!respaldo.respaldar('a mano', true)) throw new Error('No se pudo guardar la copia en ninguna carpeta (mira el registro)');
   return respaldo.info();
