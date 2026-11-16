@@ -55,6 +55,7 @@ class MercadoPagoClient {
   async start() {
     this.stop();
     const gen = this.gen;
+    this.userId = null; // con otro token, la cuenta anterior ya no es "la tuya"
     if (!this.s.accessToken) {
       this.setStatus('desconectado');
       return;
@@ -212,6 +213,8 @@ class MercadoPagoClient {
     if (type !== 'payment' || !id) return { ignored: `Aviso de tipo ${type || '?'} ignorado` };
     if (!this.verifySignature(headers, String(id))) return { error: 'Webhook de Mercado Pago con firma inválida (ignorado)' };
     if (!this.s.accessToken) return { error: 'Falta el Access Token de Mercado Pago en el panel' };
+    // sin saber cuál es tu cuenta no se puede filtrar lo que pagaste tú: el error (500) hace que Mercado Pago lo reintente
+    if (!this.userId) throw new Error('Todavía no se confirmó tu cuenta de Mercado Pago; el aviso se reintentará');
     const p = await this.api('/v1/payments/' + encodeURIComponent(id));
     await this.processPayment(p);
     return { ok: true };
