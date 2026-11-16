@@ -148,6 +148,7 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
     if (!(value >= 1)) return reply(`Uso: ${prefix}x2 30 (minutos) [subs bits paypal mp]`);
     if (value === 1) {
       setManualMultiplier({ active: false });
+      log('apagó el multiplicador');
       return reply('Multiplicador apagado');
     }
     let minutes = 0;
