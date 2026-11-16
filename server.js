@@ -313,13 +313,11 @@ function sumarHorasDiarias(motivo, forzar = false) {
 }
 
 function connectionsInfo() {
-  const pp = d.secrets.paypal;
   return {
     twitch: twitch.info(),
     mercadopago: mp.info(),
     streamelements: se.info(),
     paypal: {
-      webhookReady: !!(pp.clientId && pp.clientSecret && pp.webhookId),
       ipnReady: true,
       last: ppStatus.last,
       detail: ppStatus.detail,
