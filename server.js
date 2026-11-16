@@ -349,10 +349,12 @@ app.get('/events', (req, res) => {
   const mode = req.query.overlay === '1' ? 'overlay' : req.role === 'mod' ? 'mod' : 'full';
   const perms = req.perms || {};
   // Un mod sin permiso de "montos" nunca recibe cuánto dinero donó alguien
-  const transform = mode === 'mod' && !perms.money ? (type, p) => (type === 'log' ? redactLog(p) : type === 'added' ? redactAdded(p) : p) : null;
+  const transform = mode !== 'mod' ? null : (type, p) => (type === 'log' ? logParaMod(p, perms.money) : type === 'added' && !perms.money ? redactAdded(p) : p);
   live.attach(req, res, [['state', stateMsg()]], mode, transform);
 });
-const redactLog = (e) => (DINERO.has(e.source) ? { ...e, amount: null, currency: null, note: '', text: `${e.user || 'Alguien'} donó${e.via ? ` (vía ${e.via})` : ''}` } : e);
+const redactLog = (e) => (DINERO.has(e.source) ? { ...e, amount: null, currency: null, montoFuera: undefined, note: '', text: `${e.user || 'Alguien'} donó${e.via ? ` (vía ${e.via})` : ''}` } : e);
+// payer es el hash del id o DNI del que pagó (se puede revertir por fuerza bruta): ningún mod lo necesita
+const logParaMod = ({ payer, ...e }, verMontos) => (verMontos ? e : redactLog(e));
 const redactAdded = (a) => (DINERO.has(a.source) ? { ...a, text: `${a.user || 'Alguien'} donó` } : a);
 // Quién hizo un cambio (para el historial y el log), cuando no es el dueño en esta PC
 const actor = (req) => (req.role === 'mod' ? `${req.user} (mod)` : req.user && req.user !== 'dueño (esta PC)' ? `${req.user} (remoto)` : null);
@@ -486,7 +488,7 @@ app.get('/api/mod/data', (req, res) => {
     me: { name: req.user, role: req.role, perms },
     state: stateMsg(),
     multiplier: d.multiplier,
-    log: d.log.slice(0, 100).map((e) => (perms.money ? e : redactLog(e))),
+    log: d.log.slice(0, 100).map((e) => logParaMod(e, perms.money)),
     totalAdded: time,
     maxPerAction: req.role === 'mod' ? d.settings.modMaxSeconds || 0 : 0,
     rates: perms.rates ? d.rates : undefined,
