@@ -3,6 +3,7 @@
 //  2) Webhooks REST (PAYMENT.CAPTURE.COMPLETED / PAYMENT.SALE.COMPLETED) -> /webhooks/paypal
 // En ambos casos se verifica con PayPal que el aviso sea real antes de sumar tiempo.
 
+const querystring = require('querystring');
 const apiBase = (mode) => (mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com');
 const ipnBase = (mode) => (mode === 'sandbox' ? 'https://ipnpb.sandbox.paypal.com/cgi-bin/webscr' : 'https://ipnpb.paypal.com/cgi-bin/webscr');
 
@@ -15,7 +16,7 @@ async function getToken(cfg) {
     },
     body: 'grant_type=client_credentials',
   });
-  const j = await r.json();
+  const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error('PayPal rechazó las credenciales: ' + (j.error_description || r.status));
   return j.access_token;
 }
@@ -30,6 +31,7 @@ async function verifyWebhook(cfg, headers, rawBody) {
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body,
   });
+  if (!r.ok) throw new Error(`PayPal no pudo verificar el aviso (${r.status})`); // con error el webhook responde 500 y PayPal lo reintenta
   const j = await r.json();
   return j.verification_status === 'SUCCESS';
 }
@@ -45,6 +47,8 @@ async function handleWebhook(cfg, headers, rawBody) {
   if (!cfg.clientId || !cfg.clientSecret || !cfg.webhookId) {
     return { error: 'Webhook de PayPal recibido pero faltan Client ID / Secret / Webhook ID en el panel (no se sumó por seguridad)' };
   }
+  // sin firma no es de PayPal: se corta antes de pedir un token (un POST anónimo al túnel no gasta llamadas a PayPal)
+  if (!headers['paypal-transmission-id'] || !headers['paypal-transmission-sig']) return { error: 'Webhook de PayPal sin firma (ignorado)' };
   const ok = await verifyWebhook(cfg, headers, rawBody);
   if (!ok) return { error: 'Webhook de PayPal con firma inválida (ignorado)' };
 
@@ -59,6 +63,20 @@ async function handleWebhook(cfg, headers, rawBody) {
   return { ignored: `Evento ${evt.event_type} ignorado` };
 }
 
+// PayPal codifica el IPN con su campo `charset` (windows-1252 si no viene); URLSearchParams lo leería como UTF-8: "Jos%E9" → "Jos�"
+function ipnParams(rawBody) {
+  const charset = new URLSearchParams(rawBody).get('charset') || 'windows-1252';
+  let decoder;
+  try { decoder = new TextDecoder(charset); } catch { decoder = new TextDecoder('utf-8'); } // charset desconocido
+  const decode = (s) => decoder.decode(querystring.unescapeBuffer(s.replace(/\+/g, ' ')));
+  const p = new URLSearchParams();
+  for (const par of rawBody.split('&')) {
+    const [k, v = ''] = par.split(/=(.*)/s);
+    p.append(decode(k), decode(v));
+  }
+  return p;
+}
+
 async function handleIpn(cfg, rawBody) {
   const r = await fetch(ipnBase(cfg.mode), {
     method: 'POST',
@@ -68,7 +86,7 @@ async function handleIpn(cfg, rawBody) {
   const answer = (await r.text()).trim();
   if (answer !== 'VERIFIED') return { error: `IPN de PayPal no verificado (${answer || r.status})` };
 
-  const p = new URLSearchParams(rawBody);
+  const p = ipnParams(rawBody);
   if (p.get('payment_status') !== 'Completed') return { ignored: `IPN con estado ${p.get('payment_status')}` };
 
   const mine = (cfg.receiverEmail || '').trim().toLowerCase();

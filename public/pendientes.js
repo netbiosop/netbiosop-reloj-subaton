@@ -17,8 +17,7 @@
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const caja = document.createElement('div'); caja.id = 'pend';
-  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(caja));
-  if (document.body) document.body.appendChild(caja);
+  document.body.appendChild(caja); // el script va al final del <body> en las tres páginas
 
   const tituloBase = document.title;
   let conocidas = new Set(), primera = true;
@@ -27,7 +26,7 @@
       const a = new (window.AudioContext || window.webkitAudioContext)();
       [880, 1175].forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = f; o.connect(g); g.connect(a.destination);
         const t = a.currentTime + i * 0.18; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); o.start(t); o.stop(t + 0.17); });
-    } catch {}
+    } catch (err) { console.warn('[Aviso de donación] No se pudo sonar:', err.message); } // el navegador puede bloquear el audio
   }
   function pintar(lista) {
     const nuevas = lista.filter((p) => !conocidas.has(p.key));
@@ -43,7 +42,7 @@
         <div class="q"><b>${esc(ev.user)}</b> · ${esc(Number(ev.amount).toLocaleString('es'))} ${esc(ev.currency || '')}</div>
         <div class="det">${h}${ev.message ? ' · “' + esc(String(ev.message).slice(0, 120)) + '”' : ''}</div>
         <div class="bt"><button class="si" data-r="1">✔ Es donación</button><button class="no" data-r="0">✖ No es donación</button></div>
-        <label><input type="checkbox" data-siempre> Lo mismo para sus próximos pagos (no preguntar más)</label>
+        <label><input type="checkbox" data-siempre> ${ev.payer ? 'Lo mismo para sus próximos pagos (no preguntar más)' : 'Si es donación, que sus próximas cuenten solas'}</label>
         <div class="err"></div></div>`;
     }).join('');
   }
@@ -58,8 +57,15 @@
       card.remove();
     } catch (err) { card.querySelector('.err').textContent = err.message; card.querySelectorAll('button').forEach((x) => (x.disabled = false)); }
   });
-  async function cargar() { try { const j = await (await fetch('/api/pendientes', { cache: 'no-store' })).json(); pintar(j.lista || []); } catch {} }
+  async function cargar() {
+    try { const j = await (await fetch('/api/pendientes', { cache: 'no-store' })).json(); pintar(j.lista || []); }
+    catch (err) { console.warn('[Aviso de donación] No se pudo leer la lista:', err.message); }
+  }
   cargar();
   setInterval(cargar, 30000); // respaldo: los avisos llegan al instante por /events
-  try { new EventSource('/events').onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'pendientes') pintar(m.payload.lista || []); } catch {} }; } catch {}
+  // usa la conexión /events de la página: Chrome deja 6 por servidor y con una segunda por pestaña el panel se cuelga
+  (function escuchar() {
+    if (!window.__es) return setTimeout(escuchar, 300); // el panel del reloj la abre después de cargar sus datos
+    window.__es.addEventListener('message', (ev) => { const m = JSON.parse(ev.data); if (m.type === 'pendientes') pintar(m.payload.lista || []); });
+  })();
 })();

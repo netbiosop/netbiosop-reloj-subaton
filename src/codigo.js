@@ -3,6 +3,7 @@
 // El servidor decide cuándo sale cada cosa (cada X minutos) y avisa a los overlays por /events.
 const fs = require('fs');
 const path = require('path');
+const apartarDanado = require('./danado');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'codigo.json');
@@ -28,7 +29,7 @@ const num = (v, min, max, def) => { const n = Number(v); return Number.isFinite(
 let config = clone(DEFAULTS);
 try {
   const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  config = { ...clone(DEFAULTS), ...j, tarjeta: { ...DEFAULTS.tarjeta, ...j.tarjeta }, cinta: { ...DEFAULTS.cinta, ...j.cinta } };
+  config = { ...config, ...j, tarjeta: { ...config.tarjeta, ...j.tarjeta }, cinta: { ...config.cinta, ...j.cinta } }; // config: ya es una copia de DEFAULTS
   if (!Array.isArray(config.plataformas)) config.plataformas = clone(DEFAULTS.plataformas);
   if (!Array.isArray(config.cinta.mensajes)) config.cinta.mensajes = [];
   // valores viejos de fábrica → estilo noticiero y más lento
@@ -36,6 +37,7 @@ try {
   if (config.cinta.velocidad === 90) config.cinta.velocidad = 55;
 } catch (err) {
   if (err.code !== 'ENOENT') console.error('[Código] No se pudo leer', FILE, '-', err.message);
+  apartarDanado(FILE, err);
 }
 
 function save() {

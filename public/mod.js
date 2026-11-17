@@ -185,13 +185,14 @@ function renderLog() {
 }
 
 // ---------- tarifas (permiso "rates") ----------
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const RATE_SRC = [['paypal', 'PayPal'], ['mercadopago', 'Mercado Pago'], ['bits', 'Bits']];
 function renderRates() {
   if (!data.rates) return;
   const r = data.rates;
   const money = ([k, name]) => `<div class="rate" data-src="${k}">
       <div class="rate-head"><span class="tag ${k}">${name}</span><label class="switch"><input type="checkbox" data-f="enabled" ${r[k].enabled ? 'checked' : ''}><span></span></label></div>
-      <div class="rate-line">Por cada <input type="number" step="any" min="0" data-f="amount" value="${r[k].amount}"> ${k === 'bits' ? 'bits' : `<input class="cur" data-f="currency" maxlength="3" value="${r[k].currency || ''}">`} suma <input class="dur" data-f="seconds" data-dur value="${fmtDur(r[k].seconds)}"></div>
+      <div class="rate-line">Por cada <input type="number" step="any" min="0" data-f="amount" value="${r[k].amount}"> ${k === 'bits' ? 'bits' : `<input class="cur" data-f="currency" maxlength="3" value="${esc(r[k].currency || '')}">`} suma <input class="dur" data-f="seconds" data-dur value="${fmtDur(r[k].seconds)}"></div>
       <div class="rate-line small">Mínimo <input type="number" step="any" min="0" data-f="minAmount" value="${r[k].minAmount}"> <label class="check"><input type="checkbox" data-f="proportional" ${r[k].proportional ? 'checked' : ''}> Proporcional</label></div>
     </div>`;
   const s = r.subs;
@@ -255,7 +256,7 @@ function applyPerms() {
   $('#meName').textContent = data.me.name;
 }
 $('#btnLogout').onclick = async () => {
-  await api('POST', '/api/logout').catch(() => {});
+  await api('POST', '/api/logout').catch((err) => console.warn('[Salir]', err));
   location.href = '/login';
 };
 
@@ -294,10 +295,9 @@ function connect() {
       data.log.unshift(payload);
       $('#log .empty')?.remove();
       $('#log').prepend(logItem(payload, true));
-      if (!payload.test && payload.source !== 'manual') {
-        data.totalAdded += payload.seconds || 0;
-        if (data.stats) api('GET', '/api/mod/data').then((r) => { data.stats = r.stats; renderStats(); }).catch(() => {});
-      }
+      if (!payload.test && payload.source !== 'manual') data.totalAdded += payload.seconds || 0;
+      // "No era donación" llega como 'manual' y cambia stats y el total
+      if (!payload.test && data.stats) api('GET', '/api/mod/data').then((r) => { data.stats = r.stats; renderStats(); data.totalAdded = r.totalAdded; $('#totalAdded').textContent = fmtDur(data.totalAdded); }).catch((err) => console.warn('[Estadísticas]', err));
       $('#totalAdded').textContent = fmtDur(data.totalAdded);
     } else if (type === 'multiplier') {
       data.multiplier = payload;
@@ -309,13 +309,13 @@ function connect() {
   // Si el dueño cambió los permisos, la conexión se reinicia: se vuelven a cargar los datos
   let dropped = false;
   es.onopen = () => {
-    if (dropped) load().catch(() => {});
+    if (dropped) load().catch((err) => console.warn('[Recarga]', err));
     dropped = false;
   };
   es.onerror = () => {
     dropped = true;
     // Si el dueño quitó el acceso, la próxima petición lleva a la pantalla de entrada
-    fetch('/api/mod/data', { cache: 'no-store' }).then((r) => r.status === 401 && (location.href = '/login')).catch(() => {});
+    fetch('/api/mod/data', { cache: 'no-store' }).then((r) => r.status === 401 && (location.href = '/login')).catch(() => {}); /* sin conexión: el EventSource reintenta solo */
   };
 }
 load().then(connect).catch((e) => toast('No se pudo cargar: ' + e.message, true));

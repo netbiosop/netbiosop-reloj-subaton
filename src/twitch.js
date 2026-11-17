@@ -76,7 +76,7 @@ class TwitchClient {
         redirect_uri: this.redirectUri,
       }),
     });
-    const j = await r.json();
+    const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.message || `Error ${r.status}`);
     this.s.accessToken = j.access_token;
     this.s.refreshToken = j.refresh_token;
@@ -98,12 +98,13 @@ class TwitchClient {
         refresh_token: this.s.refreshToken,
       }),
     });
-    const j = await r.json();
-    if (!r.ok) {
+    const j = await r.json().catch(() => ({})); // un 5xx de la CDN trae HTML: el aviso debe decir el código, no "Unexpected token"
+    if (r.status === 400 || r.status === 401) {
       this.s.accessToken = '';
       this.store.save();
       throw new Error('La sesión de Twitch expiró, vuelve a conectar (' + (j.message || r.status) + ')');
     }
+    if (!r.ok) throw new Error('Twitch no pudo renovar la sesión (' + (j.message || r.status) + ')'); // 429/5xx pasajero: el token sigue
     this.s.accessToken = j.access_token;
     this.s.refreshToken = j.refresh_token || this.s.refreshToken;
     this.store.save();
@@ -124,9 +125,12 @@ class TwitchClient {
       return this.helix(method, path, body, false);
     }
     const text = await r.text();
-    const j = text ? JSON.parse(text) : {};
-    if (!r.ok) throw new Error(`${r.status} ${j.message || text}`);
-    return j;
+    if (!r.ok) {
+      let msg = text.slice(0, 200);
+      try { msg = JSON.parse(text).message || msg; } catch { /* 5xx con HTML: va el texto tal cual */ }
+      throw new Error(`${r.status} ${msg}`);
+    }
+    return text ? JSON.parse(text) : {};
   }
 
   async sendChat(message, replyTo) {
@@ -168,11 +172,10 @@ class TwitchClient {
 
   stop() {
     this.stopped = true;
+    this.chatOk = false;
     clearTimeout(this.reconnectTimer);
     clearTimeout(this.watchdog);
-    for (const ws of [this.ws, this.pendingWs]) {
-      try { ws?.close(); } catch {}
-    }
+    for (const ws of [this.ws, this.pendingWs]) ws?.close();
     this.ws = null;
     this.pendingWs = null;
   }
@@ -184,7 +187,7 @@ class TwitchClient {
 
     ws.addEventListener('message', (e) => {
       let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
+      try { msg = JSON.parse(e.data); } catch { console.warn('[Twitch] Mensaje ilegible, se ignora'); return; }
       this.onMessage(ws, msg, isReconnect).catch((err) => {
         console.error('[Twitch]', err.message);
         this.setStatus('error', err.message);
@@ -207,7 +210,7 @@ class TwitchClient {
     this.watchdog = setTimeout(() => {
       console.warn('[Twitch] Sin mensajes de Twitch, reconectando…');
       this.ws = null;
-      try { ws.close(); } catch {}
+      ws.close();
       if (!this.stopped) this.connect(EVENTSUB_URL, false);
     }, ((this.keepalive || 10) + 10) * 1000);
   }
@@ -232,7 +235,7 @@ class TwitchClient {
         const old = this.ws;
         this.ws = ws;
         this.pendingWs = null;
-        try { old?.close(); } catch {}
+        old?.close();
       } else {
         await this.subscribeAll(msg.payload.session.id);
       }

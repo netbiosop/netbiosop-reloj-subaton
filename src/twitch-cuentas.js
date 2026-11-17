@@ -10,7 +10,8 @@ const GRANT_DISPOSITIVO = 'urn:ietf:params:oauth:grant-type:device_code';
 function crearCuentas({ store, twitch }) {
   const s = () => twitch.s;
   const cuentas = () => (s().cuentas ||= {});
-  const vinculando = {}; // login → { estado: 'esperando'|'listo'|'error', codigo, url, expira, mensaje }
+  const cuenta = (login) => (Object.hasOwn(cuentas(), login) ? cuentas()[login] : null); // "constructor" es un login válido
+  const vinculando = Object.create(null); // login → { estado: 'esperando'|'listo'|'error', codigo, url, expira, mensaje }
 
   async function form(ruta, campos) {
     const r = await fetch(ID + ruta, { method: 'POST', body: new URLSearchParams(campos), signal: AbortSignal.timeout(15000) });
@@ -38,16 +39,25 @@ function crearCuentas({ store, twitch }) {
           Object.assign(v, { estado: 'error', mensaje: /denied/i.test(msg) ? 'La persona no aceptó el permiso' : 'Twitch no lo aceptó (' + msg + ')' });
           return;
         }
-        // ¿Entró con la cuenta correcta?
-        const yo = await (await fetch(HELIX + '/users', { headers: { 'Client-Id': s().clientId, Authorization: 'Bearer ' + r.j.access_token } })).json();
-        const u = yo.data?.[0];
-        if (!u) throw new Error('No se pudo leer la cuenta');
+        // ¿Entró con la cuenta correcta? El device_code ya se canjeó: si esto falla no se vuelve a preguntar con él
+        let u;
+        try {
+          const ru = await fetch(HELIX + '/users', { headers: { 'Client-Id': s().clientId, Authorization: 'Bearer ' + r.j.access_token }, signal: AbortSignal.timeout(15000) });
+          if (!ru.ok) throw new Error('Twitch respondió ' + ru.status);
+          u = (await ru.json()).data?.[0];
+          if (!u) throw new Error('respuesta sin cuenta');
+        } catch (e) {
+          console.error(`[Automensajes] No se pudo leer la cuenta de ${login} tras autorizar: ${e.message}`);
+          Object.assign(v, { estado: 'error', mensaje: 'Twitch autorizó pero no se pudo leer la cuenta (' + e.message + '): pide un código nuevo' });
+          return;
+        }
         if (u.login.toLowerCase() !== login) { Object.assign(v, { estado: 'error', mensaje: `Entró con la cuenta "${u.login}", y tenía que ser "${login}". Que cierre sesión en Twitch y pida un código nuevo.` }); return; }
         cuentas()[login] = { userId: u.id, nombre: u.display_name || u.login, accessToken: r.j.access_token, refreshToken: r.j.refresh_token || '', at: Date.now() };
         store.save();
         Object.assign(v, { estado: 'listo', mensaje: `✔ Vinculada: los mensajes que active ${u.display_name || u.login} salen con su cuenta` });
         console.log(`[Automensajes] 🔗 Cuenta de ${u.display_name || u.login} vinculada: el bot puede escribir con su nombre`);
       } catch (e) {
+        console.error(`[Automensajes] Vincular ${login}: ${e.message} (se vuelve a intentar)`);
         setTimeout(preguntar, intervalo * 2); // sin internet un momento: sigue esperando
       }
     };
@@ -56,7 +66,7 @@ function crearCuentas({ store, twitch }) {
   }
 
   async function renovar(login) {
-    const c = cuentas()[login];
+    const c = cuenta(login);
     if (!c?.refreshToken) throw new Error('sin permiso guardado');
     const base = { client_id: s().clientId, grant_type: 'refresh_token', refresh_token: c.refreshToken };
     let r = s().clientSecret ? await form('/oauth2/token', { ...base, client_secret: s().clientSecret }) : await form('/oauth2/token', base);
@@ -68,7 +78,7 @@ function crearCuentas({ store, twitch }) {
 
   // Escribe en TU chat con la cuenta de "login". Devuelve true si Twitch lo aceptó.
   async function enviar(login, texto, responderA, reintento = true) {
-    const c = cuentas()[login];
+    const c = cuenta(login);
     if (!c || !s().userId) return false;
     try {
       const r = await fetch(HELIX + '/chat/messages', {
@@ -88,7 +98,7 @@ function crearCuentas({ store, twitch }) {
     }
   }
 
-  const tiene = (login) => !!cuentas()[String(login || '').toLowerCase()];
+  const tiene = (login) => !!cuenta(String(login || '').toLowerCase());
   function estado(login) {
     const v = vinculando[login];
     return { login, vinculada: tiene(login), ...(v ? { estado: v.estado, codigo: v.estado === 'esperando' ? v.codigo : undefined, url: v.url, mensaje: v.mensaje, venceEnSeg: Math.max(0, Math.round((v.expira - Date.now()) / 1000)) } : {}) };
@@ -96,7 +106,7 @@ function crearCuentas({ store, twitch }) {
   function cancelar(login) { delete vinculando[login]; }
   function quitar(login) {
     delete vinculando[login];
-    if (cuentas()[login]) { delete cuentas()[login]; store.save(); console.log(`[Automensajes] Cuenta de ${login} desvinculada`); }
+    if (cuenta(login)) { delete cuentas()[login]; store.save(); console.log(`[Automensajes] Cuenta de ${login} desvinculada`); }
   }
   const resumen = () => Object.fromEntries(Object.entries(cuentas()).map(([k, c]) => [k, { nombre: c.nombre }]));
 

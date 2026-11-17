@@ -1,5 +1,5 @@
 // Comandos del chat de Twitch para controlar el reloj (solo tú, mods, supermods y la gente que elijas)
-const { fmtDuration } = require('./engine');
+const { fmtDuration, LABELS } = require('./engine');
 
 // "10" = 10 minutos · "1:30" = 1 min 30 s · "2:00:00" = 2 horas · también "30s", "10m", "2h", "1h30m"
 function parseDur(str) {
@@ -24,7 +24,6 @@ const SOURCE_WORDS = {
   bits: 'bits', bit: 'bits',
   subs: 'subs', sub: 'subs',
 };
-const SOURCE_LABEL = { paypal: 'PayPal', mercadopago: 'Mercado Pago', bits: 'Bits', subs: 'Subs' };
 
 function createCommands({ store, timer, engine, twitch, setManualMultiplier, podio }) {
   const d = () => store.data;
@@ -81,6 +80,11 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
     if (!permission(e)) return;
 
     const log = (t) => engine.logNote(`${who}: ${t}`);
+    const apagarMulti = () => {
+      setManualMultiplier({ active: false });
+      log('apagó el multiplicador');
+      return reply('Multiplicador apagado');
+    };
     console.log(`[Chat] ${who} → ${text}`);
 
     switch (cmd) {
@@ -129,9 +133,7 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
         return reply('▶ ¡Reloj corriendo! ' + remainingText());
       case 'x1':
       case 'multioff':
-        setManualMultiplier({ active: false });
-        log('apagó el multiplicador');
-        return reply('Multiplicador apagado');
+        return apagarMulti();
       case 'comandos':
       case 'ayuda':
         return reply(`${prefix}tiempo · ${prefix}mp.add @usuario · ${prefix}sumar 10 · ${prefix}quitar 5 · ${prefix}fijar 3:00:00 · ${prefix}pausa · ${prefix}iniciar · ${prefix}x2 30 [subs bits paypal mp] · ${prefix}multioff`);
@@ -147,10 +149,7 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
       rest = args.slice(1);
     }
     if (!(value >= 1)) return reply(`Uso: ${prefix}x2 30 (minutos) [subs bits paypal mp]`);
-    if (value === 1) {
-      setManualMultiplier({ active: false });
-      return reply('Multiplicador apagado');
-    }
+    if (value === 1) return apagarMulti();
     let minutes = 0;
     if (rest[0] && !SOURCE_WORDS[rest[0].toLowerCase()]) {
       const s = parseDur(rest.shift());
@@ -161,12 +160,12 @@ function createCommands({ store, timer, engine, twitch, setManualMultiplier, pod
     const appliesTo = { paypal: false, mercadopago: false, bits: false, subs: false };
     (picked.length ? picked : Object.keys(appliesTo)).forEach((k) => (appliesTo[k] = true));
     setManualMultiplier({ active: true, value, minutes, appliesTo });
-    const srcs = picked.length ? [...new Set(picked)].map((k) => SOURCE_LABEL[k]).join(', ') : 'todo';
+    const srcs = picked.length ? [...new Set(picked)].map((k) => LABELS[k]).join(', ') : 'todo';
     log(`activó x${value} en ${srcs}${minutes ? ` por ${fmtDuration(minutes * 60)}` : ''}`);
     return reply(`🔥 x${value} activado en ${srcs}${minutes ? ` por ${fmtDuration(minutes * 60)}` : ' hasta que se apague'}`);
   }
 
-  return { handle, parseDur };
+  return { handle };
 }
 
-module.exports = { createCommands, parseDur };
+module.exports = { createCommands };

@@ -11,17 +11,20 @@ const DATA_DIR = process.env.DATA_DIR || path.join(RAIZ, 'data');
 const LOG_DIR = process.env.LOG_DIR || path.join(RAIZ, 'logs');
 const CONF = path.join(RAIZ, 'respaldo-github.json'); // fuera de "data", nunca se sube a ningún lado
 const API = process.env.GH_BACKUP_API || 'https://api.github.com';
+// Sin multichat.json a propósito: guarda la clave de TikTok (tiktok.apiKey)
 const ARCHIVOS = ['subaton.json', 'podio.json', 'codigo.json', 'hype.json', 'automensajes.json'];
 const MIN_ENTRE_COPIAS = 5 * 60000; // como mucho una subida cada 5 minutos
-
-let conf = { repo: '', token: '', rama: 'main' };
-try { conf = { ...conf, ...JSON.parse(fs.readFileSync(CONF, 'utf8')) }; } catch {}
-let estado = { ultima: null, error: '', subiendo: false };
-let ultimoContenido = '', ultimaSubida = 0, pendiente = null;
 
 function anotar(txt) {
   try { fs.mkdirSync(LOG_DIR, { recursive: true }); fs.appendFileSync(path.join(LOG_DIR, 'respaldo-github.txt'), `[${new Date().toLocaleString('es')}] ${txt}\r\n`); } catch {}
 }
+
+let conf = { repo: '', token: '', rama: 'main' };
+try { conf = { ...conf, ...JSON.parse(fs.readFileSync(CONF, 'utf8')) }; } catch (e) {
+  if (e.code !== 'ENOENT') anotar('No se pudo leer respaldo-github.json (la copia en GitHub queda apagada): ' + e.message);
+}
+let estado = { ultima: null, error: '', subiendo: false };
+let ultimoContenido = '', ultimaSubida = 0, pendiente = null, motivoPendiente = '', otraVez = null;
 const configurado = () => !!(conf.repo && conf.token);
 
 async function gh(method, ruta, body) {
@@ -41,7 +44,10 @@ function leerArchivos() {
   const out = [];
   for (const f of ARCHIVOS) {
     let j;
-    try { j = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')); } catch { continue; }
+    try { j = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')); } catch (e) {
+      if (e.code !== 'ENOENT') anotar(`No se sube ${f}: ${e.message}`);
+      continue;
+    }
     if (f === 'subaton.json') delete j.secrets;
     out.push({ path: 'datos/' + f, content: JSON.stringify(j, null, 2) + '\n' });
   }
@@ -49,7 +55,8 @@ function leerArchivos() {
 }
 
 async function subir(motivo = 'automática') {
-  if (!configurado() || estado.subiendo) return null;
+  if (!configurado()) return null;
+  if (estado.subiendo) { otraVez = motivo; return null; } // se vuelve a pedir al terminar (al cerrar el reloj no da tiempo)
   const archivos = leerArchivos();
   if (!archivos.length) return null;
   const huella = JSON.stringify(archivos);
@@ -78,15 +85,22 @@ async function subir(motivo = 'automática') {
     estado.error = e.message;
     anotar('No se pudo subir: ' + e.message);
     return null;
-  } finally { estado.subiendo = false; }
+  } finally {
+    estado.subiendo = false;
+    // lo pedido durante la subida se vuelve a programar con ultimaSubida nueva (respeta el mínimo entre copias)
+    const motivoNuevo = otraVez || (pendiente && motivoPendiente);
+    otraVez = null;
+    if (motivoNuevo) { clearTimeout(pendiente); pendiente = null; pedir(motivoNuevo); }
+  }
 }
 
-// Pedido de copia: se junta con otros y sale como mucho una cada 5 minutos (al cerrar sale enseguida)
-function pedir(motivo, ya = false) {
+// Pedido de copia: se junta con otros y sale como mucho una cada 5 minutos (subir() no rechaza: anota sus errores)
+function pedir(motivo) {
   if (!configurado()) return;
-  clearTimeout(pendiente);
-  const espera = ya ? 0 : Math.max(10000, ultimaSubida + MIN_ENTRE_COPIAS - Date.now());
-  pendiente = setTimeout(() => { subir(motivo).catch(() => {}); }, espera);
+  motivoPendiente = motivo;
+  if (pendiente) return; // no se pospone: en una racha de aportes la copia igual sale
+  const espera = Math.max(10000, ultimaSubida + MIN_ENTRE_COPIAS - Date.now());
+  pendiente = setTimeout(() => { pendiente = null; subir(motivoPendiente); }, espera);
 }
 
 function info() {

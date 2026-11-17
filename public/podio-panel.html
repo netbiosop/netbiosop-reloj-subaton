@@ -286,12 +286,12 @@ function pintar(){
   // Monedas
   const curs = ['USD', ...D.currencies.map(c=>c.code)];
   const sel = $('addCur').value;
-  $('addCur').innerHTML = curs.map(c=>`<option ${c===(sel||'USD')?'selected':''}>${c}</option>`).join('');
+  $('addCur').innerHTML = curs.map(c=>`<option ${c===(sel||'USD')?'selected':''}>${esc(c)}</option>`).join('');
   const enfocado = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.rate;
   if(!enfocado){
     $('tasas').innerHTML = `<div class="tasa"><span>Moneda</span><span>Automática</span><span>Mi tasa (1 USD =)</span></div>` +
-      D.currencies.map(c=>`<div class="tasa"><b>${c.code}</b><span>${c.auto?'1 USD = '+fmtNum(c.auto)+' '+c.code:'sin datos'}</span>
-        <input type="number" min="0" step="any" data-rate="${c.code}" value="${c.manual||''}" placeholder="automática"></div>`).join('');
+      D.currencies.map(c=>`<div class="tasa"><b>${esc(c.code)}</b><span>${c.auto?'1 USD = '+fmtNum(c.auto)+' '+esc(c.code):'sin datos'}</span>
+        <input type="number" min="0" step="any" data-rate="${esc(c.code)}" value="${c.manual||''}" placeholder="automática"></div>`).join('');
   }
   $('ratesNota').textContent = D.ratesAt ? 'Cotización automática del '+new Date(D.ratesAt).toLocaleString('es') : 'Sin cotización automática todavía (¿sin internet?).';
 
@@ -340,7 +340,7 @@ function pintar(){
   const lista = D.events.filter(e=>!filtro || e.cat===filtro);
   $('eventos').innerHTML = lista.map(e=>{
     const neg = (e.amount ?? e.count) < 0;
-    let det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${e.currency}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
+    let det = e.cat==='dinero' ? `${fmtNum(e.amount)} ${esc(e.currency)}${e.currency!=='USD'?` ≈ $${e.usd==null?'?':Number(e.usd).toFixed(2)} USD`:''}`
               : e.cat==='bits' ? `${fmtNum(e.amount)} bits` : e.kind==='new' ? 'sub nueva (solo meta)' : e.kind==='resub' ? 'resub (solo meta)' : `${e.count} sub${Math.abs(e.count)>1?'s':''} regalada${Math.abs(e.count)>1?'s':''}`;
     if (neg) det = `<span class="neg">${det.replace(/^-/, '−')}</span>`;
     const h = new Date(e.at).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
@@ -401,7 +401,7 @@ $('eventos').addEventListener('click', async (ev)=>{
     const e = D.events.find(x=>x.id===nd.dataset.nodon);
     if(!confirm(`¿${e.user} (${fmtNum(e.amount)} ${e.currency}) NO es una donación?\n\nSe quita del podio y de las metas, y se descuenta del reloj el tiempo que había sumado.`)) return;
     const recordar = e.source==='mercadopago' && !!e.pk && confirm(`¿Tampoco contar los PRÓXIMOS pagos de ${e.user}?\n(Aceptar = nunca más cuentan · Cancelar = solo este)`);
-    try{ const r = await api('/api/podio/no-es-donacion','POST',{id:e.id, recordar}); alert(`Listo: ${e.user} ya no cuenta como donación${r.result.segundos?`. Se descontaron ${Math.round(r.result.segundos/60)} min del reloj`:''}${r.result.recordado?'. Sus próximos pagos tampoco van a contar':''}.`); firma=''; cargar(); }
+    try{ const r = await api('/api/podio/no-es-donacion','POST',{id:e.id, recordar}); alert(`Listo: ${e.user} ya no cuenta como donación${r.result.segundos?`. Se descontaron ${Math.round(r.result.segundos/60)} min del reloj`:''}${r.result.recordado?'. Sus próximos pagos tampoco van a contar':''}.${r.result.sinHistorial?'\n\nNo está en el historial: el tiempo NO se descontó; quítalo a mano si hace falta.':''}`); firma=''; cargar(); }
     catch(err){ alert(err.message); }
     return;
   }
@@ -441,7 +441,7 @@ $('rank').addEventListener('click', async (ev)=>{
   const de = b.dataset.renom;
   const a = prompt(`Nuevo nombre para "${de}" (se cambia en todos sus aportes de ${D.month.label}).\nSi escribes un nombre que ya está en el ranking, se suman juntos.`, de);
   if(!a || a.trim()===de) return;
-  try{ const r = await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
+  try{ await api('/api/podio/renombrar','POST',{mes:D.month.key, de, a}); firma=''; await cargar(); }catch(e){ alert(e.message); }
 });
 // Reyes del mes pasado: automáticos, con opción de ponerlos a mano
 let editRey = null;
@@ -506,7 +506,7 @@ document.addEventListener('click', (ev)=>{
 
 cargar();
 setInterval(cargar, 10000);
-try { new EventSource('/events').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
+(window.__es = new EventSource('/events')).onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) { console.warn('[Podio]', e); } }; // pendientes.js la comparte
 </script>
 <script src="/pendientes.js"></script>
 </body>

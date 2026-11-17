@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 
 const API = 'https://api.mercadopago.com';
+const START_RETRY_MS = 60 * 1000;
 
 // "Luis Villa" coincide con "LUIS MARÍA VILLA" (las palabras de la regla, en orden, empezando por el primer nombre);
 // una sola letra vale como inicial: "Luis V" coincide con "Luis Villa" y "Luis Valdez". "Luisa Villa" no coincide con "Luis Villa".
@@ -17,6 +18,8 @@ function coincideNombre(nombre, regla) {
   for (const w of r.slice(1)) { while (i < n.length && !igual(n[i], w)) i++; if (i++ >= n.length) return false; }
   return true;
 }
+
+const SIN_NOMBRE = 'Donación Mercado Pago'; // nombre de los pagos sin nombre: junta a pagadores distintos
 
 class MercadoPagoClient {
   constructor({ store, onContribution, onStatus }) {
@@ -47,18 +50,21 @@ class MercadoPagoClient {
   async api(path) {
     const r = await fetch(API + path, { headers: { Authorization: 'Bearer ' + this.s.accessToken } });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(`${r.status} ${j.message || j.error || ''}`.trim());
+    if (!r.ok) throw Object.assign(new Error(`${r.status} ${j.message || j.error || ''}`.trim()), { status: r.status });
     return j;
   }
 
   async start() {
     this.stop();
+    const gen = this.gen;
+    this.userId = null; // con otro token, la cuenta anterior ya no es "la tuya"
     if (!this.s.accessToken) {
       this.setStatus('desconectado');
       return;
     }
     try {
       const me = await this.api('/users/me');
+      if (gen !== this.gen) return; // otro start() o un stop() mientras se esperaba: su sondeo quedaría sin referencia
       this.userId = me.id;
       this.nickname = me.nickname || '';
       if (!this.store.data.mpSince) {
@@ -74,22 +80,33 @@ class MercadoPagoClient {
       }
       console.log(`[Mercado Pago] Conectado como ${this.nickname} (modo ${this.s.mode})`);
     } catch (err) {
-      this.setStatus('error', 'Token inválido: ' + err.message);
+      if (gen !== this.gen) return;
       console.error('[Mercado Pago]', err.message);
+      if (err.status >= 400 && err.status < 500 && err.status !== 429) return this.setStatus('error', 'Token inválido: ' + err.message);
+      this.setStatus('reconectando', 'Sin conexión con Mercado Pago, reintentando: ' + err.message);
+      this.retryTimer = setTimeout(() => this.start(), START_RETRY_MS);
     }
   }
 
   stop() {
+    this.gen = (this.gen || 0) + 1;
     clearInterval(this.pollTimer);
+    clearTimeout(this.retryTimer);
   }
 
   async poll() {
+    const gen = this.gen;
     try {
       const q = new URLSearchParams({ sort: 'date_created', criteria: 'desc', limit: '50' });
       const res = await this.api('/v1/payments/search?' + q);
-      for (const p of (res.results || []).reverse()) await this.processPayment(p);
+      for (const p of (res.results || []).reverse()) {
+        if (gen !== this.gen) return; // otro start() o un stop(): la cuenta pudo cambiar
+        await this.processPayment(p);
+      }
+      if (gen !== this.gen) return;
       this.setStatus('conectado', 'Revisando pagos cada ' + (this.s.pollSeconds || 15) + ' s');
     } catch (err) {
+      if (gen !== this.gen) return;
       this.setStatus('error', 'Error consultando pagos: ' + err.message);
     }
   }
@@ -142,17 +159,28 @@ class MercadoPagoClient {
     if (approvedAt && approvedAt < (this.store.data.mpSince || 0) - 60_000) return;
     const amount = Number(p.transaction_amount);
     if (!(amount > 0)) return;
+    // sin saber cuál es tu cuenta no se puede filtrar lo que pagaste tú: en un webhook el error (500) hace que Mercado Pago lo reintente
+    if (!this.userId) throw new Error('Todavía no se confirmó tu cuenta de Mercado Pago; el aviso se reintentará');
+    const yo = this.userId; // start() lo borra al guardar ajustes mientras se espera el pago completo
     if ((this.vistos ||= new Set()).has(String(p.id))) return;
     this.vistos.add(String(p.id));
+    if (this.vistos.size > 2000) this.vistos = new Set([...this.vistos].slice(-1000)); // igual que twitch.js: el reloj puede quedar abierto semanas
     // la búsqueda de pagos a veces viene sin el nombre o sin quién lo cobró: se pide el pago completo
     const cobrador = (x) => x.collector_id ?? x.collector?.id;
     let nombre = this.nombreDe(p);
-    if (!nombre || (this.userId && !cobrador(p))) { try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); } catch {} }
-    // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
-    if (this.userId) {
-      if (String(cobrador(p) ?? '') !== String(this.userId)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
-      if (p.payer?.id && String(p.payer.id) === String(this.userId)) return this.ignorar(p, nombre, 'lo pagaste tú');
+    if (!nombre || !cobrador(p)) {
+      try { const full = await this.api('/v1/payments/' + encodeURIComponent(p.id)); p = { ...p, ...full }; nombre = this.nombreDe(p); }
+      catch (err) {
+        console.warn(`[Mercado Pago] No se pudo pedir el pago ${p.id} completo:`, err.message);
+        // sin saber quién lo cobró se descartaría: si el fallo es pasajero (red, 429, 5xx) se olvida para que el
+        // próximo sondeo lo reintente; un 4xx fijo no se reintenta (serían un pedido y un aviso cada sondeo para siempre)
+        const fijo = err.status >= 400 && err.status < 500 && err.status !== 429;
+        if (!cobrador(p) && !fijo) { this.vistos.delete(String(p.id)); return; }
+      }
     }
+    // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
+    if (String(cobrador(p) ?? '') !== String(yo)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
+    if (p.payer?.id && String(p.payer.id) === String(yo)) return this.ignorar(p, nombre, 'lo pagaste tú');
     const pk = this.clave(p);
     // Personas de "no contar" (ej. el sueldo): por nombre o porque marcaste un pago suyo como "No es donación"
     const lista = this.store.data.settings.mpIgnorar || {};
@@ -160,7 +188,7 @@ class MercadoPagoClient {
     const regla = this.nombresDe(p).map((n) => (lista.nombres || []).find((r) => coincideNombre(n, r))).find(Boolean);
     if (regla) return this.ignorar(p, nombre, `está en tu lista de "no contar" ("${regla}")`);
     // si en el motivo de la transferencia escribió su usuario de Twitch (@usuario), se usa ese
-    const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/@([A-Za-z0-9_]{3,25})/);
+    const arroba = String(p.description || p.additional_info?.items?.[0]?.title || '').match(/(?<![\w.])@([A-Za-z0-9_]{3,25})/);   // sin letra antes: un correo no es @usuario
     const recordado = (arroba && arroba[1]) || (pk && this.store.data.mpNombres && this.store.data.mpNombres[pk]);
     if (arroba && pk) (this.store.data.mpNombres ||= {})[pk] = arroba[1];
     if (!nombre && !recordado) console.warn(`[Mercado Pago] Pago ${p.id} sin nombre del que donó (método: ${p.payment_method_id || p.payment_type_id || '?'}). Puedes ponerle el nombre en el podio y se recuerda para la próxima.`);
@@ -169,7 +197,7 @@ class MercadoPagoClient {
       id: String(p.id),
       amount,
       currency: p.currency_id,
-      user: recordado || this.formatear(nombre) || 'Donación Mercado Pago',
+      user: recordado || this.formatear(nombre) || SIN_NOMBRE,
       payer: pk,
       message: p.description || '',
     });
@@ -188,10 +216,12 @@ class MercadoPagoClient {
 
   async handleWebhook(query, headers, rawBody) {
     let body = {};
-    try { body = JSON.parse(rawBody || '{}'); } catch {}
+    try { body = JSON.parse(rawBody || '{}'); } catch { /* Mercado Pago también manda tipo e id en la URL */ }
     const type = body.type || query.type || query.topic;
     const id = query['data.id'] || body.data?.id || query.id;
     if (type !== 'payment' || !id) return { ignored: `Aviso de tipo ${type || '?'} ignorado` };
+    // en "Revisar pagos" el sondeo ya trae cada pago: un POST anónimo al túnel no gasta llamadas con tu token
+    if (this.s.mode === 'polling') return { ignored: 'Mercado Pago está en modo "Revisar pagos": aviso ignorado' };
     if (!this.verifySignature(headers, String(id))) return { error: 'Webhook de Mercado Pago con firma inválida (ignorado)' };
     if (!this.s.accessToken) return { error: 'Falta el Access Token de Mercado Pago en el panel' };
     const p = await this.api('/v1/payments/' + encodeURIComponent(id));
@@ -200,4 +230,4 @@ class MercadoPagoClient {
   }
 }
 
-module.exports = { coincideNombre, MercadoPagoClient };
+module.exports = { MercadoPagoClient, SIN_NOMBRE };

@@ -138,7 +138,7 @@ function ocultar(){
   clearTimeout(timerOcultar); timerOcultar = null;
   cola.length = 0;
   for (const p of patos){ p.muere = true; p.lento = true; }
-  try { localStorage.removeItem(CLAVE); } catch (e) {}
+  try { localStorage.removeItem(CLAVE); } catch (e) { /* ver CLAVE */ }
 }
 
 // ---------- llega una donación ----------
@@ -160,12 +160,13 @@ function aporte(m){
 }
 
 // ---------- el montón visible se guarda (sobrevive a recargar la fuente u OBS) ----------
+// Sin localStorage (navegador privado) el montón simplemente no se recuerda al recargar.
 const CLAVE = 'patitos-monton-v1';
 function guardar(){
   try {
     const v = vivos(); if (!v.length) return localStorage.removeItem(CLAVE);
     localStorage.setItem(CLAVE, JSON.stringify({ W, H, p: v.map(p => [p.c, Math.round(p.x), Math.round(p.y), +p.a.toFixed(2), p.f, +(p.r / R).toFixed(2)]) }));
-  } catch (e) {}
+  } catch (e) { /* ver CLAVE */ }
 }
 setInterval(guardar, 3000);
 addEventListener('beforeunload', guardar);
@@ -175,7 +176,7 @@ function restaurar(){
     const sx = W / (d.W || W), sy = H / (d.H || H);
     for (const [c, x, y, a, f, rr] of d.p) patos.push({ c, x: x * sx, y: y * sy, vx: 0, vy: 0, r: R * (rr || 1), a, va: 0, f, alfa: 1, muere: false, lento: false });
     recortar();
-  } catch (e) {}
+  } catch (e) { console.warn('[Patitos] Montón guardado ilegible, se descarta:', e); }
 }
 
 // ---------- configuración del panel y conexión con el reloj ----------
@@ -189,7 +190,7 @@ async function leerConfig(primera){
       const dur = (Number(cfg.duracionMin) || 0) * 60000;
       // Al abrir: si todavía no pasó la duración desde la última donación, el montón sigue en pantalla
       if (!dur || Date.now() - ultimo < dur){ restaurar(); if (vivos().length) programarOcultar(ultimo); }
-      else { try { localStorage.removeItem(CLAVE); } catch (e) {} }
+      else { try { localStorage.removeItem(CLAVE); } catch (e) { /* ver CLAVE */ } }
     } else if (cfg.duracionMin !== antes && vivos().length){
       programarOcultar(ultimo || Date.now());
     }
@@ -198,7 +199,7 @@ async function leerConfig(primera){
 }
 function conectar(){
   const es = new EventSource('/events?overlay=1');
-  es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'aporte') aporte(m.payload); } catch (e) {} };
+  es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'aporte') aporte(m.payload); } catch (e) { console.warn('[Patitos]', e); } };
   es.onerror = () => { es.close(); setTimeout(conectar, 3000); };
 }
 leerConfig(true).then(conectar);

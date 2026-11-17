@@ -3,14 +3,19 @@ const crypto = require('crypto');
 
 const SOURCES = ['paypal', 'mercadopago', 'bits', 'subs'];
 const LABELS = { paypal: 'PayPal', mercadopago: 'Mercado Pago', bits: 'Bits', subs: 'Subs', manual: 'Manual' };
+const MAX_PROCESADOS = 3000;
 
 function fmtDuration(totalSeconds) {
-  const s = Math.max(0, Math.round(Math.abs(totalSeconds)));
+  const s = Math.round(Math.abs(totalSeconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
 }
+
+// Una donación en otra moneda no suma tiempo ni monto: sumar 5000 JPY a dólares falseaba las estadísticas
+const otraMoneda = (rate, ev) => ev.source !== 'bits' && !!rate?.currency && !!ev.currency
+  && rate.currency.toUpperCase() !== String(ev.currency).toUpperCase();
 
 function createEngine({ store, timer, broadcast }) {
   const d = () => store.data;
@@ -19,8 +24,8 @@ function createEngine({ store, timer, broadcast }) {
   function remember(key) {
     processed.add(key);
     d().processed.push(key);
-    if (d().processed.length > 3000) {
-      const removed = d().processed.splice(0, d().processed.length - 3000);
+    if (d().processed.length > MAX_PROCESADOS) {
+      const removed = d().processed.splice(0, d().processed.length - MAX_PROCESADOS);
       removed.forEach((k) => processed.delete(k));
     }
   }
@@ -60,7 +65,6 @@ function createEngine({ store, timer, broadcast }) {
     return {
       value: top,
       bySource,
-      sources,
       labels: sources.map((s) => LABELS[s]),
       until: top > 1 && !indefinite && ends.length ? Math.max(...ends) : null,
       since: top > 1 ? Math.min(...active.filter((a) => a.value === top && a.since).map((a) => a.since), Date.now()) : null,
@@ -82,7 +86,7 @@ function createEngine({ store, timer, broadcast }) {
     const amount = Number(ev.amount) || 0;
     const block = Number(r.amount) || 0;
     if (block <= 0) return { secs: 0, note: 'Tarifa sin monto configurado' };
-    if (ev.source !== 'bits' && r.currency && ev.currency && r.currency.toUpperCase() !== String(ev.currency).toUpperCase()) {
+    if (otraMoneda(r, ev)) {
       return { secs: 0, note: `Moneda ${ev.currency} distinta de ${r.currency} (no se sumó)` };
     }
     if (amount < (Number(r.minAmount) || 0)) return { secs: 0, note: 'Por debajo del mínimo' };
@@ -151,6 +155,7 @@ function createEngine({ store, timer, broadcast }) {
       months: ev.months || null,
       via: ev.via || null,
       payer: ev.payer || null,
+      montoFuera: otraMoneda(d().rates[ev.source], ev), // se guarda: la moneda de la tarifa puede cambiar antes de anularla
       multiplier: mult,
       seconds: Math.round(addedMs / 1000),
       note,
@@ -161,7 +166,7 @@ function createEngine({ store, timer, broadcast }) {
     if (!entry.test) {
       const st = (d().stats[ev.source] ||= { count: 0, amount: 0, seconds: 0 });
       st.count += ev.source === 'subs' ? ev.count || 1 : 1;
-      if (ev.source !== 'subs') st.amount = Math.round((st.amount + (Number(ev.amount) || 0)) * 100) / 100;
+      if (ev.source !== 'subs' && !entry.montoFuera) st.amount = Math.round((st.amount + (Number(ev.amount) || 0)) * 100) / 100;
       st.seconds += entry.seconds;
     }
 
@@ -199,7 +204,7 @@ function createEngine({ store, timer, broadcast }) {
     return entry;
   }
 
-  return { contribute, manualAdjust, logNote, multiplierFor, multiplierStatus, activeMultipliers, SOURCES, LABELS };
+  return { contribute, procesado: (key) => processed.has(key), manualAdjust, logNote, multiplierStatus };
 }
 
-module.exports = { createEngine, fmtDuration, LABELS, SOURCES };
+module.exports = { createEngine, fmtDuration, LABELS, SOURCES, otraMoneda };

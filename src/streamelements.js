@@ -57,7 +57,7 @@ class StreamElementsClient {
   stop() {
     this.stopped = true;
     clearTimeout(this.retryTimer);
-    try { this.ws?.close(); } catch {}
+    this.ws?.close();
     this.ws = null;
   }
 
@@ -70,7 +70,7 @@ class StreamElementsClient {
 
     ws.addEventListener('message', (e) => {
       let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
+      try { msg = JSON.parse(e.data); } catch { console.warn('[StreamElements] Mensaje ilegible, se ignora'); return; }
       this.onMessage(msg, resuming);
     });
     ws.addEventListener('close', () => {
@@ -123,7 +123,7 @@ class StreamElementsClient {
 
   handleTip(t) {
     const status = String(t.status || 'success').toLowerCase();
-    if (status && !['success', 'completed', 'approved'].includes(status)) {
+    if (!['success', 'completed', 'approved'].includes(status)) {
       console.log(`[StreamElements] Donación con estado "${t.status}" ignorada`);
       return;
     }
