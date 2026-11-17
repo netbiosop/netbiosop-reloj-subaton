@@ -218,6 +218,8 @@ class MercadoPagoClient {
     const type = body.type || query.type || query.topic;
     const id = query['data.id'] || body.data?.id || query.id;
     if (type !== 'payment' || !id) return { ignored: `Aviso de tipo ${type || '?'} ignorado` };
+    // en "Revisar pagos" el sondeo ya trae cada pago: un POST anónimo al túnel no gasta llamadas con tu token
+    if (this.s.mode === 'polling') return { ignored: 'Mercado Pago está en modo "Revisar pagos": aviso ignorado' };
     if (!this.verifySignature(headers, String(id))) return { error: 'Webhook de Mercado Pago con firma inválida (ignorado)' };
     if (!this.s.accessToken) return { error: 'Falta el Access Token de Mercado Pago en el panel' };
     const p = await this.api('/v1/payments/' + encodeURIComponent(id));
