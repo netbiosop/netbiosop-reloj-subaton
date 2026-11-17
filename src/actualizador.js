@@ -116,7 +116,9 @@ async function alAbrir(log = console.log, forzar = false) {
   if (!info || !info.nueva) return null;
   log(`  ⬆️  Hay una versión nueva: ${info.version} (tienes ${versionLocal()}). Actualizando…`);
   // copia de seguridad de los datos antes de actualizar (por las dudas; los datos no se tocan)
-  try { require('./respaldo').respaldar('antes de actualizar', true); } catch (e) { log('  ⚠️ No se pudo hacer la copia de seguridad previa: ' + e.message); }
+  try {
+    if (!require('./respaldo').respaldar('antes de actualizar', true)) log('  ⚠️ No se pudo hacer la copia de seguridad previa (mira el registro)');
+  } catch (e) { log('  ⚠️ No se pudo hacer la copia de seguridad previa: ' + e.message); }
   try {
     const r = await instalar(info, log);
     log(`  ✅ Actualizado a la versión ${r.a} (${r.archivos} archivos). Tus datos quedaron igual.`);

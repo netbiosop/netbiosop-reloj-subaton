@@ -205,7 +205,8 @@ function setConfig(b = {}) {
 }
 function pedirRestaurar(copia) {
   if (!carpetas().some((b) => copias(b).includes(copia))) throw new Error('No encuentro esa copia');
-  respaldar('antes de restaurar', true);
+  // sin esa copia, restaurar borraría los datos actuales sin vuelta atrás
+  if (!respaldar('antes de restaurar', true)) throw new Error('No se pudo guardar una copia de los datos actuales, no se restauró (mira el registro)');
   fs.writeFileSync(path.join(DATA_DIR, 'restaurar.json'), JSON.stringify({ copia }));
 }
 
