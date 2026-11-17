@@ -98,7 +98,7 @@ class TwitchClient {
         refresh_token: this.s.refreshToken,
       }),
     });
-    const j = await r.json();
+    const j = await r.json().catch(() => ({})); // un 5xx de la CDN trae HTML: el aviso debe decir el código, no "Unexpected token"
     if (r.status === 400 || r.status === 401) {
       this.s.accessToken = '';
       this.store.save();
@@ -125,9 +125,12 @@ class TwitchClient {
       return this.helix(method, path, body, false);
     }
     const text = await r.text();
-    const j = text ? JSON.parse(text) : {};
-    if (!r.ok) throw new Error(`${r.status} ${j.message || text}`);
-    return j;
+    if (!r.ok) {
+      let msg = text.slice(0, 200);
+      try { msg = JSON.parse(text).message || text; } catch { /* 5xx con HTML: va el texto tal cual */ }
+      throw new Error(`${r.status} ${msg}`);
+    }
+    return text ? JSON.parse(text) : {};
   }
 
   async sendChat(message, replyTo) {

@@ -16,7 +16,7 @@ async function getToken(cfg) {
     },
     body: 'grant_type=client_credentials',
   });
-  const j = await r.json();
+  const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error('PayPal rechazó las credenciales: ' + (j.error_description || r.status));
   return j.access_token;
 }
