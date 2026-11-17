@@ -191,7 +191,7 @@ const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
   onContribution,
-  onChat: (e) => { try { multichat.deTwitch(e); } catch (err) { console.error('[Multichat]', err.message); } automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
+  onChat: (e) => { intentar('Multichat', () => multichat.deTwitch(e)); automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
   onStream,
   onStatus: () => { sendConnections(); multichat.estadoTwitch(twitch.chatOk); },
   onHype,
