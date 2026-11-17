@@ -378,9 +378,13 @@ function createPodio({ store }) {
     // Si ese nombre ya existe en el mes, se respeta cómo estaba escrito (y sus aportes se suman juntos)
     const existente = data.events.find((e) => monthKey(e.at) === key && e.user.toLowerCase() === nuevo.toLowerCase() && e.user.toLowerCase() !== viejo);
     if (existente) nuevo = existente.user;
-    let n = 0;
-    for (const e of data.events) if (monthKey(e.at) === key && e.user.toLowerCase() === viejo) { e.user = nuevo; n++; recordarNombre(e.pk, nuevo); }
-    if (!n) throw new Error('No hay aportes con ese nombre en ' + monthLabel(key));
+    const evs = data.events.filter((e) => monthKey(e.at) === key && e.user.toLowerCase() === viejo);
+    if (!evs.length) throw new Error('No hay aportes con ese nombre en ' + monthLabel(key));
+    for (const e of evs) e.user = nuevo;
+    const n = evs.length;
+    // "Donación Mercado Pago" junta a varios pagadores: recordar el nombre para todos les daría ese nombre para siempre
+    const pagadores = new Set(evs.map((e) => e.pk).filter(Boolean));
+    if (pagadores.size === 1) recordarNombre([...pagadores][0], nuevo);
     console.log(`[Podio] "${cleanName(de)}" → "${nuevo}" en ${n} aporte(s) de ${monthLabel(key)}`);
     save();
     return n;
