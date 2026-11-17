@@ -52,6 +52,15 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
   cuerpo original. Webhook REST sin `paypal-transmission-id/sig` se descarta sin llamar a PayPal.
 
 ## Pendientes
+- Encontrados el 2026-11-17:
+  - Stream terminado con el reloj cerrado (Apagar, corte de luz): al abrir con el stream apagado `onStream(false, true)`
+    (`server.js:273`) no avisa al podio; al salir en vivo `patitosStream(true)` lo toma como el mismo stream y los patitos
+    no se vacían aunque "porStream" esté activo. Las horas diarias (`sumarHorasDiarias`) tienen la misma causa. Propuesta:
+    al abrir sin directo, cerrar el stream abierto con `finStream = 1` (no `Date.now()`, por `margenMin`); ¿sumar las horas?
+  - `timer.js:15,20,38,58`: `endsAt` usa `Date.now()`; si Windows corrige la hora (+2 min, "Sincronizar ahora", que el
+    aviso de `twitch.js:226` recomienda) el reloj en marcha pierde o gana ese tiempo. `performance.now()` lo evitaría,
+    pero hay que probar en Windows qué pasa al suspender la PC.
+  - `respaldo.js`: `CARPETAS` (claves de configuración) y `carpetas()` (rutas) se confunden al leer `server.js:1040`.
 - Encontrados el 2026-11-16:
   - PayPal REST pide un token OAuth nuevo en cada aviso firmado (`paypal.js:getToken`): guardarlo hasta `expires_in`.
   - Estructura (decide el dueño): permisos de cada ruta en 4 sitios (`auth.js` OPEN_PATHS/MOD_GET/MOD_POST, `http.js`
@@ -223,6 +232,21 @@ Lo lee y lo actualiza la revisión nocturna antes de revisar. Cada revisión agr
 - Al mover `shutdown`/`restart` a `src/ciclo.js`: programar el `process.exit` de seguridad antes de cualquier otro paso.
 
 ## Historial
+### 2026-11-17 — revisión nocturna (PR #2, rama `revision-nocturna`; `main` sin cambios desde la v2.18.0)
+- `mercadopago.js:58,177`: guardar ajustes de Mercado Pago mientras un pago esperaba su detalle ponía `userId = null`; el
+  pago se descartaba como "no lo cobraste tú" y quedaba en `vistos` (1000 ARS perdidos, sin reintento) → se usa la cuenta
+  leída antes del `await`. Un sondeo viejo ya no pisa el estado del `start()` nuevo.
+- `mercadopago.js:212`: en modo "Revisar pagos" un POST anónimo al webhook pedía `/v1/payments/N` con el token del dueño
+  → se ignora (el sondeo ya trae los pagos), como PayPal en c0260e0.
+- `podio.js:382`: renombrar la fila "Donación Mercado Pago" guardaba ese nombre para todos sus pagadores para siempre →
+  con la fila genérica (`SIN_NOMBRE`) solo se recuerda si es un solo pagador; con otro nombre se recuerdan todas sus claves.
+- `actualizador.js:119`, `respaldo.js:208`: desde que `respaldar()` devuelve `null`, la copia previa fallida pasaba en
+  silencio → el actualizador avisa y la restauración se cancela con error (sin copia borraría los datos actuales).
+- `twitch.js:79,101,126`, `paypal.js:19,34`: un 5xx con HTML daba "Unexpected token <" en vez del código → JSON roto como
+  vacío; la verificación de PayPal lanza con el código (el webhook sigue respondiendo 500 para que PayPal reintente).
+- `server.js:194`: único try/catch a mano en `onChat` → `intentar()`.
+- Probado: `node --check` de todos los .js; scripts sin red (carrera de Mercado Pago, webhook en polling, renombrar con 1 y
+  2 pagadores y con nombre propio, Twitch 502) y reloj aislado arrancado y cerrado. Pendientes nuevos arriba.
 ### 2026-11-16 — revisión nocturna (PR #2, rama `revision-nocturna`)
 - `server.js:1034`/`respaldo.js:195`: con la sesión admin remota se podía poner cualquier carpeta de respaldo (UNC
   incluida) y cada aporte copiaba ahí `subaton.json` con las claves → solo desde la PC del reloj.
