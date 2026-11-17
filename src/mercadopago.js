@@ -101,8 +101,10 @@ class MercadoPagoClient {
         if (gen !== this.gen) return; // otro start() o un stop(): la cuenta pudo cambiar
         await this.processPayment(p);
       }
+      if (gen !== this.gen) return;
       this.setStatus('conectado', 'Revisando pagos cada ' + (this.s.pollSeconds || 15) + ' s');
     } catch (err) {
+      if (gen !== this.gen) return;
       this.setStatus('error', 'Error consultando pagos: ' + err.message);
     }
   }
@@ -157,6 +159,7 @@ class MercadoPagoClient {
     if (!(amount > 0)) return;
     // sin saber cuál es tu cuenta no se puede filtrar lo que pagaste tú: en un webhook el error (500) hace que Mercado Pago lo reintente
     if (!this.userId) throw new Error('Todavía no se confirmó tu cuenta de Mercado Pago; el aviso se reintentará');
+    const yo = this.userId; // start() lo borra al guardar ajustes mientras se espera el pago completo
     if ((this.vistos ||= new Set()).has(String(p.id))) return;
     this.vistos.add(String(p.id));
     if (this.vistos.size > 2000) this.vistos = new Set([...this.vistos].slice(-1000)); // igual que twitch.js: el reloj puede quedar abierto semanas
@@ -174,8 +177,8 @@ class MercadoPagoClient {
       }
     }
     // Solo pagos que RECIBES: se descarta si no está confirmado que lo cobraste tú, o si lo pagaste tú
-    if (String(cobrador(p) ?? '') !== String(this.userId)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
-    if (p.payer?.id && String(p.payer.id) === String(this.userId)) return this.ignorar(p, nombre, 'lo pagaste tú');
+    if (String(cobrador(p) ?? '') !== String(yo)) return this.ignorar(p, nombre, 'no figura que lo cobraste tú (un pago o compra que hiciste)');
+    if (p.payer?.id && String(p.payer.id) === String(yo)) return this.ignorar(p, nombre, 'lo pagaste tú');
     const pk = this.clave(p);
     // Personas de "no contar" (ej. el sueldo): por nombre o porque marcaste un pago suyo como "No es donación"
     const lista = this.store.data.settings.mpIgnorar || {};
