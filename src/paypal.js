@@ -31,6 +31,7 @@ async function verifyWebhook(cfg, headers, rawBody) {
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body,
   });
+  if (!r.ok) throw new Error(`PayPal no pudo verificar el aviso (${r.status})`); // con error el webhook responde 500 y PayPal lo reintenta
   const j = await r.json();
   return j.verification_status === 'SUCCESS';
 }

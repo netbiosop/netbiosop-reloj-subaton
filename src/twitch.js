@@ -76,7 +76,7 @@ class TwitchClient {
         redirect_uri: this.redirectUri,
       }),
     });
-    const j = await r.json();
+    const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.message || `Error ${r.status}`);
     this.s.accessToken = j.access_token;
     this.s.refreshToken = j.refresh_token;
@@ -127,7 +127,7 @@ class TwitchClient {
     const text = await r.text();
     if (!r.ok) {
       let msg = text.slice(0, 200);
-      try { msg = JSON.parse(text).message || text; } catch { /* 5xx con HTML: va el texto tal cual */ }
+      try { msg = JSON.parse(text).message || msg; } catch { /* 5xx con HTML: va el texto tal cual */ }
       throw new Error(`${r.status} ${msg}`);
     }
     return text ? JSON.parse(text) : {};

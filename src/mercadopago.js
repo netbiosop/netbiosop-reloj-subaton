@@ -19,6 +19,8 @@ function coincideNombre(nombre, regla) {
   return true;
 }
 
+const SIN_NOMBRE = 'Donación Mercado Pago'; // nombre de los pagos sin nombre: junta a pagadores distintos
+
 class MercadoPagoClient {
   constructor({ store, onContribution, onStatus }) {
     this.store = store;
@@ -195,7 +197,7 @@ class MercadoPagoClient {
       id: String(p.id),
       amount,
       currency: p.currency_id,
-      user: recordado || this.formatear(nombre) || 'Donación Mercado Pago',
+      user: recordado || this.formatear(nombre) || SIN_NOMBRE,
       payer: pk,
       message: p.description || '',
     });
@@ -228,4 +230,4 @@ class MercadoPagoClient {
   }
 }
 
-module.exports = { MercadoPagoClient };
+module.exports = { MercadoPagoClient, SIN_NOMBRE };

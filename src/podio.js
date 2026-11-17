@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const apartarDanado = require('./danado');
+const { SIN_NOMBRE } = require('./mercadopago');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'podio.json');
@@ -381,13 +382,12 @@ function createPodio({ store }) {
     const evs = data.events.filter((e) => monthKey(e.at) === key && e.user.toLowerCase() === viejo);
     if (!evs.length) throw new Error('No hay aportes con ese nombre en ' + monthLabel(key));
     for (const e of evs) e.user = nuevo;
-    const n = evs.length;
-    // "Donación Mercado Pago" junta a varios pagadores: recordar el nombre para todos les daría ese nombre para siempre
+    // la fila genérica junta a varios pagadores: recordar el nombre para todos les daría ese nombre para siempre
     const pagadores = new Set(evs.map((e) => e.pk).filter(Boolean));
-    if (pagadores.size === 1) recordarNombre([...pagadores][0], nuevo);
-    console.log(`[Podio] "${cleanName(de)}" → "${nuevo}" en ${n} aporte(s) de ${monthLabel(key)}`);
+    if (viejo !== SIN_NOMBRE.toLowerCase() || pagadores.size === 1) for (const pk of pagadores) recordarNombre(pk, nuevo);
+    console.log(`[Podio] "${cleanName(de)}" → "${nuevo}" en ${evs.length} aporte(s) de ${monthLabel(key)}`);
     save();
-    return n;
+    return evs.length;
   }
 
   // Lo que leen los overlays (público: nombres y totales)

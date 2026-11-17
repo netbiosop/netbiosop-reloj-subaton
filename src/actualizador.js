@@ -117,7 +117,7 @@ async function alAbrir(log = console.log, forzar = false) {
   log(`  ⬆️  Hay una versión nueva: ${info.version} (tienes ${versionLocal()}). Actualizando…`);
   // copia de seguridad de los datos antes de actualizar (por las dudas; los datos no se tocan)
   try {
-    if (!require('./respaldo').respaldar('antes de actualizar', true)) log('  ⚠️ No se pudo hacer la copia de seguridad previa (mira el registro)');
+    if (!require('./respaldo').respaldar('antes de actualizar', true)) throw new Error('ninguna carpeta aceptó la copia (mira el registro)');
   } catch (e) { log('  ⚠️ No se pudo hacer la copia de seguridad previa: ' + e.message); }
   try {
     const r = await instalar(info, log);
