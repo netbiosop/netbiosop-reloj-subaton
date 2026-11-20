@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rangos en Discord · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#5865f2;--ok:#3ddc97;--bad:#ff5d73;--warn:#ffb547;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;padding:16px 20px 40px;max-width:1240px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 10px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  h2 .r{margin-left:auto}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input,button,select{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input[type=text],input[type=password],select{width:100%}
+  button,.btn{cursor:pointer;background:var(--card2);text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--line);border-radius:9px;padding:8px 12px}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  .prim{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .fila{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+  .fila>div{flex:1;min-width:160px}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px}
+  .ok{color:var(--ok)} .mal{color:var(--bad)} .aviso{color:var(--warn)}
+  .switch{display:inline-flex;align-items:center;gap:10px;padding:8px 16px;border-radius:999px;font-weight:700;border:2px solid var(--line);background:#0f0e14;cursor:pointer}
+  .switch .bola{width:38px;height:22px;border-radius:999px;background:#3a3548;position:relative;transition:.2s}
+  .switch .bola::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+  .switch.on{border-color:var(--ok);color:var(--ok)} .switch.on .bola{background:var(--ok)} .switch.on .bola::after{left:19px}
+  .estado{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:#0f0e14;border:1px solid var(--line)}
+  .estado i{flex:0 0 10px;height:10px;border-radius:50%;background:#555;margin-top:5px}
+  .estado.conectado i{background:var(--ok);box-shadow:0 0 8px var(--ok)} .estado.error i{background:var(--bad)}
+  ol{margin:6px 0 0;padding-left:20px} li{margin:5px 0}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#b9c0ff}
+  .rango{display:grid;grid-template-columns:200px 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .rango:last-child{border-bottom:0}
+  .rango b{display:block} .rango small{color:var(--muted)}
+  .rango .quienes{grid-column:2;font-size:12px;color:var(--muted);margin-top:-4px}
+  table{width:100%;border-collapse:collapse} td,th{padding:7px 8px;text-align:left;border-bottom:1px solid var(--line)} th{font-size:12px;color:var(--muted);font-weight:600}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(88,101,242,.18);color:#b9c0ff}
+  .log{max-height:260px;overflow:auto;font-size:13px}
+  .log div{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+  .log time{color:#5d586c;font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} .rango{grid-template-columns:1fr} .rango .quienes{grid-column:1} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎖️ Rangos en Discord</h1>
+  <button class="switch" id="on"><span class="bola"></span><span id="onTxt">Apagado</span></button>
+  <span class="sp"></span>
+  <button class="sm" id="sync">🔄 Sincronizar ahora</button>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card">
+    <h2>Conexión con tu servidor</h2>
+    <div class="estado" id="estado"><i></i><div><b id="estTit">…</b><div class="nota" id="estDet" style="margin:0"></div></div></div>
+    <label>Token del bot</label>
+    <input type="password" id="token" autocomplete="off" placeholder="Pega el token del bot">
+    <label>ID de tu servidor de Discord</label>
+    <input type="text" id="guild" inputmode="numeric" autocomplete="off" placeholder="Ej. 123456789012345678">
+    <div class="fila"><button class="prim" id="guardarCon">Guardar y probar</button><a class="btn" id="invitar" target="_blank" rel="noopener" hidden>➕ Invitar el bot a tu servidor</a></div>
+    <div class="nota" id="notaCon"></div>
+    <details style="margin-top:12px">
+      <summary>Cómo crear el bot (una sola vez, 5 minutos)</summary>
+      <ol class="nota">
+        <li>Entra a <a href="https://discord.com/developers/applications" target="_blank" style="color:#b9c0ff">discord.com/developers/applications</a> → <b>New Application</b> → ponle un nombre (ej. "Reloj Subatón").</li>
+        <li>A la izquierda, <b>Bot</b> → <b>Reset Token</b> → copia el token y pégalo arriba. Más abajo, activa <b>Server Members Intent</b> y guarda.</li>
+        <li>En Discord: <b>Configuración de usuario → Avanzado → Modo desarrollador</b> (activado). Luego clic derecho en tu servidor → <b>Copiar ID del servidor</b> y pégalo arriba.</li>
+        <li>Toca <b>Guardar y probar</b> y después <b>➕ Invitar el bot a tu servidor</b> (ya pide el permiso "Gestionar roles").</li>
+        <li>En tu servidor: <b>Ajustes del servidor → Roles</b> → arrastra el rol del bot <b>por encima</b> de los rangos que va a dar.</li>
+      </ol>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Cómo se vinculan los viewers</h2>
+    <div class="nota" style="margin-top:0">Cada viewer escribe en el chat de Twitch <code id="cmdEj">!discord su_usuario</code> y el bot lo busca en tu servidor. Tiene que haber entrado al servidor antes. Si escribe solo <code>!discord</code> no pasa nada (por si ya tienes ese comando con la invitación).</div>
+    <div class="fila">
+      <div><label>Comando</label><input type="text" id="comando" placeholder="discord"></div>
+      <div><label>Invitación a tu servidor (se la dice a quien no encuentra)</label><input type="text" id="invitacion" placeholder="https://discord.gg/…"></div>
+    </div>
+    <h2 style="margin-top:16px">Vincular a mano</h2>
+    <div class="fila">
+      <div><label>Nombre (como aparece en el podio)</label><input type="text" id="vNombre" list="personasLista" placeholder="Ej. Nephallems"></div>
+      <div><label>Usuario de Discord</label><input type="text" id="vUsuario" placeholder="Ej. nepha_ok"></div>
+      <button id="vBtn">🔗 Vincular</button>
+    </div>
+    <datalist id="personasLista"></datalist>
+    <div class="nota" id="notaV"></div>
+  </section>
+
+  <section class="card ancho">
+    <h2>Rangos <span class="nota r" id="notaRoles" style="margin:0"></span></h2>
+    <div class="nota" style="margin:0 0 6px">Elige qué rol de tu servidor corresponde a cada rango. Todos son <b>mensuales</b>: al terminar el mes se quitan y se vuelven a ganar. El reloj solo quita los roles que puso él; nunca toca los que diste a mano.</div>
+    <div id="rangos"></div>
+    <div class="fila" style="max-width:340px"><div><label>Monto mínimo del mes para "Donador" (USD)</label><input type="text" id="minUsd" inputmode="decimal" placeholder="0 = cualquier monto"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Aportaron este mes</h2>
+    <table><thead><tr><th>Nombre</th><th>Discord</th></tr></thead><tbody id="personas"></tbody></table>
+    <h2 style="margin-top:16px">Todos los vinculados</h2>
+    <table><tbody id="vinculos"></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Actividad <span class="nota r" id="ultimaSync" style="margin:0"></span></h2>
+    <div class="log" id="log"></div>
+    <h2 style="margin-top:16px">Suscriptores de Twitch: la opción de Discord</h2>
+    <div class="nota" style="margin:0">Discord puede dar un rol a <b>todos</b> tus suscriptores de Twitch, aunque no usen <code>!discord</code>:
+      en tu servidor ve a <b>Ajustes del servidor → Integraciones → Twitch</b> y conecta tu cuenta. Cada suscriptor tiene que conectar su Twitch en
+      <b>Ajustes de usuario → Conexiones</b>. Ese rol lo maneja Discord. El rango "Suscriptor" de acá es para quienes se suscribieron este mes y se vincularon con <code>!discord</code>.</div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+const nota = (el, t, c='') => { el.textContent = t; el.className = 'nota ' + c; };
+const editando = (el) => document.activeElement === el;
+let D = null;
+function pintar(d){
+  D = d; const c = d.config, e = d.estado;
+  $('on').classList.toggle('on', c.on); $('onTxt').textContent = c.on ? 'Prendido' : 'Apagado';
+  const est = $('estado'); est.className = 'estado ' + (e.conectado ? 'conectado' : e.error ? 'error' : '');
+  $('estTit').textContent = e.conectado ? `Conectado a "${e.servidor.nombre}"` : !d.tieneToken ? 'Sin conectar' : 'No conecta';
+  $('estDet').textContent = e.conectado ? `Bot: ${e.bot.username}` : e.error || '';
+  $('token').placeholder = d.tieneToken ? '•••••••• (guardado; pega otro solo para cambiarlo)' : 'Pega el token del bot';
+  if (!editando($('guild'))) $('guild').value = c.guildId || '';
+  $('invitar').hidden = !d.invitarBot; $('invitar').href = d.invitarBot || '#';
+  if (!editando($('comando'))) $('comando').value = c.comando; $('cmdEj').textContent = `!${c.comando} su_usuario`;
+  if (!editando($('invitacion'))) $('invitacion').value = c.invitacion || '';
+  if (!editando($('minUsd'))) $('minUsd').value = c.minDonacionUsd || '';
+  // rangos
+  const roles = e.rolesServidor || [];
+  $('notaRoles').textContent = roles.length ? '' : (e.conectado ? 'Tu servidor no tiene roles para elegir' : 'Conecta el bot para elegir los roles');
+  if (!document.activeElement?.closest?.('#rangos')) $('rangos').innerHTML = Object.entries(d.rangos).map(([k, r]) => {
+    const sel = c.roles[k] || '', rol = roles.find((x) => x.id === sel);
+    const quienes = (d.deseados[sel] || []);
+    return `<div class="rango"><div><b>${esc(r.nombre)}</b><small>${esc(r.desc)}</small></div>
+      <select data-rango="${k}"><option value="">— No dar este rango —</option>${roles.map((x) => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.nombre)}${x.puede ? '' : ' ⚠ (el rol del bot está más abajo)'}</option>`).join('')}
+        ${sel && !rol ? `<option value="${sel}" selected>(rol ${sel})</option>` : ''}</select>
+      ${sel ? `<div class="quienes">${rol && !rol.puede ? '<span class="mal">⚠ El bot no puede dar este rol: en Ajustes del servidor → Roles, sube el rol del bot por encima de éste. </span>' : ''}Este mes: ${quienes.length ? quienes.map(esc).join(', ') : 'nadie todavía'}</div>` : ''}</div>`;
+  }).join('');
+  // personas del mes
+  $('personas').innerHTML = d.personas.map((p) => `<tr><td>${esc(p.nombre)}</td><td>${p.vinculo ? `<span class="tag">${esc(p.vinculo.usuario)}</span>` : `<span class="nota" style="margin:0">sin vincular</span>`}</td></tr>`).join('') || '<tr><td colspan="2" class="nota">Nadie aportó este mes todavía.</td></tr>';
+  $('personasLista').innerHTML = d.personas.map((p) => `<option value="${esc(p.nombre)}">`).join('');
+  const vs = Object.entries(c.vinculos || {});
+  $('vinculos').innerHTML = vs.map(([k, v]) => `<tr><td>${esc(v.de || k)}</td><td><span class="tag">${esc(v.usuario)}</span> <small class="nota">${v.via === 'chat' ? 'desde el chat' : 'a mano'}</small></td><td style="text-align:right"><button class="sm" data-desv="${esc(k)}" title="Quitar vínculo">✕</button></td></tr>`).join('') || '<tr><td class="nota">Todavía nadie se vinculó.</td></tr>';
+  $('log').innerHTML = (e.cambios || []).map((x) => `<div><time>${new Date(x.at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</time>${esc(x.t)}</div>`).join('') || '<div class="nota">Sin actividad todavía.</div>';
+  $('ultimaSync').textContent = e.ultimaSync ? 'Última revisión ' + new Date(e.ultimaSync).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+async function guardar(cambios, el){ try { pintar((await api('/api/discord/config', 'POST', cambios)).result); if (el) nota(el, '✔ Guardado', 'ok'); } catch (e) { nota(el || $('notaCon'), e.message, 'mal'); } }
+async function cargar(){ try { pintar(await api('/api/discord')); } catch (e) { nota($('notaCon'), e.message, 'mal'); } }
+
+$('on').onclick = () => guardar({ on: !D.config.on });
+$('guardarCon').onclick = async () => {
+  $('guardarCon').disabled = true; nota($('notaCon'), 'Probando con Discord…');
+  const b = { guildId: $('guild').value, probar: true }; if ($('token').value.trim()) b.token = $('token').value.trim();
+  try { const d = (await api('/api/discord/config', 'POST', b)).result; $('token').value = ''; pintar(d); nota($('notaCon'), d.estado.conectado ? '✔ Conectado' : (d.estado.error || 'Guardado'), d.estado.conectado ? 'ok' : 'mal'); }
+  catch (e) { nota($('notaCon'), e.message, 'mal'); }
+  $('guardarCon').disabled = false;
+};
+$('rangos').onchange = (e) => { const s = e.target.closest('[data-rango]'); if (s) guardar({ roles: { [s.dataset.rango]: s.value } }); };
+$('comando').onchange = () => guardar({ comando: $('comando').value }, $('notaV'));
+$('invitacion').onchange = () => guardar({ invitacion: $('invitacion').value }, $('notaV'));
+$('minUsd').onchange = () => guardar({ minDonacionUsd: $('minUsd').value.replace(',', '.') });
+$('vBtn').onclick = async () => {
+  $('vBtn').disabled = true; nota($('notaV'), 'Buscando en Discord…');
+  try { pintar((await api('/api/discord/vincular', 'POST', { nombre: $('vNombre').value, usuario: $('vUsuario').value })).result); nota($('notaV'), '✔ Vinculado', 'ok'); $('vNombre').value = ''; $('vUsuario').value = ''; }
+  catch (e) { nota($('notaV'), e.message, 'mal'); }
+  $('vBtn').disabled = false;
+};
+$('vinculos').onclick = async (e) => {
+  const b = e.target.closest('[data-desv]'); if (!b) return;
+  if (!confirm('¿Quitar este vínculo? Sus rangos se le quitan en la próxima revisión.')) return;
+  try { pintar((await api('/api/discord/desvincular', 'POST', { clave: b.dataset.desv })).result); } catch {}
+};
+$('sync').onclick = async () => { $('sync').disabled = true; try { pintar((await api('/api/discord/sincronizar', 'POST', {})).result); } catch (e) { nota($('notaCon'), e.message, 'mal'); } $('sync').disabled = false; };
+cargar(); setInterval(cargar, 15000);
+</script>
+<script src="/pendientes.js"></script>
+</body>
+</html>

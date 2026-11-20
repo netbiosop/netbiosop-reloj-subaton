@@ -172,6 +172,25 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
+## 🎖️ Rangos en Discord
+
+Menú → **🎖️ Rangos en Discord**. El reloj da roles de tu servidor de Discord a quienes aportan, y **todos son mensuales**: al terminar el mes se quitan y se vuelven a ganar.
+
+| Rango | Quién lo recibe |
+|---|---|
+| Donador | donó por Mercado Pago o PayPal este mes (puedes poner un mínimo en USD) |
+| Sub regalador | regaló subs este mes |
+| Bits | dio bits este mes |
+| Suscriptor | se suscribió o renovó este mes |
+| Top donador / Top subs regaladas / Top bits | los reyes del mes (los #1 del mes pasado) |
+
+- **Conectar (una vez):** crea un bot en discord.com/developers/applications (Bot → Reset Token, y activa *Server Members Intent*), pega el **token** y el **ID de tu servidor** en el panel, toca **Guardar y probar** y después **➕ Invitar el bot a tu servidor**. En Ajustes del servidor → Roles, sube el rol del bot **por encima** de los rangos que da.
+- **Elegir los roles:** en el panel eliges qué rol de tu servidor corresponde a cada rango (o "No dar este rango").
+- **Vincular a los viewers:** cada uno escribe en el chat de Twitch `!discord su_usuario` (tiene que haber entrado a tu servidor). Si escribe solo `!discord` no pasa nada, por si ya tienes ese comando con la invitación. También puedes vincular a mano desde el panel (útil para donadores de Mercado Pago).
+- El reloj revisa los rangos cada vez que cambia el podio y cada 10 minutos. Solo quita los roles que puso él: nunca toca los que diste a mano.
+- **Suscriptores de Twitch:** Discord también puede dar un rol a todos tus subs solo (Ajustes del servidor → Integraciones → Twitch), si cada uno conecta su Twitch en Discord.
+- El token queda guardado solo en tu PC (no va a GitHub ni a la copia de GitHub).
+
 ## 🗨️ Multichat (Twitch, Kick, YouTube y TikTok)
 
 Menú → **🗨️ Multichat**. Es para ti, no sale en el stream: lees en un solo lugar lo que te escriben en todas tus plataformas, y cada mensaje dice de cuál viene (TW, KICK, YT, TT). Ábrelo en otra pantalla o en el celular.

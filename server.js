@@ -160,7 +160,9 @@ setInterval(() => broadcast('state', stateMsg()), 10000);
 // ---------- Integraciones ----------
 const podio = createPodio({ store });
 // cualquier cambio del podio (aporte, a mano, quitado, nombre, metas) llega al instante a los overlays
-podio.onCambio((v) => broadcast('podio', { v }));
+// Rangos de Discord (src/discord.js): se recalculan cuando cambia el podio
+const discord = require('./src/discord').crearDiscord({ store, podio });
+podio.onCambio((v) => { broadcast('podio', { v }); discord.pedirSync(15000); });
 // Cada aporte real (no las pruebas) también entra al podio del mes
 const onContribution = (ev) => {
   const entry = engine.contribute(ev);
@@ -179,7 +181,7 @@ const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
   onContribution,
-  onChat: (e) => { try { multichat.deTwitch(e); } catch (err) { console.error('[Multichat]', err.message); } automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
+  onChat: (e) => { try { multichat.deTwitch(e); } catch (err) { console.error('[Multichat]', err.message); } discord.alChat(e, (t) => twitch.sendChat(t, e.message_id)).catch(() => {}); automensajes.alChat(e, autoCtx()); commands.handle(e).catch((err) => console.error('[Chat]', err.message)); },
   onStream: (isLive, initial) => onStream(isLive, initial),
   onStatus: () => { sendConnections(); multichat.estadoTwitch(twitch.chatOk); },
   onHype: (fase, e, desfase) => onHype(fase, e, desfase),
@@ -902,6 +904,14 @@ app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
 setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { console.error('[Código]', e.message); } }, 5000);
 
+// ---------- Rangos en Discord ----------
+app.get('/api/discord', (req, res) => res.json(discord.publico()));
+app.post('/api/discord/config', async (req, res) => { try { ok(res, { result: await discord.setConfig(req.body) }); } catch (err) { res.json({ error: err.message }, 400); } });
+app.post('/api/discord/sincronizar', async (req, res) => { try { await discord.probar(); ok(res, { result: await discord.sincronizar() }); } catch (err) { res.json({ error: err.message }, 400); } });
+app.post('/api/discord/vincular', async (req, res) => { try { ok(res, { result: await discord.vincularDesdePanel(String(req.body.nombre || '').trim(), String(req.body.usuario || '')) }); } catch (err) { res.json({ error: err.message }, 400); } });
+app.post('/api/discord/desvincular', (req, res) => { discord.desvincular(String(req.body.clave || '')); ok(res, { result: discord.publico() }); });
+discord.iniciar();
+
 // ---------- Multichat (Twitch, Kick, YouTube y TikTok en un solo chat) ----------
 app.get('/api/multichat', (req, res) => res.json(multichat.publicData()));
 app.post('/api/multichat/config', podioRoute((req) => multichat.setConfig(req.body)));
@@ -1159,6 +1169,7 @@ function shutdown(reason) {
   try { hype.save(); } catch {}
   try { automensajes.save(); } catch {}
   try { multichat.save(); multichat.parar(); } catch {}
+  try { discord.save(); } catch {}
   try { respaldo.respaldar('al cerrar', true); } catch {}
   const subida = Promise.race([respaldoGithub.subir('al cerrar').catch(() => {}), new Promise((r) => setTimeout(r, 8000))]); // la copia en GitHub, sin hacer esperar más de 8 s
   console.log(`⏹ ${reason} · quedan ${fmtDuration(timer.remainingMs / 1000)} guardados`);

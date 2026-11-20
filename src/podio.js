@@ -347,6 +347,23 @@ function createPodio({ store }) {
     console.log('[Patitos] Montón vaciado');
   }
 
+  // Quién aportó qué en un mes (para los rangos de Discord): por persona, con sus claves de Mercado Pago
+  function personasDelMes(key = monthKey(Date.now())) {
+    const m = new Map();
+    for (const e of data.events) {
+      if (monthKey(e.at) !== key) continue;
+      const k = e.user.toLowerCase();
+      const r = m.get(k) || { nombre: e.user, pks: [], dinero: 0, regaladas: 0, subs: 0, bits: 0 };
+      if (e.cat === 'dinero') r.dinero += Number(e.usd) || 0;
+      else if (e.cat === 'bits') r.bits += Number(e.amount) || 0;
+      else if (e.cat === 'subs') { if (!e.kind || e.kind === 'gift') r.regaladas += Number(e.count) || 0; else r.subs += Number(e.count) || 0; }
+      if (e.pk && !r.pks.includes(e.pk)) r.pks.push(e.pk);
+      m.set(k, r);
+    }
+    return [...m.values()].map((r) => ({ ...r, dinero: round2(r.dinero) }));
+  }
+  const reyesActuales = () => reyesDe(prevKey(monthKey(Date.now()))); // los reyes que se muestran este mes (del mes pasado)
+
   // Reyes de un mes: automáticos, salvo los que se pusieron a mano
   function reyesDe(key) {
     const auto = board(key, 1), man = data.config.reyesManual[key] || {};
@@ -502,7 +519,7 @@ function createPodio({ store }) {
 
   return {
     record, addManual, removeEvent, renameEvent, renamePerson, vincularMP, setRey, setConfig, refreshRates, toUsd, patitosAporte, vaciarPatitos, patitosStream,
-    publicData, adminData, saveNow, evento: (id) => data.events.find((e) => e.id === id) || null, version: () => version, onCambio: (fn) => { alCambiar = fn; },
+    publicData, adminData, saveNow, personasDelMes, reyesActuales, mesActual: () => monthKey(Date.now()), evento: (id) => data.events.find((e) => e.id === id) || null, version: () => version, onCambio: (fn) => { alCambiar = fn; },
   };
 }
 

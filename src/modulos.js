@@ -63,6 +63,15 @@ module.exports = [
     overlays: [{ nombre: 'Tren del hype (pantalla completa)', url: '/hype', tam: '1920 × 1080' }],
   },
   {
+    id: 'discord',
+    nombre: 'Rangos en Discord',
+    icono: '🎖️',
+    color: '#5865f2',
+    desc: 'Da roles en tu servidor de Discord a donadores, subs regaladas, bits, suscriptores y Top del mes. Se renuevan cada mes.',
+    panel: '/discord-panel',
+    overlays: [],
+  },
+  {
     id: 'multichat',
     nombre: 'Multichat',
     icono: '🗨️',
