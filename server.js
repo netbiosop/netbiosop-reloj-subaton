@@ -904,6 +904,16 @@ app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
 setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { console.error('[Código]', e.message); } }, 5000);
 
+// ---------- 🩺 Debug de overlays: vigila que corran en OBS y los arregla solo ----------
+const diagnostico = require('./src/diagnostico').crearDiagnostico({ store, broadcast, puerto: PORT });
+app.post('/api/latido', (req, res) => { diagnostico.latido(req.body || {}, req.headers['user-agent']); res.json({ ok: true }); });
+app.get('/api/debug', (req, res) => res.json(diagnostico.estado()));
+app.post('/api/debug/recargar', (req, res) => { diagnostico.recargar(String(req.body.pagina || '')); ok(res, { result: diagnostico.estado() }); });
+app.post('/api/debug/revisar', async (req, res) => { try { ok(res, { result: await diagnostico.revisar(!!req.body.arreglar) }); } catch (err) { res.json({ error: err.message }, 400); } });
+app.post('/api/debug/arreglar', async (req, res) => { try { ok(res, { result: await diagnostico.arreglar(String(req.body.nombre || '')) }); } catch (err) { res.json({ error: err.message }, 400); } });
+app.post('/api/debug/config', (req, res) => ok(res, { result: diagnostico.setConfig(req.body || {}) }));
+diagnostico.iniciar();
+
 // ---------- Rangos en Discord ----------
 app.get('/api/discord', (req, res) => res.json(discord.publico()));
 app.post('/api/discord/config', async (req, res) => { try { ok(res, { result: await discord.setConfig(req.body) }); } catch (err) { res.json({ error: err.message }, 400); } });

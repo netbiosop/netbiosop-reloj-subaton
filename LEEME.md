@@ -172,6 +172,15 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
+## 🩺 Debug de overlays (si alguno no aparece en OBS)
+
+Botón **🩺 Debug** arriba a la derecha del menú (o la tarjeta "Debug de overlays").
+
+- **Cada overlay se vigila solo:** avisa al reloj cada 10 segundos que está vivo. Si falla al arrancar, **se recarga solo** (hasta 3 veces seguidas, para no quedar en un bucle). Si el reloj se cerró y vuelve, los overlays se recargan solos para arrancar limpios.
+- **En el panel** ves cada overlay: 🟢 *En OBS*, 🔵 *Solo navegador*, 🔴 *No responde* o *No abierto*, con los errores que tuvo. **🔄 Recargar** recarga uno; **Recargar todos los overlays** los recarga a todos en OBS.
+- **Arreglo automático en OBS (recomendado):** en OBS → **Herramientas → Ajustes del servidor WebSocket** → *Habilitar servidor WebSocket* → *Mostrar información de conexión* → copia la contraseña y pégala en el panel. Con eso el reloj ve las fuentes de navegador de la escena al aire, y si una del reloj deja de responder (dos revisiones seguidas, unos 40 s), **la arregla sola**: si usa `localhost` la cambia a `127.0.0.1`; si no, la refresca como el botón de OBS (como mucho una vez cada 3 minutos por fuente). También puedes tocar **🛠️ Arreglar** en cada fuente. Se apaga con "Arreglar solo".
+- La contraseña de OBS queda guardada solo en tu PC.
+
 ## 🎖️ Rangos en Discord
 
 Menú → **🎖️ Rangos en Discord**. El reloj da roles de tu servidor de Discord a quienes aportan, y **todos son mensuales**: al terminar el mes se quitan y se vuelven a ganar.

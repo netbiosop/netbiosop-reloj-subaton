@@ -63,6 +63,15 @@ module.exports = [
     overlays: [{ nombre: 'Tren del hype (pantalla completa)', url: '/hype', tam: '1920 × 1080' }],
   },
   {
+    id: 'diagnostico',
+    nombre: 'Debug de overlays',
+    icono: '🩺',
+    color: '#ff9f43',
+    desc: '¿Un overlay no aparece en OBS? Muestra cuáles están corriendo, los recarga y, conectado a OBS, arregla solo los que fallan.',
+    panel: '/diagnostico',
+    overlays: [],
+  },
+  {
     id: 'discord',
     nombre: 'Rangos en Discord',
     icono: '🎖️',

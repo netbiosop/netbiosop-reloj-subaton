@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Debug de overlays · Reloj Subatón</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{--bg:#0e0d12;--card:#17151e;--card2:#1e1b27;--line:#2b2737;--text:#ecebf2;--muted:#9a96ab;--accent:#ff9f43;--ok:#3ddc97;--bad:#ff5d73;--warn:#ffb547;--info:#5ab0ff;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:#121018;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font:400 28px/1 'Bebas Neue',sans-serif;letter-spacing:1px}
+  .sp{flex:1}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px;padding:16px 20px 40px;max-width:1240px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+  .card.ancho{grid-column:1/-1}
+  h2{margin:0 0 10px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  h2 .r{margin-left:auto}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input,button{font:inherit;color:var(--text);background:#0f0e14;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  input[type=text],input[type=password]{width:100%}
+  input[type=checkbox]{accent-color:var(--ok);transform:scale(1.15)}
+  button,.btn{cursor:pointer;background:var(--card2);text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--line);border-radius:9px;padding:8px 12px}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  .prim{background:var(--accent);border-color:var(--accent);color:#2a1500;font-weight:700}
+  .sm{padding:4px 9px;font-size:12px}
+  .fila{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+  .fila>div{flex:1;min-width:120px}
+  .check{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px;cursor:pointer;color:var(--text)}
+  .nota{font-size:12px;color:var(--muted);margin-top:6px}
+  .ok{color:var(--ok)} .mal{color:var(--bad)} .aviso{color:var(--warn)}
+  table{width:100%;border-collapse:collapse} td,th{padding:8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top} th{font-size:12px;color:var(--muted);font-weight:600}
+  .est{display:inline-flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap}
+  .est i{width:9px;height:9px;border-radius:50%;background:#555}
+  .est.obs i{background:var(--ok);box-shadow:0 0 6px var(--ok)} .est.obs{color:var(--ok)}
+  .est.nav i{background:var(--info)} .est.nav{color:var(--info)}
+  .est.no i{background:var(--bad)} .est.no{color:var(--bad)}
+  .est.nada i{background:#555} .est.nada{color:var(--muted);font-weight:500}
+  .estado{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:#0f0e14;border:1px solid var(--line)}
+  .estado i{flex:0 0 10px;height:10px;border-radius:50%;background:#555;margin-top:5px}
+  .estado.si i{background:var(--ok);box-shadow:0 0 8px var(--ok)} .estado.no i{background:var(--bad)}
+  .err{font-size:12px;color:var(--bad);margin-top:3px;word-break:break-word}
+  .ev{font-size:12px;color:var(--muted);margin-top:3px}
+  code{background:#0f0e14;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#ffd7a8;word-break:break-all}
+  .log{max-height:300px;overflow:auto;font-size:13px}
+  .log div{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+  .log time{color:#5d586c;font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
+  ol{margin:6px 0 0;padding-left:20px} li{margin:5px 0}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  @media(max-width:700px){ main{grid-template-columns:1fr;padding:12px} td,th{padding:6px 4px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🩺 Debug de overlays</h1>
+  <span class="sp"></span>
+  <button class="prim" id="todos">🔄 Recargar todos los overlays</button>
+  <a class="btn sm" href="/menu">🏠 Menú</a>
+</header>
+<main>
+  <section class="card ancho">
+    <h2>Overlays <span class="nota r" id="resumen" style="margin:0"></span></h2>
+    <table><thead><tr><th>Overlay</th><th>Estado</th><th>Último aviso</th><th></th></tr></thead><tbody id="overlays"></tbody></table>
+    <div class="nota">Cada overlay avisa cada 10 segundos que está vivo. <b>🟢 En OBS</b>: corre en OBS. <b>🔵 Solo navegador</b>: está abierto en un navegador pero no en OBS. <b>🔴 No responde</b>: estuvo y dejó de avisar. Si un overlay falla al arrancar, se recarga solo (hasta 3 veces seguidas).</div>
+  </section>
+
+  <section class="card">
+    <h2>Conexión con OBS <label class="check r" style="margin:0"><input type="checkbox" id="auto"> Arreglar solo</label></h2>
+    <div class="estado" id="obsEstado"><i></i><div><b id="obsTit">…</b><div class="nota" id="obsDet" style="margin:0"></div></div></div>
+    <div class="fila">
+      <div><label>Dirección</label><input type="text" id="host" placeholder="127.0.0.1"></div>
+      <div style="max-width:110px"><label>Puerto</label><input type="text" id="port" inputmode="numeric" placeholder="4455"></div>
+    </div>
+    <label>Contraseña del WebSocket de OBS</label>
+    <input type="password" id="pass" autocomplete="off" placeholder="La de OBS → Herramientas → Ajustes del servidor WebSocket">
+    <div class="fila"><button class="prim" id="conectar">Guardar y conectar</button><button id="revisar">🔍 Revisar ahora</button></div>
+    <div class="nota" id="notaObs"></div>
+    <details style="margin-top:10px">
+      <summary>Cómo activar el WebSocket en OBS (una sola vez)</summary>
+      <ol class="nota">
+        <li>En OBS: <b>Herramientas → Ajustes del servidor WebSocket</b>.</li>
+        <li>Marca <b>Habilitar servidor WebSocket</b> (puerto 4455) y toca <b>Mostrar información de conexión</b>.</li>
+        <li>Copia la <b>contraseña</b>, pégala arriba y toca <b>Guardar y conectar</b>.</li>
+      </ol>
+      <div class="nota">Con esto el reloj ve las fuentes de navegador de la escena al aire. Si una del reloj deja de responder dos revisiones seguidas (unos 40 s), la arregla sola: si usa <code>localhost</code> la cambia a <code>127.0.0.1</code>; si no, la refresca como el botón de OBS. Como mucho una vez cada 3 minutos por fuente.</div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Actividad</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card ancho" id="cardFuentes">
+    <h2>Fuentes de navegador en OBS <span class="nota r" id="escena" style="margin:0"></span></h2>
+    <table><thead><tr><th>Fuente</th><th>Dirección</th><th>Estado</th><th></th></tr></thead><tbody id="fuentes"></tbody></table>
+  </section>
+
+  <section class="card ancho">
+    <h2>Si sigue sin verse en OBS</h2>
+    <ol class="nota" style="margin-top:0">
+      <li>En la fuente, la dirección tiene que ser <code>http://127.0.0.1:3000/…</code> y <b>"Archivo local"</b> desmarcado.</li>
+      <li>OBS → Archivo → Configuración → Avanzado → Fuentes → desmarca <b>"Habilitar aceleración por hardware de la fuente del navegador"</b> y reinicia OBS.</li>
+      <li>En la fuente, desmarca <b>"Apagar la fuente cuando no sea visible"</b>.</li>
+      <li>El reloj tiene que estar abierto en la misma PC que OBS (si está en otra PC, usa la dirección de esa PC).</li>
+    </ol>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(path, method='GET', body){
+  const r = await fetch(path,{method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined});
+  const j = await r.json().catch(()=>({}));
+  if(r.status===401) location.href='/login';
+  if(!r.ok || j.error) throw new Error(j.error || ('Error '+r.status));
+  return j;
+}
+const hace = (ms) => { if (!ms) return '—'; const s = Math.round((Date.now() - ms) / 1000); return s < 5 ? 'ahora' : s < 60 ? `hace ${s} s` : s < 3600 ? `hace ${Math.round(s / 60)} min` : `hace ${Math.round(s / 3600)} h`; };
+const hora = (ms) => new Date(ms).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+let conocidos = []; // los overlays del menú (nombre + dirección)
+async function cargarConocidos(){
+  try {
+    const m = await api('/api/menu');
+    const vistos = new Set();
+    conocidos = [];
+    for (const mod of m.modulos || []) for (const o of mod.overlays || []) {
+      const pagina = o.url.split('?')[0].replace(/\.html$/, '');
+      if (vistos.has(pagina)) continue; vistos.add(pagina);
+      conocidos.push({ pagina, nombre: o.nombre, url: o.url });
+    }
+  } catch {}
+}
+function pintar(d){
+  const porPagina = Object.fromEntries((d.paginas || []).map((p) => [p.pagina, p]));
+  const filas = [...conocidos, ...(d.paginas || []).filter((p) => !conocidos.some((c) => c.pagina === p.pagina)).map((p) => ({ pagina: p.pagina, nombre: p.pagina }))];
+  let enObs = 0, caidos = 0;
+  $('overlays').innerHTML = filas.map((c) => {
+    const p = porPagina[c.pagina];
+    let est;
+    if (p && p.obs) { est = `<span class="est obs"><i></i>En OBS${p.obs > 1 ? ' ×' + p.obs : ''}</span>`; enObs++; }
+    else if (p && p.navegador) est = `<span class="est nav"><i></i>Solo navegador</span>`;
+    else if (p) { est = `<span class="est no"><i></i>No responde</span>`; caidos++; }
+    else est = `<span class="est nada"><i></i>No abierto</span>`;
+    const extra = p ? [...(p.errores || []).map((e) => `<div class="err">⚠ ${hora(e.at)} · ${esc(e.t)}</div>`), ...(p.eventos || []).map((e) => `<div class="ev">${hora(e.at)} · ${esc(e.t)}</div>`)].join('') : '';
+    return `<tr><td><b>${esc(c.nombre)}</b><div class="nota" style="margin:0"><code>${esc(c.url || c.pagina)}</code></div>${extra}</td><td>${est}</td><td>${p ? hace(p.ultimo) : '—'}</td>
+      <td style="text-align:right">${p ? `<button class="sm" data-recargar="${esc(c.pagina)}">🔄 Recargar</button>` : ''}</td></tr>`;
+  }).join('');
+  $('resumen').textContent = `${enObs} en OBS${caidos ? ` · ${caidos} sin responder` : ''}`;
+  // OBS
+  const o = d.obs;
+  $('obsEstado').className = 'estado ' + (o.conectado ? 'si' : 'no');
+  $('obsTit').textContent = o.conectado ? `Conectado a OBS${o.version ? ' (WebSocket ' + o.version + ')' : ''}` : 'OBS no conectado';
+  $('obsDet').textContent = o.conectado ? (o.auto ? 'Arreglo automático prendido' : 'Arreglo automático apagado: usa los botones 🛠️') : (o.error || 'Activa el WebSocket de OBS (abajo te explico cómo)');
+  if (document.activeElement !== $('host')) $('host').value = o.host || '127.0.0.1';
+  if (document.activeElement !== $('port')) $('port').value = o.port || 4455;
+  $('pass').placeholder = o.tienePassword ? '•••••••• (guardada; escribe otra solo para cambiarla)' : 'La de OBS → Herramientas → Ajustes del servidor WebSocket';
+  $('auto').checked = o.auto;
+  $('cardFuentes').hidden = !o.conectado;
+  $('escena').textContent = o.escena ? 'Escena al aire: ' + o.escena : '';
+  $('fuentes').innerHTML = (o.fuentes || []).map((f) => {
+    let est;
+    if (!f.delReloj) est = `<span class="est nada"><i></i>${f.archivoLocal ? 'Archivo local' : 'No es del reloj'}</span>`;
+    else if (!f.alAire) est = `<span class="est nada"><i></i>No está al aire</span>`;
+    else if (f.ok) est = `<span class="est obs"><i></i>Funciona</span>`;
+    else est = `<span class="est no"><i></i>No responde</span>`;
+    const local = f.delReloj && /\/\/localhost[:/]/.test(f.url) ? '<div class="ev aviso">usa "localhost": se cambia a 127.0.0.1 al arreglar</div>' : '';
+    return `<tr><td><b>${esc(f.nombre)}</b></td><td><code>${esc(f.url || '(vacía)')}</code>${local}</td><td>${est}</td>
+      <td style="text-align:right">${f.delReloj ? `<button class="sm" data-arreglar="${esc(f.nombre)}">🛠️ Arreglar</button>` : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="nota">No hay fuentes de navegador en OBS.</td></tr>';
+  $('log').innerHTML = (d.actividad || []).map((x) => `<div><time>${hora(x.at)}</time>${esc(x.t)}</div>`).join('') || '<div class="nota">Sin novedades. Si un overlay falla, se anota acá.</div>';
+}
+async function cargar(){ try { pintar(await api('/api/debug')); } catch {} }
+$('todos').onclick = async () => { try { pintar((await api('/api/debug/recargar', 'POST', {})).result); } catch {} };
+$('overlays').onclick = async (e) => { const b = e.target.closest('[data-recargar]'); if (!b) return; b.disabled = true; try { pintar((await api('/api/debug/recargar', 'POST', { pagina: b.dataset.recargar })).result); } catch {} setTimeout(cargar, 4000); };
+$('fuentes').onclick = async (e) => { const b = e.target.closest('[data-arreglar]'); if (!b) return; b.disabled = true; try { pintar((await api('/api/debug/arreglar', 'POST', { nombre: b.dataset.arreglar })).result); } catch (err) { $('notaObs').textContent = err.message; $('notaObs').className = 'nota mal'; } };
+$('conectar').onclick = async () => {
+  const b = { host: $('host').value, port: $('port').value }; if ($('pass').value) b.password = $('pass').value;
+  try { pintar((await api('/api/debug/config', 'POST', b)).result); $('pass').value = ''; $('notaObs').textContent = 'Conectando…'; $('notaObs').className = 'nota'; setTimeout(cargar, 2000); }
+  catch (e) { $('notaObs').textContent = e.message; $('notaObs').className = 'nota mal'; }
+};
+$('auto').onchange = async () => { try { pintar((await api('/api/debug/config', 'POST', { auto: $('auto').checked })).result); } catch {} };
+$('revisar').onclick = async () => { $('revisar').disabled = true; try { pintar((await api('/api/debug/revisar', 'POST', { arreglar: true })).result); $('notaObs').textContent = '✔ Revisado'; $('notaObs').className = 'nota ok'; } catch (e) { $('notaObs').textContent = e.message; $('notaObs').className = 'nota mal'; } $('revisar').disabled = false; };
+cargarConocidos().then(cargar); setInterval(cargar, 5000);
+</script>
+<script src="/pendientes.js"></script>
+</body>
+</html>
