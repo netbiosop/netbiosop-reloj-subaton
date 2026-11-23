@@ -56,18 +56,19 @@
 <header>
   <h1>🩺 Debug de overlays</h1>
   <span class="sp"></span>
-  <button class="prim" id="todos">🔄 Recargar todos los overlays</button>
+  <button class="prim" id="revisarTodo">🔍 Revisar</button>
+  <button id="todos">🔄 Recargar todos los overlays</button>
   <a class="btn sm" href="/menu">🏠 Menú</a>
 </header>
 <main>
   <section class="card ancho">
-    <h2>Overlays <span class="nota r" id="resumen" style="margin:0"></span></h2>
-    <table><thead><tr><th>Overlay</th><th>Estado</th><th>Último aviso</th><th></th></tr></thead><tbody id="overlays"></tbody></table>
-    <div class="nota">Cada overlay avisa cada 10 segundos que está vivo. <b>🟢 En OBS</b>: corre en OBS. <b>🔵 Solo navegador</b>: está abierto en un navegador pero no en OBS. <b>🔴 No responde</b>: estuvo y dejó de avisar. Si un overlay falla al arrancar, se recarga solo (hasta 3 veces seguidas).</div>
+    <h2>Overlays <span class="nota r" id="resumen" style="margin:0">Toca 🔍 Revisar para ver cuáles están funcionando</span></h2>
+    <table><thead><tr><th>Overlay</th><th>Estado</th><th></th></tr></thead><tbody id="overlays"></tbody></table>
+    <div class="nota">Nada se revisa ni se recarga solo: solo cuando tocas un botón. Al tocar <b>🔍 Revisar</b>, cada overlay abierto responde en 2 segundos. <b>🟢 En OBS</b>: corre en OBS. <b>🔵 Solo navegador</b>: está abierto en un navegador pero no en OBS. <b>⚪ No respondió</b>: no está abierto en ningún lado, o no cargó.</div>
   </section>
 
   <section class="card">
-    <h2>Conexión con OBS <label class="check r" style="margin:0"><input type="checkbox" id="auto"> Arreglar solo</label></h2>
+    <h2>Conexión con OBS (opcional)</h2>
     <div class="estado" id="obsEstado"><i></i><div><b id="obsTit">…</b><div class="nota" id="obsDet" style="margin:0"></div></div></div>
     <div class="fila">
       <div><label>Dirección</label><input type="text" id="host" placeholder="127.0.0.1"></div>
@@ -75,7 +76,7 @@
     </div>
     <label>Contraseña del WebSocket de OBS</label>
     <input type="password" id="pass" autocomplete="off" placeholder="La de OBS → Herramientas → Ajustes del servidor WebSocket">
-    <div class="fila"><button class="prim" id="conectar">Guardar y conectar</button><button id="revisar">🔍 Revisar ahora</button></div>
+    <div class="fila"><button class="prim" id="conectar">Guardar y revisar</button></div>
     <div class="nota" id="notaObs"></div>
     <details style="margin-top:10px">
       <summary>Cómo activar el WebSocket en OBS (una sola vez)</summary>
@@ -84,7 +85,7 @@
         <li>Marca <b>Habilitar servidor WebSocket</b> (puerto 4455) y toca <b>Mostrar información de conexión</b>.</li>
         <li>Copia la <b>contraseña</b>, pégala arriba y toca <b>Guardar y conectar</b>.</li>
       </ol>
-      <div class="nota">Con esto el reloj ve las fuentes de navegador de la escena al aire. Si una del reloj deja de responder dos revisiones seguidas (unos 40 s), la arregla sola: si usa <code>localhost</code> la cambia a <code>127.0.0.1</code>; si no, la refresca como el botón de OBS. Como mucho una vez cada 3 minutos por fuente.</div>
+      <div class="nota">Con esto, al tocar <b>🔍 Revisar</b> el reloj también mira las fuentes de navegador de OBS y te dice cuáles del reloj están al aire y si responden. Con <b>🛠️ Arreglar</b> en una fuente: si usa <code>localhost</code> la cambia a <code>127.0.0.1</code>; si no, la refresca como el botón de OBS. El reloj solo se conecta a OBS mientras dura la revisión.</div>
     </details>
   </section>
 
@@ -140,24 +141,23 @@ function pintar(d){
   $('overlays').innerHTML = filas.map((c) => {
     const p = porPagina[c.pagina];
     let est;
-    if (p && p.obs) { est = `<span class="est obs"><i></i>En OBS${p.obs > 1 ? ' ×' + p.obs : ''}</span>`; enObs++; }
+    if (!d.ultimaRevision) est = `<span class="est nada"><i></i>Sin revisar</span>`;
+    else if (p && p.obs) { est = `<span class="est obs"><i></i>En OBS${p.obs > 1 ? ' ×' + p.obs : ''}</span>`; enObs++; }
     else if (p && p.navegador) est = `<span class="est nav"><i></i>Solo navegador</span>`;
-    else if (p) { est = `<span class="est no"><i></i>No responde</span>`; caidos++; }
-    else est = `<span class="est nada"><i></i>No abierto</span>`;
+    else { est = `<span class="est nada"><i></i>No respondió</span>`; caidos++; }
     const extra = p ? [...(p.errores || []).map((e) => `<div class="err">⚠ ${hora(e.at)} · ${esc(e.t)}</div>`), ...(p.eventos || []).map((e) => `<div class="ev">${hora(e.at)} · ${esc(e.t)}</div>`)].join('') : '';
-    return `<tr><td><b>${esc(c.nombre)}</b><div class="nota" style="margin:0"><code>${esc(c.url || c.pagina)}</code></div>${extra}</td><td>${est}</td><td>${p ? hace(p.ultimo) : '—'}</td>
+    return `<tr><td><b>${esc(c.nombre)}</b><div class="nota" style="margin:0"><code>${esc(c.url || c.pagina)}</code></div>${extra}</td><td>${est}</td>
       <td style="text-align:right">${p ? `<button class="sm" data-recargar="${esc(c.pagina)}">🔄 Recargar</button>` : ''}</td></tr>`;
   }).join('');
-  $('resumen').textContent = `${enObs} en OBS${caidos ? ` · ${caidos} sin responder` : ''}`;
+  $('resumen').textContent = d.ultimaRevision ? `Revisado a las ${hora(d.ultimaRevision)} · ${enObs} en OBS` : 'Toca 🔍 Revisar para ver cuáles están funcionando';
   // OBS
   const o = d.obs;
   $('obsEstado').className = 'estado ' + (o.conectado ? 'si' : 'no');
-  $('obsTit').textContent = o.conectado ? `Conectado a OBS${o.version ? ' (WebSocket ' + o.version + ')' : ''}` : 'OBS no conectado';
-  $('obsDet').textContent = o.conectado ? (o.auto ? 'Arreglo automático prendido' : 'Arreglo automático apagado: usa los botones 🛠️') : (o.error || 'Activa el WebSocket de OBS (abajo te explico cómo)');
+  $('obsTit').textContent = o.conectado ? `OBS respondió${o.version ? ' (WebSocket ' + o.version + ')' : ''}` : o.tienePassword ? (d.ultimaRevision ? 'OBS no respondió' : 'Configurado: se usa al tocar 🔍 Revisar') : 'Sin configurar (opcional)';
+  $('obsDet').textContent = o.conectado ? 'En la última revisión' : (o.error || (o.tienePassword ? '' : 'Activa el WebSocket de OBS (abajo te explico cómo)'));
   if (document.activeElement !== $('host')) $('host').value = o.host || '127.0.0.1';
   if (document.activeElement !== $('port')) $('port').value = o.port || 4455;
   $('pass').placeholder = o.tienePassword ? '•••••••• (guardada; escribe otra solo para cambiarla)' : 'La de OBS → Herramientas → Ajustes del servidor WebSocket';
-  $('auto').checked = o.auto;
   $('cardFuentes').hidden = !o.conectado;
   $('escena').textContent = o.escena ? 'Escena al aire: ' + o.escena : '';
   $('fuentes').innerHTML = (o.fuentes || []).map((f) => {
@@ -165,7 +165,7 @@ function pintar(d){
     if (!f.delReloj) est = `<span class="est nada"><i></i>${f.archivoLocal ? 'Archivo local' : 'No es del reloj'}</span>`;
     else if (!f.alAire) est = `<span class="est nada"><i></i>No está al aire</span>`;
     else if (f.ok) est = `<span class="est obs"><i></i>Funciona</span>`;
-    else est = `<span class="est no"><i></i>No responde</span>`;
+    else est = `<span class="est no"><i></i>No respondió</span>`;
     const local = f.delReloj && /\/\/localhost[:/]/.test(f.url) ? '<div class="ev aviso">usa "localhost": se cambia a 127.0.0.1 al arreglar</div>' : '';
     return `<tr><td><b>${esc(f.nombre)}</b></td><td><code>${esc(f.url || '(vacía)')}</code>${local}</td><td>${est}</td>
       <td style="text-align:right">${f.delReloj ? `<button class="sm" data-arreglar="${esc(f.nombre)}">🛠️ Arreglar</button>` : ''}</td></tr>`;
@@ -174,16 +174,20 @@ function pintar(d){
 }
 async function cargar(){ try { pintar(await api('/api/debug')); } catch {} }
 $('todos').onclick = async () => { try { pintar((await api('/api/debug/recargar', 'POST', {})).result); } catch {} };
-$('overlays').onclick = async (e) => { const b = e.target.closest('[data-recargar]'); if (!b) return; b.disabled = true; try { pintar((await api('/api/debug/recargar', 'POST', { pagina: b.dataset.recargar })).result); } catch {} setTimeout(cargar, 4000); };
+$('overlays').onclick = async (e) => { const b = e.target.closest('[data-recargar]'); if (!b) return; b.disabled = true; try { pintar((await api('/api/debug/recargar', 'POST', { pagina: b.dataset.recargar })).result); } catch {} b.disabled = false; };
 $('fuentes').onclick = async (e) => { const b = e.target.closest('[data-arreglar]'); if (!b) return; b.disabled = true; try { pintar((await api('/api/debug/arreglar', 'POST', { nombre: b.dataset.arreglar })).result); } catch (err) { $('notaObs').textContent = err.message; $('notaObs').className = 'nota mal'; } };
+async function revisar(){
+  const b = $('revisarTodo'); b.disabled = true; b.textContent = '🔍 Revisando…';
+  try { pintar((await api('/api/debug/revisar', 'POST', {})).result); } catch (e) { $('notaObs').textContent = e.message; $('notaObs').className = 'nota mal'; }
+  b.disabled = false; b.textContent = '🔍 Revisar';
+}
+$('revisarTodo').onclick = revisar;
 $('conectar').onclick = async () => {
   const b = { host: $('host').value, port: $('port').value }; if ($('pass').value) b.password = $('pass').value;
-  try { pintar((await api('/api/debug/config', 'POST', b)).result); $('pass').value = ''; $('notaObs').textContent = 'Conectando…'; $('notaObs').className = 'nota'; setTimeout(cargar, 2000); }
+  try { await api('/api/debug/config', 'POST', b); $('pass').value = ''; $('notaObs').textContent = ''; await revisar(); }
   catch (e) { $('notaObs').textContent = e.message; $('notaObs').className = 'nota mal'; }
 };
-$('auto').onchange = async () => { try { pintar((await api('/api/debug/config', 'POST', { auto: $('auto').checked })).result); } catch {} };
-$('revisar').onclick = async () => { $('revisar').disabled = true; try { pintar((await api('/api/debug/revisar', 'POST', { arreglar: true })).result); $('notaObs').textContent = '✔ Revisado'; $('notaObs').className = 'nota ok'; } catch (e) { $('notaObs').textContent = e.message; $('notaObs').className = 'nota mal'; } $('revisar').disabled = false; };
-cargarConocidos().then(cargar); setInterval(cargar, 5000);
+cargarConocidos().then(cargar);
 </script>
 <script src="/pendientes.js"></script>
 </body>
