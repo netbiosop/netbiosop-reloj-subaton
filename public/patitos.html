@@ -67,11 +67,13 @@ function nuevoPato(c, x){
   patos.push({ c, x: x ?? (X0 + r + Math.random() * (X1 - X0 - 2 * r)), y: -r - Math.random() * 60, vx: (Math.random() - .5) * 3, vy: Math.random() * 2,
     r, a: (Math.random() - .5) * .8, va: (Math.random() - .5) * .2, f: Math.random() < .5 ? -1 : 1, alfa: 1, muere: false, lento: false });
   recortar();
+  despertar();
 }
 // Si hay más patitos que el máximo en pantalla, los más viejos se desvanecen
 function recortar(){
   const v = vivos(), extra = v.length - cfg.maxPantalla;
   for (let i = 0; i < extra; i++) v[i].muere = true;
+  if (extra > 0) despertar();
 }
 function paso(){
   const n = patos.length;
@@ -108,13 +110,18 @@ function dibujar(){
     ctx.drawImage(s, -s.width / 2, -s.height / 2 - R * .1); ctx.restore();
   }
 }
-let ult = performance.now(), acum = 0;
+// El bucle corre solo mientras hay patitos moviéndose: quietos o sin patitos, no gasta nada (despierta con despertar())
+let ult = performance.now(), acum = 0, corriendo = false, quietos = 0;
+const enReposo = () => cola.length === 0 && patos.every((p) => !p.muere && Math.abs(p.vx) < 0.08 && Math.abs(p.vy) < 0.6 && Math.abs(p.va) < 0.01);
 function bucle(t){
   acum += Math.min(100, t - ult); ult = t;
   while (acum >= 16.67){ paso(); acum -= 16.67; }
-  dibujar(); requestAnimationFrame(bucle);
+  dibujar();
+  quietos = enReposo() ? quietos + 1 : 0;
+  if (quietos > 60 || (!patos.length && !cola.length)) { corriendo = false; return; } // 1 s quietos: se detiene
+  requestAnimationFrame(bucle);
 }
-requestAnimationFrame(bucle);
+function despertar(){ quietos = 0; if (corriendo) return; corriendo = true; ult = performance.now(); acum = 0; requestAnimationFrame(bucle); }
 
 // ---------- lluvia: repartida por TODO el ancho de la pantalla ----------
 const cola = [];
@@ -139,6 +146,7 @@ function ocultar(){
   clearTimeout(timerOcultar); timerOcultar = null;
   cola.length = 0;
   for (const p of patos){ p.muere = true; p.lento = true; }
+  despertar();
   try { localStorage.removeItem(CLAVE); } catch (e) {}
 }
 
@@ -176,6 +184,7 @@ function restaurar(){
     const sx = W / (d.W || W), sy = H / (d.H || H);
     for (const [c, x, y, a, f, rr] of d.p) patos.push({ c, x: x * sx, y: y * sy, vx: 0, vy: 0, r: R * (rr || 1), a, va: 0, f, alfa: 1, muere: false, lento: false });
     recortar();
+    despertar();
   } catch (e) {}
 }
 

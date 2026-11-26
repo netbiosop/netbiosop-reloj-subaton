@@ -118,10 +118,11 @@
     auto(raiz) {
       const p = new URLSearchParams(location.search);
       const cada = Math.max(10, parseFloat(p.get('regalo')) || 300);
-      setTimeout(() => this.abrir(raiz), 2500);
-      setInterval(() => this.abrir(raiz), cada * 1000);
-      setTimeout(() => this.contar(raiz), 1800);
-      setInterval(() => this.contar(raiz), 7000);
+      const liviano = () => document.documentElement.classList.contains('liviano'); // modo liviano: sin efectos que se repiten solos
+      setTimeout(() => { if (!liviano()) this.abrir(raiz); }, 2500);
+      setInterval(() => { if (!liviano()) this.abrir(raiz); }, cada * 1000);
+      setTimeout(() => { if (!liviano()) this.contar(raiz); }, 1800);
+      setInterval(() => { if (!liviano()) this.contar(raiz); }, 7000);
     },
   };
 })();

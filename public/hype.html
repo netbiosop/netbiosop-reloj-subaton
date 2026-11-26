@@ -17,6 +17,8 @@
 
   /* ---------- Entrada: túnel de neón ---------- */
   #intro{position:absolute;inset:0;z-index:10;opacity:0;pointer-events:none;transition:opacity .35s}
+  body.dormido #escena{visibility:hidden}
+  body.dormido *,body.dormido *::before,body.dormido *::after{animation-play-state:paused!important}
   #intro.on{opacity:1}
   .franja{position:absolute;left:0;right:0;top:400px;height:400px;overflow:hidden;
           background:linear-gradient(180deg,rgba(5,5,8,0),rgba(5,5,8,.92) 14%,rgba(5,5,8,.92) 86%,rgba(5,5,8,0));
@@ -347,7 +349,17 @@ const sonido = (() => {
 
 // ---------- Pulso al ritmo (cada golpe ilumina la barra, el título y los bordes) ----------
 let ultimoGolpe = -1, ultimoDrop = -1;
+// Dormido: sin tren ni efectos en pantalla, la escena se oculta y se pausan todas sus animaciones (no gasta nada)
+const ACTIVOS = ['intro', 'hud', 'final', 'nivel', 'flash', 'od'];
+const hayAlgo = () => ACTIVOS.some((id) => $(id) && $(id).classList.contains('on')) || sonido.activa() || corriendo;
+let pulsoCorriendo = false;
+function actualizarDormido(){
+  const algo = hayAlgo();
+  document.body.classList.toggle('dormido', !algo);
+  if (algo && !pulsoCorriendo){ pulsoCorriendo = true; requestAnimationFrame(pulso); }
+}
 function pulso(){
+  if (!hayAlgo()){ pulsoCorriendo = false; $('escena').style.setProperty('--p', '0'); actualizarDormido(); return; }
   const b = sonido.golpe();
   let p = 0;
   if (b){ p = Math.pow(1 - b.fase, 3); if (b.indice !== ultimoGolpe){ ultimoGolpe = b.indice; enGolpe(b.indice); } }
@@ -360,7 +372,10 @@ function pulso(){
   }
   requestAnimationFrame(pulso);
 }
-requestAnimationFrame(pulso);
+// despierta apenas aparece algo (intro, barra, nivel, final…), sin esperar
+const mirar = new MutationObserver(actualizarDormido);
+for (const id of ACTIVOS) if ($(id)) mirar.observe($(id), { attributes: true, attributeFilter: ['class'] });
+actualizarDormido();
 function enGolpe(i){
   if (!$('hud').classList.contains('on')) return;
   // el OVERDRIVE del drop de la canción
@@ -393,7 +408,7 @@ function relojTick(){
   $('reloj').lastChild.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   $('reloj').classList.toggle('apurado', s <= 30);
 }
-setInterval(relojTick, 500);
+setInterval(() => { if (est && est.fase !== 'fin') relojTick(); actualizarDormido(); }, 500);
 function mostrarHud(e){ pintarTren(e.nivel, false); pintarHud(e); $('hud').classList.add('on'); }
 
 // ---------- Momentos ----------

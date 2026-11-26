@@ -27,6 +27,7 @@ const DEFAULTS = {
     mpIgnorar: { nombres: ['Luis Maria Villa', 'Luis Villa', 'Luis V'], claves: [] },
     // Donaciones que esperan que digas "es donación" o "no" antes de contar (subs y bits cuentan siempre solos)
     preguntarDonaciones: { mercadopago: true, paypal: true },
+    overlaysAnimados: false, // animaciones de fondo en Metas, Top general, Podio y Reyes (apagadas = gasta menos en OBS)
     siempreDonacion: [],      // personas que aprobaste con "siempre": no se pregunta más por ellas
     descansoPrevRunning: false, // ¿el reloj estaba corriendo al pausar todo? (para reanudarlo igual)
     sounds: {                 // sonidos del overlay (se escuchan en OBS)

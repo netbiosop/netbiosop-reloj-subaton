@@ -172,6 +172,15 @@ Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** pa
 - Si recargas la fuente o reinicias OBS antes de que pase la duración, los patitos siguen en pantalla.
 - Opciones en la URL: `desde=420&hasta=1500` (que caigan solo en esa franja) y `tam=24` (tamaño).
 
+## ⚡ Rendimiento (que el juego no pierda FPS)
+
+Los overlays casi no consumen mientras no pasa nada:
+- **Lluvia de patitos:** solo se dibuja mientras caen; quietos en el piso o sin patitos, no gasta.
+- **Tren del hype:** sin tren queda dormido (invisible y sin animaciones); despierta solo apenas arranca un tren.
+- **Cinta y tarjeta del código:** ocultas no animan nada.
+- **Modo liviano** (Podio y Metas → Ajustes de los overlays → *Animaciones de fondo* apagado, que es como viene): Metas, Top general, Podio y Reyes no repiten brillos, rayas ni rebotes; se animan solo cuando entra un aporte. En una fuente de OBS puedes forzarlo agregando `?animado=1` o `?liviano=1` al final de la dirección.
+- En OBS ayuda además poner las fuentes de navegador a **30 FPS** (Usar velocidad de fotogramas personalizada) y borrar las que no uses.
+
 ## 🩺 Debug de overlays (si alguno no aparece en OBS)
 
 Botón **🩺 Debug** arriba a la derecha del menú (o la tarjeta "Debug de overlays"). **No revisa ni recarga nada solo**: todo pasa cuando tocas un botón.

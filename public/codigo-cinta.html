@@ -11,6 +11,7 @@
   .cinta{position:absolute;left:0;right:0;bottom:6px;height:48px;display:flex;align-items:stretch;transform:translateY(80px);opacity:0;
          transition:transform .7s cubic-bezier(.2,.9,.3,1),opacity .4s}
   .cinta.on{transform:none;opacity:1}
+  .cinta:not(.on), .cinta:not(.on) *{animation-play-state:paused!important}
   .pin{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 26px 0 16px;background:linear-gradient(90deg,var(--rojo-oscuro),var(--rojo));clip-path:polygon(0 0,100% 0,90% 100%,0 100%);z-index:2;
        font-family:var(--f-titulo);font-size:30px;letter-spacing:1.2px;text-shadow:0 2px 0 #3a0003;text-transform:uppercase}
   /* estilo noticiero: luz roja que titila y destello al entrar */
@@ -69,7 +70,12 @@ function mostrar(durSeg){
   armar();
   $('cinta').classList.add('on');
   clearTimeout(timerFin);
-  if (durSeg) timerFin = setTimeout(() => $('cinta').classList.remove('on'), durSeg * 1000);
+  if (durSeg) timerFin = setTimeout(ocultarCinta, durSeg * 1000);
+}
+// oculta y deja de mover el texto (oculta no gasta nada)
+function ocultarCinta(){
+  $('cinta').classList.remove('on');
+  setTimeout(() => { if (!$('cinta').classList.contains('on') && anim) anim.pause(); }, 900);
 }
 async function cargar(){
   try { cfg = (await (await fetch('/api/codigo', { cache: 'no-store' })).json()).config; } catch (e) {}

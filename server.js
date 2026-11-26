@@ -904,6 +904,14 @@ app.post('/api/codigo/config', podioRoute((req) => codigo.setConfig(req.body)));
 app.post('/api/codigo/mostrar', podioRoute((req) => codigo.mostrar(req.body.que, broadcast, true)));
 setInterval(() => { try { codigo.tick(broadcast, codigoCtx()); } catch (e) { console.error('[Código]', e.message); } }, 5000);
 
+// ---------- Animaciones de fondo de los overlays (apagadas = modo liviano, gasta menos en OBS) ----------
+app.get('/api/estilo', (req, res) => res.json({ animado: !!d.settings.overlaysAnimados }));
+app.post('/api/estilo/config', (req, res) => {
+  d.settings.overlaysAnimados = !!req.body.animado; store.save();
+  broadcast('estilo', { animado: d.settings.overlaysAnimados });
+  ok(res, { result: { animado: d.settings.overlaysAnimados } });
+});
+
 // ---------- 🩺 Debug de overlays: revisa y arregla solo cuando tocas los botones del panel ----------
 const diagnostico = require('./src/diagnostico').crearDiagnostico({ store, broadcast, puerto: PORT });
 app.post('/api/latido', (req, res) => { diagnostico.latido(req.body || {}, req.headers['user-agent']); res.json({ ok: true }); });

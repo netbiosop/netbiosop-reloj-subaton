@@ -204,6 +204,8 @@
 
   <section class="card">
     <h2>Ajustes de los overlays</h2>
+    <label style="display:flex;align-items:center;gap:8px;margin:0 0 10px;color:var(--text);font-size:13px;cursor:pointer"><input type="checkbox" id="animado"> ✨ Animaciones de fondo (brillos, rayas, rebotes)</label>
+    <div class="nota" style="margin:-6px 0 10px">Apagadas = <b>modo liviano</b>: Metas, Top general, Podio y Reyes gastan casi nada en OBS y se animan solo cuando entra un aporte. Recomendado si el juego pierde FPS.</div>
     <div class="fila">
       <div><label>Podio: mostrar</label>
         <select id="modo">
@@ -504,6 +506,9 @@ document.addEventListener('click', (ev)=>{
   navigator.clipboard?.writeText(b.dataset.copy).then(()=>{ const t=b.textContent; b.textContent='✔ Copiado'; setTimeout(()=>b.textContent=t,1200); });
 });
 
+// Animaciones de fondo (modo liviano)
+fetch('/api/estilo', { cache: 'no-store' }).then((r) => r.json()).then((j) => { $('animado').checked = !!j.animado; }).catch(() => {});
+$('animado').onchange = () => api('/api/estilo/config', 'POST', { animado: $('animado').checked }).catch((e) => alert(e.message));
 cargar();
 setInterval(cargar, 10000);
 try { new EventSource('/events').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
