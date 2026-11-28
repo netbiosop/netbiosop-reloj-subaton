@@ -167,6 +167,11 @@ podio.onCambio((v) => { broadcast('podio', { v }); discord.pedirSync(15000); });
 const onContribution = (ev) => {
   const entry = engine.contribute(ev);
   try { podio.record(entry); } catch (err) { console.error('[Podio]', err.message); }
+  // Récords históricos: Twitch dice cuántas subs regaló esa persona en total en el canal; los bits se consultan al ranking
+  if (entry && !entry.duplicate && !entry.test) {
+    if (ev.regaladasTotal > 0) podio.historicoTwitch('subs', ev.user, ev.regaladasTotal);
+    if (ev.source === 'bits') pedirTopBits(10000);
+  }
   // copia de seguridad apenas entra una donación, sub o bits (las pruebas no cuentan)
   if (entry && !entry.duplicate && !entry.test) respaldo.alAporte();
   // Aviso para el overlay de patitos (PayPal → verdes, Mercado Pago → amarillos), también en las pruebas
@@ -177,6 +182,17 @@ const onContribution = (ev) => {
   }
   return entry;
 };
+// Ranking de bits de siempre (Twitch): al iniciar, cada 30 min y unos segundos después de cada aporte de bits
+let topBitsTimer = null;
+function pedirTopBits(ms) {
+  clearTimeout(topBitsTimer);
+  topBitsTimer = setTimeout(async () => {
+    try { const t = await twitch.topBitsHistorico(); if (t) podio.historicoTwitch('bits', t.name, t.total); }
+    catch (err) { console.error('[Podio] No se pudo leer el ranking de bits de Twitch:', err.message); }
+  }, ms);
+}
+setTimeout(() => pedirTopBits(0), 30000);
+setInterval(() => pedirTopBits(0), 30 * 60 * 1000);
 const sendConnections = () => broadcast('connections', connectionsInfo());
 const twitch = new TwitchClient({
   store,
@@ -844,6 +860,8 @@ app.post('/api/podio/event', podioRoute((req) => { const r = podio.addManual(req
 app.post('/api/podio/event/:id', podioRoute((req) => podio.renameEvent(req.params.id, req.body.user)));
 app.post('/api/podio/renombrar', podioRoute((req) => podio.renamePerson(req.body)));
 app.post('/api/podio/rey', podioRoute((req) => podio.setRey(req.body)));
+app.post('/api/podio/historico', podioRoute((req) => podio.setHistorico(req.body)));
+app.post('/api/podio/historico/twitch', async (req, res) => { pedirTopBits(0); setTimeout(() => res.json({ ok: true }), 4000); });
 app.get('/api/pendientes', (req, res) => res.json({ lista: pendientes(), preguntar: d.settings.preguntarDonaciones, siempre: d.settings.siempreDonacion || [] }));
 app.post('/api/pendientes/decidir', (req, res) => {
   try { ok(res, { result: decidirDonacion({ key: String(req.body.key || ''), esDonacion: !!req.body.esDonacion, siempre: !!req.body.siempre }) }); }

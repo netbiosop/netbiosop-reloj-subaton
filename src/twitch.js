@@ -129,6 +129,14 @@ class TwitchClient {
     return j;
   }
 
+  // El que más bits dio en el canal desde siempre (ranking oficial de Twitch). null si no se pudo.
+  async topBitsHistorico() {
+    if (!this.s.accessToken || !this.s.userId) return null;
+    const j = await this.helix('GET', '/bits/leaderboard?count=1&period=all');
+    const x = (j.data || [])[0];
+    return x ? { name: x.user_name || x.user_login, total: Number(x.score) || 0 } : null;
+  }
+
   async sendChat(message, replyTo) {
     if (!this.chatOk) return false;
     try {
@@ -354,7 +362,7 @@ class TwitchClient {
         this.onContribution({ source: 'subs', kind: 'new', id, tier: tierNum(e.tier), count: 1, user });
         break;
       case 'channel.subscription.gift':
-        this.onContribution({ source: 'subs', kind: 'gift', id, tier: tierNum(e.tier), count: e.total || 1, user });
+        this.onContribution({ source: 'subs', kind: 'gift', id, tier: tierNum(e.tier), count: e.total || 1, user, regaladasTotal: e.is_anonymous ? null : e.cumulative_total });
         break;
       case 'channel.subscription.message':
         this.onContribution({ source: 'subs', kind: 'resub', id, tier: tierNum(e.tier), count: 1, user, months: e.cumulative_months });

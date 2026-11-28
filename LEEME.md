@@ -21,6 +21,8 @@ Medidas tomadas de tu stream: la columna izquierda pegada al borde (metas arriba
 | Código de creador: cinta de noticias | `http://127.0.0.1:3000/codigo-cinta` | 1920 × 60 | 0, 1020 |
 | Tren del hype (arriba de todo) | `http://127.0.0.1:3000/hype` | 1920 × 1080 | 0, 0 |
 
+**Leyendas del canal (desde la 2.22.0):** el overlay de Reyes se alterna con los récords de todos los tiempos (subs regaladas, $ y bits). Se actualizan solos con lo que informa Twitch y lo que registra el reloj, y se pueden poner a mano en el panel del Podio → 🏆 Récords históricos (ahí también se apaga la alternancia o se cambia cada cuántos segundos).
+
 **Tamaño libre (desde la 2.21.1):**
 - Las medidas de la tabla son solo una sugerencia. Cada overlay se agranda o achica solo para llenar el **Ancho × Alto** que le pongas a la fuente (propiedades de la fuente), sin deformarse y siempre nítido.
 - También puedes arrastrar las esquinas en OBS al tamaño que quieras. Funciona igual; si lo agrandas mucho arrastrando, el texto puede verse un poco más suave, y ahí conviene subir el Ancho × Alto en las propiedades.

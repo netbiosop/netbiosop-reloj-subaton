@@ -29,7 +29,11 @@ const DEFAULTS = {
       bits: 'Top Bits',
       general: 'Top General',
       reyes: 'Reyes de {mes}',
+      historicos: 'Leyendas del canal',
     },
+    // Récords de todos los tiempos (se alternan con los reyes en el overlay /reyes)
+    // manual: { bits: { name, total } } → valor puesto a mano; si alguien lo supera, gana el automático
+    historicos: { on: true, segundos: 20, manual: {} },
     // Metas del mes (overlay /metas): se llenan solas con los aportes del mes
     metas: {
       titulo: 'Metas del mes',
@@ -48,6 +52,8 @@ const DEFAULTS = {
   rates: { rates: {}, fetchedAt: 0 },
   events: [],     // { id, at, cat, user, amount, currency, usd, count, source, manual, ref }
   backfilled: false,
+  // Lo último que informó Twitch: ranking de bits de siempre y el total histórico de subs regaladas de cada uno
+  historicoTwitch: { subs: null, bits: null },
   // patitos acumulados (amarillos = Mercado Pago, verdes = PayPal) + cuándo empezó/terminó el stream
   patitos: { y: 0, g: 0, ultimo: 0, inicioStream: 0, finStream: 0 },
 };
@@ -271,10 +277,10 @@ function createPodio({ store }) {
   }
 
   // ---------- Rankings ----------
-  function ranking(key, cat, limit = 3) {
+  function ranking(key, cat, limit = 3) { // key null = todos los meses guardados
     const m = new Map();
     for (const e of data.events) {
-      if (e.cat !== cat || monthKey(e.at) !== key) continue;
+      if (e.cat !== cat || (key && monthKey(e.at) !== key)) continue;
       if (cat === 'subs' && e.kind && e.kind !== 'gift') continue; // el podio de subs es solo de regaladas
       const v = cat === 'dinero' ? Number(e.usd) || 0 : cat === 'bits' ? Number(e.amount) || 0 : Number(e.count) || 0;
       if (!v) continue; // los negativos (restado a mano) descuentan
@@ -386,6 +392,53 @@ function createPodio({ store }) {
     save();
     return reyesDe(key);
   }
+  // ---------- Récords históricos ----------
+  // Para cada categoría gana el mayor entre: lo que informa Twitch, lo registrado por el reloj (todos los meses)
+  // y lo puesto a mano. En empate gana lo puesto a mano (así puedes corregir el nombre).
+  function historicosDetalle() {
+    const propio = board(null, 1), man = data.config.historicos.manual, tw = data.historicoTwitch;
+    return Object.fromEntries(CATS.map((c) => [c, {
+      manual: man[c] && man[c].name ? { name: man[c].name, total: Number(man[c].total) || 0 } : null,
+      twitch: c !== 'dinero' && tw[c] ? { name: tw[c].name, total: tw[c].total } : null,
+      propio: propio[c][0] || null,
+    }]));
+  }
+  function historicos() {
+    const out = {};
+    for (const [c, d] of Object.entries(historicosDetalle())) {
+      let mejor = null;
+      for (const fuente of ['manual', 'twitch', 'propio']) {
+        const x = d[fuente];
+        if (x && x.total > 0 && (!mejor || x.total > mejor.total)) mejor = { ...x, fuente };
+      }
+      out[c] = mejor;
+    }
+    return out;
+  }
+  function setHistorico({ cat, name, total }) {
+    if (!CATS.includes(cat)) throw new Error('Categoría inválida');
+    const man = data.config.historicos.manual, nombre = cleanName(name);
+    if (!nombre) { delete man[cat]; console.log(`[Podio] Récord histórico de ${cat}: vuelve a ser automático`); }
+    else {
+      const t = cat === 'dinero' ? round2(Number(total) || 0) : Math.round(Number(total) || 0);
+      if (!(t > 0)) throw new Error('Pon una cantidad mayor que 0');
+      man[cat] = { name: nombre, total: t };
+      console.log(`[Podio] Récord histórico de ${cat} puesto a mano: ${nombre} (${t})`);
+    }
+    save();
+    return historicos();
+  }
+  // Lo que informa Twitch (cat: 'bits' | 'subs'). Para subs solo se guarda si supera al anterior.
+  function historicoTwitch(cat, name, total) {
+    const n = cleanName(name), t = Math.round(Number(total) || 0);
+    if (!['bits', 'subs'].includes(cat) || !n || !(t > 0)) return;
+    const prev = data.historicoTwitch[cat];
+    if (cat === 'subs' && prev && prev.total >= t && prev.name.toLowerCase() !== n.toLowerCase()) return;
+    if (prev && prev.name === n && prev.total === t) return;
+    data.historicoTwitch[cat] = { name: n, total: t, at: Date.now() };
+    save();
+  }
+
   // Cambiar el nombre de una persona en todos sus aportes del mes (ej. "Donación Mercado Pago" → "Juancho")
   function renamePerson({ mes, de, a }) {
     const key = /^\d{4}-\d{2}$/.test(mes || '') ? mes : monthKey(Date.now());
@@ -414,12 +467,14 @@ function createPodio({ store }) {
       mesAnterior: { key: prev, label: monthLabel(prev), nombre: monthName(prev) },
       actual: board(cur, 3),
       anterior: reyesDe(prev),
+      historicos: historicos(),
       metas: metasData(cur),
       patitos: { config: data.config.patitos, y: data.patitos.y, g: data.patitos.g, ultimo: data.patitos.ultimo },
       config: {
         modo: data.config.modo,
         segundos: data.config.segundos,
         mostrar: data.config.mostrar,
+        historicos: { on: data.config.historicos.on, segundos: data.config.historicos.segundos },
         titulos: { ...t, reyes: String(t.reyes || '').replace('{mes}', monthName(prev)) },
       },
     };
@@ -445,6 +500,7 @@ function createPodio({ store }) {
       fullConfig: data.config,
       ajusteMes: data.config.ajustes[key] || { subs: 0, bits: 0, dinero: 0 },
       reyesAuto: board(prevKey(monthKey(Date.now())), 1),
+      historicosDetalle: historicosDetalle(),
       totales: totals(key),
     };
   }
@@ -458,6 +514,10 @@ function createPodio({ store }) {
       for (const k of Object.keys(DEFAULTS.config.titulos)) {
         if (k in b.titulos) c.titulos[k] = String(b.titulos[k] || '').trim().slice(0, 50) || DEFAULTS.config.titulos[k];
       }
+    }
+    if (b.historicos && typeof b.historicos === 'object') {
+      if ('on' in b.historicos) c.historicos.on = !!b.historicos.on;
+      if ('segundos' in b.historicos) c.historicos.segundos = Math.min(600, Math.max(5, Math.round(Number(b.historicos.segundos)) || 20));
     }
     if (b.metas && typeof b.metas === 'object') {
       const m = c.metas;
@@ -518,7 +578,7 @@ function createPodio({ store }) {
   setInterval(() => refreshRates(), 30 * 60 * 1000);
 
   return {
-    record, addManual, removeEvent, renameEvent, renamePerson, vincularMP, setRey, setConfig, refreshRates, toUsd, patitosAporte, vaciarPatitos, patitosStream,
+    record, addManual, removeEvent, renameEvent, renamePerson, vincularMP, setRey, setHistorico, historicoTwitch, setConfig, refreshRates, toUsd, patitosAporte, vaciarPatitos, patitosStream,
     publicData, adminData, saveNow, personasDelMes, reyesActuales, mesActual: () => monthKey(Date.now()), evento: (id) => data.events.find((e) => e.id === id) || null, version: () => version, onCambio: (fn) => { alCambiar = fn; },
   };
 }

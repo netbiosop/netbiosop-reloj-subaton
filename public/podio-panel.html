@@ -52,7 +52,8 @@
   .rey .auto{font-size:11px;color:var(--muted);margin-top:4px}
   .rey input{width:100%;padding:5px 7px;font-size:12px;margin-top:5px}
   .vacio{color:var(--muted);padding:8px 2px}
-  .reyes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .reyes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .reyes .auto{overflow-wrap:anywhere}
   .rey{background:var(--card2);border-radius:11px;padding:10px;text-align:center;border-top:3px solid var(--c)}
   .rey .t{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--c);font-weight:700}
   .rey .n{font-weight:700;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -125,6 +126,18 @@
     <h2>👑 Reyes de <span id="reyesMes"></span></h2>
     <div class="reyes" id="reyes"></div>
     <div class="ayuda">Los reyes se calculan solos: el día 1 de cada mes el podio vuelve a cero y los #1 del mes que terminó pasan a este overlay. Con <b>Editar</b> o <b>Agregar</b> puedes ponerlos a mano (por ejemplo si alguien donó por transferencia), y con <b>Automático</b> vuelven a calcularse solos.</div>
+  </section>
+
+  <!-- RÉCORDS HISTÓRICOS -->
+  <section class="card">
+    <h2>🏆 Récords históricos</h2>
+    <div class="fila" style="align-items:center;margin-bottom:10px">
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="histOn"> Alternarlos con los reyes en el overlay</label>
+      <label style="display:flex;gap:6px;align-items:center">cada <input type="number" id="histSeg" min="5" max="600" style="width:70px"> s</label>
+      <button class="sm" id="histTw" title="Volver a leer el ranking de bits de siempre en Twitch">↻ Leer Twitch</button>
+    </div>
+    <div class="reyes" id="hist"></div>
+    <div class="ayuda">Se actualizan solos: <b>bits</b> con el ranking oficial de Twitch de todos los tiempos, <b>subs</b> con el total histórico de regaladas que Twitch informa cada vez que alguien regala (la primera vez que ese alguien regale), y <b>$</b> con todas las donaciones registradas en el reloj. Con <b>Editar</b> pones nombre y cantidad a mano; si después alguien supera esa cantidad, el récord pasa a esa persona solo. Con <b>Automático</b> se borra lo puesto a mano.</div>
   </section>
 
   <!-- AGREGAR A MANO -->
@@ -224,7 +237,7 @@
     <label>Títulos</label>
     <div class="fila"><input data-t="dinero" placeholder="Top Donadores"><input data-t="subs" placeholder="Top Subs Regaladas"></div>
     <div class="fila" style="margin-top:8px"><input data-t="bits" placeholder="Top Bits"><input data-t="general" placeholder="Top General"></div>
-    <input data-t="reyes" placeholder="Reyes de {mes}" style="margin-top:8px">
+    <div class="fila" style="margin-top:8px"><input data-t="reyes" placeholder="Reyes de {mes}"><input data-t="historicos" placeholder="Leyendas del canal"></div>
     <div class="nota">En el título de los reyes, <code>{mes}</code> se cambia por el nombre del mes pasado.</div>
   </section>
 
@@ -283,6 +296,19 @@ function pintar(){
       <div class="n">${k?esc(k.name):'—'}${k&&k.manual?'<span class="man">a mano</span>':''}</div><div class="m">${k?FMT[c](k.total):'sin aportes'}</div>
       ${k&&k.manual?`<div class="auto">Automático: ${auto?esc(auto.name)+' · '+FMT[c](auto.total):'sin aportes'}</div>`:''}
       <div class="acc"><button data-rey-ed="${c}">${k?'✏️ Editar':'＋ Agregar'}</button>${k&&k.manual?`<button data-rey-auto="${c}">↺ Automático</button>`:''}</div></div>`;
+  }).join('');
+
+  // Récords históricos
+  const H = D.historicos || {}, HD = D.historicosDetalle || {}, FUENTE = {manual:'a mano', twitch:'Twitch', propio:'del reloj'};
+  if(document.activeElement!==$('histSeg')) $('histSeg').value = D.fullConfig.historicos.segundos;
+  $('histOn').checked = !!D.fullConfig.historicos.on;
+  if(!editHist) $('hist').innerHTML = ['dinero','subs','bits'].map(c=>{
+    const k = H[c], d = HD[c] || {};
+    const det = ['twitch','propio'].filter(f=>f!=='twitch'||c!=='dinero').map(f=>`${FUENTE[f]}: ${d[f]?esc(d[f].name)+' · '+FMT[c](d[f].total):'—'}`).join('<br>');
+    return `<div class="rey c-${c}"><div class="t">${ICO[c]} ${c==='dinero'?'Donador':c==='subs'?'Subs regaladas':'Bits'}</div>
+      <div class="n">${k?esc(k.name):'—'}${k?`<span class="man">${FUENTE[k.fuente]}</span>`:''}</div><div class="m">${k?FMT[c](k.total):'sin datos'}</div>
+      <div class="auto">${det}${d.manual?'<br>a mano: '+esc(d.manual.name)+' · '+FMT[c](d.manual.total):''}</div>
+      <div class="acc"><button data-hist-ed="${c}">${k?'✏️ Editar':'＋ Agregar'}</button>${d.manual?`<button data-hist-auto="${c}">↺ Automático</button>`:''}</div></div>`;
   }).join('');
 
   // Monedas
@@ -466,6 +492,33 @@ $('reyes').addEventListener('click', async (ev)=>{
   if(ca){ editRey=null; firma=''; cargar(); }
   if(au){
     try{ await api('/api/podio/rey','POST',{mes:D.mesAnterior.key, cat:au.dataset.reyAuto, name:''}); firma=''; await cargar(); }catch(e){ alert(e.message); }
+  }
+});
+
+// Récords históricos: automáticos, con opción de ponerlos a mano
+let editHist = null;
+$('histOn').onchange = ()=>guardar({historicos:{on:$('histOn').checked}});
+$('histSeg').onchange = ()=>guardar({historicos:{segundos:$('histSeg').value}});
+$('histTw').onclick = async ()=>{ $('histTw').disabled = true; try{ await api('/api/podio/historico/twitch','POST',{}); firma=''; await cargar(); }catch(e){ alert(e.message); } $('histTw').disabled = false; };
+$('hist').addEventListener('click', async (ev)=>{
+  const ed = ev.target.closest('[data-hist-ed]'), au = ev.target.closest('[data-hist-auto]'), gu = ev.target.closest('[data-hist-guardar]'), ca = ev.target.closest('[data-hist-cancelar]');
+  if(ed){
+    const c = ed.dataset.histEd, k = (D.historicos||{})[c], card = ed.closest('.rey');
+    editHist = c;
+    card.innerHTML = `<div class="t">${ICO[c]} ${c==='dinero'?'Donador':c==='subs'?'Subs regaladas':'Bits'}</div>
+      <input id="histNom" placeholder="Nombre" value="${k?esc(k.name):''}">
+      <input id="histTot" type="number" min="0" step="any" placeholder="${c==='dinero'?'Monto en USD':c==='subs'?'Subs regaladas':'Bits'}" value="${k?k.total:''}">
+      <div class="acc"><button data-hist-guardar="${c}">Guardar</button><button data-hist-cancelar>Cancelar</button></div>`;
+    $('histNom').focus();
+  }
+  if(gu){
+    const c = gu.dataset.histGuardar, name = $('histNom').value.trim(), total = $('histTot').value;
+    if(!name) return alert('Escribe el nombre');
+    try{ await api('/api/podio/historico','POST',{cat:c, name, total}); editHist=null; firma=''; await cargar(); }catch(e){ alert(e.message); }
+  }
+  if(ca){ editHist=null; firma=''; cargar(); }
+  if(au){
+    try{ await api('/api/podio/historico','POST',{cat:au.dataset.histAuto, name:''}); firma=''; await cargar(); }catch(e){ alert(e.message); }
   }
 });
 

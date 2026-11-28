@@ -45,11 +45,12 @@
 </div>
 <script>
 // Reyes del mes pasado (estilo BYTEDEMOND): el #1 de cada categoría del mes que terminó.
-// Cambia solo el día 1 de cada mes. Opciones en la URL:  ?escala=1.2   ?repetir=60
+// Cambia solo el día 1 de cada mes. Si están activados en el panel, se alterna con los récords históricos
+// ("Leyendas del canal": el máximo de siempre en subs, $ y bits). Opciones en la URL:  ?escala=1.2   ?repetir=60
 const CATS = {
-  subs:  {nombre:'Rey subs', fmt:v=>v+(v===1?' sub':' subs')},
-  dinero:{nombre:'Rey $',    fmt:v=>'$'+Number(v).toFixed(2)},
-  bits:  {nombre:'Rey bits', fmt:v=>Number(v).toLocaleString('es')+' bits'}
+  subs:  {nombre:'Rey subs', record:'Récord subs', fmt:v=>v+(v===1?' sub':' subs')},
+  dinero:{nombre:'Rey $',    record:'Récord $',    fmt:v=>'$'+Number(v).toFixed(2)},
+  bits:  {nombre:'Rey bits', record:'Récord bits', fmt:v=>Number(v).toLocaleString('es')+' bits'}
 };
 const ORDEN = ['subs','dinero','bits'];
 const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
@@ -65,6 +66,7 @@ for(let i=0;i<12;i++){
   s.style.animationDelay = (-Math.random()*8).toFixed(1)+'s';
   polvo.appendChild(s);
 }
+const wrapEl = document.getElementById('wrap');
 const tronosEl = document.getElementById('tronos'), tronos = {};
 ORDEN.forEach(cat=>{
   const t = document.createElement('div');
@@ -96,35 +98,52 @@ function pintarTitulo(t){
   const el = document.getElementById('titulo'); el.textContent = a + (b.length ? ' ' : '');
   if(b.length){ const em = document.createElement('em'); em.textContent = b.join(' '); el.appendChild(em); }
 }
-let firma = '';
+let firma = '', datos = null, vista = 'reyes', timerVista = null;
+// Pinta la vista actual: 'reyes' (del mes pasado) o 'historicos' (récords de siempre)
+function pintar(){
+  const j = datos, hist = vista === 'historicos';
+  pintarTitulo(hist ? (j.config.titulos.historicos || 'Leyendas del canal') : j.config.titulos.reyes);
+  ORDEN.forEach(cat=>{
+    const d = hist ? (j.historicos||{})[cat] : (j.anterior[cat]||[])[0], t = tronos[cat];
+    t.classList.toggle('vacio', !d);
+    t.querySelector('.cat').textContent = hist ? CATS[cat].record : CATS[cat].nombre;
+    t.querySelector('.rey').textContent = d ? d.name : '—';
+    t.querySelector('.monto').textContent = d ? CATS[cat].fmt(d.total) : ' ';
+  });
+  encajarTodos(); entrada();
+}
+const hayHistoricos = () => datos && datos.config.historicos && datos.config.historicos.on && ORDEN.some(c => (datos.historicos||{})[c]);
+// Alterna reyes ↔ históricos cada X segundos, con un fundido entre los dos
+function programarVista(){
+  clearTimeout(timerVista);
+  if(!hayHistoricos()){ if(vista !== 'reyes'){ vista = 'reyes'; pintar(); } return; }
+  timerVista = setTimeout(()=>{
+    wrapEl.style.opacity = 0;
+    setTimeout(()=>{ vista = vista === 'reyes' ? 'historicos' : 'reyes'; if(!cintaActiva) wrapEl.style.opacity = ''; pintar(); programarVista(); }, 550);
+  }, Math.max(5, Number(datos.config.historicos.segundos) || 20) * 1000);
+}
 async function cargar(){
   try{
     const j = await (await fetch('/api/podio',{cache:'no-store'})).json();
-    const f = JSON.stringify([j.mesAnterior.key, j.anterior, j.config.titulos.reyes]);
+    const f = JSON.stringify([j.mesAnterior.key, j.anterior, j.historicos, j.config.titulos.reyes, j.config.titulos.historicos, j.config.historicos]);
     if(f===firma) return;
-    firma = f;
-    pintarTitulo(j.config.titulos.reyes);
-    ORDEN.forEach(cat=>{
-      const d = (j.anterior[cat]||[])[0], t = tronos[cat];
-      t.classList.toggle('vacio', !d);
-      t.querySelector('.rey').textContent = d ? d.name : '—';
-      t.querySelector('.monto').textContent = d ? CATS[cat].fmt(d.total) : ' ';
-    });
-    encajarTodos(); entrada();
+    const antes = firma; firma = f; datos = j;
+    pintar();
+    if(!antes || !timerVista || !hayHistoricos()) programarVista();
   }catch(e){ /* reloj apagado: queda lo último */ }
 }
 cargar(); setInterval(cargar, 15000); // respaldo: los cambios llegan al instante por /events
 document.fonts.ready.then(encajarTodos);
 // Cuando pasa la cinta de noticias del código de creador (que va abajo), los reyes se esconden y vuelven después
-const wrapEl = document.getElementById('wrap'); let timerCinta = null;
+let timerCinta = null, cintaActiva = false;
 wrapEl.style.transition = 'opacity .5s, transform .5s';
 try {
   const es = new EventoVivo('/events?overlay=1');
   es.onmessage = (ev) => { try { const m = JSON.parse(ev.data);
     if (m.type === 'podio') cargar();
     if (m.type === 'codigo' && m.payload.que === 'cinta' && m.payload.config.cinta.ocultarReyes !== false) {
-      wrapEl.style.opacity = 0; wrapEl.style.translate = '0 30px';
-      clearTimeout(timerCinta); timerCinta = setTimeout(() => { wrapEl.style.opacity = ''; wrapEl.style.translate = ''; entrada(); }, (m.payload.dur + 0.8) * 1000);
+      cintaActiva = true; wrapEl.style.opacity = 0; wrapEl.style.translate = '0 30px';
+      clearTimeout(timerCinta); timerCinta = setTimeout(() => { cintaActiva = false; wrapEl.style.opacity = ''; wrapEl.style.translate = ''; entrada(); }, (m.payload.dur + 0.8) * 1000);
     } } catch (e) {} };
 } catch (e) {}
 const repetir = parseFloat(params.get('repetir'));
