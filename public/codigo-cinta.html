@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="es">
 <head>
+<script src="/vivo.js"></script>
 <script src="/latido.js"></script>
 <meta charset="utf-8">
 <title>Cinta de noticias</title>
 <link rel="stylesheet" href="marca.css">
 <style>
   /* Fuente de navegador: 1920 × 60, pegada abajo de la pantalla. Aparece cada X minutos (se configura en /codigo-panel) */
-  html,body{width:100%;height:100%}
+  html,body{width:100%;height:100%;overflow:hidden} body{transform-origin:0 0}
   .cinta{position:absolute;left:0;right:0;bottom:6px;height:48px;display:flex;align-items:stretch;transform:translateY(80px);opacity:0;
          transition:transform .7s cubic-bezier(.2,.9,.3,1),opacity .4s}
   .cinta.on{transform:none;opacity:1}
@@ -81,7 +82,11 @@ async function cargar(){
   try { cfg = (await (await fetch('/api/codigo', { cache: 'no-store' })).json()).config; } catch (e) {}
 }
 cargar(); setInterval(cargar, 15000);
-const es = new EventSource('/events?overlay=1');
+// Se dibuja para 60 px de alto: si la fuente en OBS es más alta o más baja, la cinta crece o se achica en proporción
+function ajustarCinta(){ const k = innerHeight / 60; if (!(k > 0)) return; const b = document.body.style;
+  b.width = (innerWidth / k) + 'px'; b.height = '60px'; b.transform = Math.abs(k - 1) < .01 ? '' : `scale(${k})`; }
+ajustarCinta(); addEventListener('resize', ajustarCinta);
+const es = new EventoVivo('/events?overlay=1');
 es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'codigo' && m.payload.que === 'cinta'){ cfg = m.payload.config; document.fonts.ready.then(() => mostrar(m.payload.dur)); } } catch (e) {} };
 if (params.get('demo')) document.fonts.ready.then(async () => { await cargar(); mostrar(0); });
 </script>

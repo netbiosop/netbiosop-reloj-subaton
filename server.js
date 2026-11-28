@@ -24,7 +24,7 @@ const { createCommands } = require('./src/commands');
 const automensajes = require('./src/automensajes');
 const respaldoGithub = require('./src/respaldo-github');
 const multichat = require('./src/multichat');
-const { createApp, createLive } = require('./src/http');
+const { aceptarWs, createApp, createLive } = require('./src/http');
 const { createAuth } = require('./src/auth');
 const { createPodio } = require('./src/podio');
 const { fmtDuration, LABELS } = require('./src/engine');
@@ -1089,6 +1089,14 @@ app.post('/api/actualizar/ahora', (req, res) => {
 });
 
 const server = http.createServer(app.handle);
+// Canal en vivo de los overlays por WebSocket (mismo contenido que /events?overlay=1, abierto igual que ese)
+server.on('upgrade', (req, sock) => {
+  // Solo páginas del propio reloj (un WebSocket no respeta CORS: sin esto cualquier web abierta podría escuchar)
+  let mismoOrigen = !req.headers.origin;
+  try { mismoOrigen = mismoOrigen || new URL(req.headers.origin).host === req.headers.host; } catch {}
+  if (!String(req.url || '').startsWith('/vivo') || !mismoOrigen || !aceptarWs(req, sock)) { sock.destroy(); return; }
+  live.attachWs(sock, [['state', stateMsg()]], 'overlay');
+});
 let hookServer;
 
 // ---------- Servidor de webhooks (el único que va al túnel) ----------

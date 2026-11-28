@@ -24,7 +24,7 @@ const OPEN_PATHS = new Set(['/overlay', '/overlay.html', '/sounds.js', '/login',
   // Overlay del tren del hype
   '/hype', '/hype.html', '/api/hype', '/hype-analisis.js',
   // Vigilante de overlays (🩺 Debug): cada overlay avisa que está vivo
-  '/latido.js', '/api/latido', '/api/estilo']);
+  '/latido.js', '/vivo.js', '/ajustar.js', '/api/latido', '/api/estilo']);
 
 // Lo único que puede usar un moderador
 const MOD_GET = new Set(['/mod', '/mod.html', '/mod.js', '/panel.css', '/api/mod/data', '/events']);

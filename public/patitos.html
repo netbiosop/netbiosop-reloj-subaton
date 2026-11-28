@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head>
+<script src="/vivo.js"></script>
 <script src="/latido.js"></script>
 <meta charset="utf-8">
 <title>Lluvia de patitos</title>
@@ -207,7 +208,7 @@ async function leerConfig(primera){
   } catch (e) { if (primera) restaurar(); }
 }
 function conectar(){
-  const es = new EventSource('/events?overlay=1');
+  const es = new EventoVivo('/events?overlay=1');
   es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'aporte') aporte(m.payload); } catch (e) {} };
   es.onerror = () => { es.close(); setTimeout(conectar, 3000); };
 }

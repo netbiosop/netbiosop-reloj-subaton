@@ -211,7 +211,7 @@ window.addEventListener('beforeunload', (e)=>{ if(cambios){ e.preventDefault(); 
 (async ()=>{
   const j = await api('/api/codigo/estado'); cfg = j.config; pintar(); pintarEstado(j); vistaPrevia();
   const base = location.origin.replace(/\/\/[^:/]+/, '//localhost');
-  $('urls').innerHTML = [['Tarjeta "Apoya a un creador"','/codigo-tarjeta','520 × 230'],['Cinta de noticias','/codigo-cinta','1920 × 60']]
+  $('urls').innerHTML = [['Tarjeta "Apoya a un creador"','/codigo-tarjeta','520 × 230 (o el tamaño que quieras)'],['Cinta de noticias','/codigo-cinta','1920 × 60 (o el tamaño que quieras)']]
     .map(([n,u,t])=>`<div class="url"><b>${n}</b><code>${base+u}</code><span class="tam">${t}</span><button class="sm" data-copy="${base+u}">Copiar</button></div>`).join('');
   $('urls').onclick = (e)=>{ const b = e.target.closest('[data-copy]'); if(b) navigator.clipboard?.writeText(b.dataset.copy).then(()=>{ b.textContent='✔ Copiado'; setTimeout(()=>b.textContent='Copiar',1200); }); };
   setInterval(estado, 5000);

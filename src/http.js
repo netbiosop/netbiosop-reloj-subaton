@@ -97,6 +97,41 @@ function createApp({ staticDir, guard } = {}) {
 }
 
 // Eventos en vivo (Server-Sent Events): el panel y el overlay los reciben al instante
+// ---------- WebSocket mínimo (solo lo que necesitan los overlays: el reloj manda, el overlay escucha) ----------
+const crypto = require('crypto');
+function aceptarWs(req, sock) {
+  const clave = req.headers['sec-websocket-key'];
+  if (!clave || String(req.headers.upgrade || '').toLowerCase() !== 'websocket') { sock.destroy(); return false; }
+  const acepto = crypto.createHash('sha1').update(clave + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${acepto}\r\n\r\n`);
+  sock.setNoDelay(true);
+  return true;
+}
+function enviarWs(sock, texto, op = 0x1) {
+  if (sock.destroyed) return;
+  const datos = Buffer.from(texto, 'utf8'), n = datos.length;
+  const cab = n < 126 ? Buffer.from([0x80 | op, n]) : n < 65536 ? Buffer.from([0x80 | op, 126, n >> 8, n & 255]) : Buffer.concat([Buffer.from([0x80 | op, 127, 0, 0, 0, 0]), Buffer.from([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255])]);
+  try { sock.write(Buffer.concat([cab, datos])); } catch {}
+}
+// Lee los cuadros que manda el navegador (solo importan cerrar y ping; el resto se descarta)
+function leerWs(sock, alCuadro) {
+  let buf = Buffer.alloc(0);
+  sock.on('data', (d) => {
+    buf = Buffer.concat([buf, d]);
+    while (buf.length >= 2) {
+      let largo = buf[1] & 127, pos = 2;
+      if (largo === 126) { if (buf.length < 4) return; largo = buf.readUInt16BE(2); pos = 4; }
+      else if (largo === 127) { if (buf.length < 10) return; largo = Number(buf.readBigUInt64BE(2)); pos = 10; }
+      const conMascara = buf[1] & 128; if (conMascara) pos += 4;
+      if (buf.length < pos + largo) return;
+      const op = buf[0] & 15;
+      buf = buf.subarray(pos + largo);
+      alCuadro(op);
+      if (largo > 1e6) { sock.destroy(); return; }
+    }
+  });
+}
+
 function createLive() {
   const clients = new Set();
   setInterval(() => {
@@ -132,6 +167,24 @@ function createLive() {
         live.onChange?.();
       });
     },
+    // Lo mismo por WebSocket (/vivo): los overlays de OBS lo usan porque el navegador de OBS permite solo
+    // 6 conexiones abiertas a la vez contra el reloj, y con varios overlays las de más quedaban esperando.
+    attachWs(sock, initial, mode = 'overlay') {
+      const cli = {
+        mode, transform: null, localOwner: false,
+        write(msg) {
+          if (msg.startsWith('data: ')) enviarWs(sock, msg.slice(6).trim());
+          else if (msg.startsWith(': ping')) enviarWs(sock, '', 0x9); // mantiene viva la conexión
+        },
+        end() { try { sock.end(Buffer.from([0x88, 0])); } catch {} },
+      };
+      clients.add(cli);
+      if (initial) for (const [type, payload] of initial) cli.write(`data: ${JSON.stringify({ type, payload })}\n\n`);
+      live.onChange?.();
+      const salir = () => { if (clients.delete(cli)) live.onChange?.(); };
+      sock.on('close', salir); sock.on('error', salir);
+      leerWs(sock, (op) => { if (op === 0x8) { cli.end(); salir(); } else if (op === 0x9) enviarWs(sock, '', 0xA); });
+    },
     // Corta en vivo la conexión de un usuario al que se le quitó el acceso
     kick(user) {
       for (const res of clients) if (res.user === user) { res.end(); clients.delete(res); }
@@ -155,4 +208,4 @@ function createLive() {
   return live;
 }
 
-module.exports = { createApp, createLive };
+module.exports = { aceptarWs, createApp, createLive };

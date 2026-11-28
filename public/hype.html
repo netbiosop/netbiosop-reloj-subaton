@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="es">
 <head>
+<script src="/vivo.js"></script>
 <script src="/latido.js"></script>
+<script src="/ajustar.js"></script>
 <meta charset="utf-8">
 <title>Tren del hype</title>
 <link rel="stylesheet" href="marca.css">
@@ -9,6 +11,7 @@
   /* Fuente de navegador: 1920 × 1080 (pantalla completa, fondo transparente).
      En OBS marca "Controlar audio a través de OBS" para que la canción salga en el stream. */
   html,body{width:1920px;height:1080px}
+  html{overflow:hidden} body{transform-origin:0 0}
   #escena{position:absolute;inset:0;overflow:hidden;--c:#ff2a36;--c2:#7a0a10;--p:0}
   #escena.tiembla{animation:tiembla .45s linear}
   canvas#fx{position:absolute;inset:0;pointer-events:none;z-index:20}
@@ -213,6 +216,9 @@ $('maglevGrande').innerHTML = maglev('#ff2a36', false);
 const flujoCss = document.createElement('style');
 flujoCss.textContent = '.flujo{animation:flujo .5s linear infinite}@keyframes flujo{to{stroke-dashoffset:-70}}';
 document.head.appendChild(flujoCss);
+// Se dibuja en 1920 × 1080 y se escala al tamaño de la fuente en OBS (eh = escala actual, para las chispas)
+let escHype = 1; const eh = () => escHype;
+ajustarAlTamano(document.body, 0, (s) => { escHype = s; });
 for (let i = 0; i < 14; i++){ const l = document.createElement('i'); l.style.top = (20 + Math.random() * 360) + 'px'; l.style.width = (120 + Math.random() * 380) + 'px'; l.style.animationDuration = (0.35 + Math.random() * .5) + 's'; l.style.animationDelay = (-Math.random()) + 's'; $('lineas').appendChild(l); }
 $('celdas').innerHTML = '<i></i>'.repeat(24);
 $('eq').innerHTML = '<i></i>'.repeat(12);
@@ -383,7 +389,7 @@ function enGolpe(i){
   const drops = [].concat(c.drop == null ? [] : c.drop).map(Number);
   if (sonido.activa() && pos != null && drops.some((d) => Math.abs(pos - d) < .25) && Math.round(pos * 4) !== ultimoDrop){
     ultimoDrop = Math.round(pos * 4); replay($('od'), 'on'); destello(); replay($('hud'), 'sacude');
-    const r = $('hud').getBoundingClientRect(); for (let k = 0; k < 5; k++) setTimeout(() => chispas(r.left + Math.random() * r.width, r.top + r.height / 2, 30, colorNivel(est ? est.nivel : 1)), k * 120);
+    const r = $('hud').getBoundingClientRect(); for (let k = 0; k < 5; k++) setTimeout(() => chispas((r.left + Math.random() * r.width) / eh(), (r.top + r.height / 2) / eh(), 30, colorNivel(est ? est.nivel : 1)), k * 120);
   }
 }
 
@@ -400,7 +406,7 @@ function pintarHud(e, conPop){
   $('pct').textContent = pct + '%';
   $('top').innerHTML = cfg.mostrarTop ? (e.top || []).map((c, i) => `<span class="chip">${i === 0 ? '👑' : ''}<b>${esc(c.nombre)}</b><small>${c.tipo === 'bits' ? c.total + ' bits' : c.tipo === 'subs' ? 'subs' : c.total + ' pts'}</small></span>`).join('') : '';
   if (conPop){ const m = document.createElement('div'); m.className = 'mas'; m.textContent = '+' + conPop; $('hud').appendChild(m); setTimeout(() => m.remove(), 1700); sonido.pop();
-    const cel = $('celdas').children[Math.max(0, n - 1)].getBoundingClientRect(); setTimeout(() => chispas(cel.right, cel.top + 10, 22, colorNivel(e.nivel)), 300); }
+    const cel = $('celdas').children[Math.max(0, n - 1)].getBoundingClientRect(); setTimeout(() => chispas(cel.right / eh(), (cel.top + 10) / eh(), 22, colorNivel(e.nivel)), 300); }
 }
 function relojTick(){
   if (!est || est.fase === 'fin' || !est.expira) return;
@@ -500,7 +506,7 @@ fetch('/api/hype', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
   const e = j.estado;
   if (e && e.fase !== 'fin' && e.expira > Date.now() + desfase){ est = e; mostrarHud(e); if (sonido.usaCancion() && cfg.musica !== false) sonido.empezarCancion().then(() => {}); else sonido.musica(e.nivel); }
 }).catch(() => {});
-const es = new EventSource('/events?overlay=1');
+const es = new EventoVivo('/events?overlay=1');
 es.onmessage = (ev) => { try { const m = JSON.parse(ev.data); if (m.type === 'hype') recibir(m.payload); } catch (e) {} };
 // Por si el tren vence sin aviso de "fin" (se cortó la conexión): se esconde solo
 setInterval(() => { if (est && est.fase !== 'fin' && est.expira && Date.now() + desfase > est.expira + 20000){ est = null; $('hud').classList.remove('on'); sonido.parar(); } }, 5000);

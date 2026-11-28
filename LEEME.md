@@ -6,23 +6,26 @@
 
 ## 🎨 Distribución recomendada en OBS (lienzo 1920 × 1080)
 
+> Escribe las URL completas, con `http://` delante (por ejemplo `http://127.0.0.1:3000/reyes`). Desde la 2.21.1 los overlays reciben los avisos en vivo por WebSocket: antes el navegador de OBS solo dejaba 6 conexiones abiertas con el reloj y, con muchos overlays, algunos no cargaban o no se actualizaban hasta reiniciar OBS.
+
 Medidas tomadas de tu stream: la columna izquierda pegada al borde (metas arriba, reloj, Top General) y el podio debajo de la cámara.
 
-| Fuente de navegador | URL | Ancho × Alto | Posición X, Y |
+| Fuente de navegador | URL | Ancho × Alto (sugerido) | Posición X, Y |
 |---|---|---|---|
-| Reloj | `http://localhost:3000/overlay?align=left&pops=right&size=84` | 900 × 150 | (como lo tienes) |
-| Metas del mes | `http://localhost:3000/metas` | 306 × 200 | 8, 15 |
-| Top General | `http://localhost:3000/top-general` | 306 × 195 | 8, 405 |
-| Podio del mes (debajo de la cámara) | `http://localhost:3000/podio` | 306 × 205 | 1553, 385 |
-| Reyes del mes pasado (abajo al centro) | `http://localhost:3000/reyes` | 640 × 112 | 640, 942 |
-| Código de creador: tarjeta (en lugar del cuadro azul) | `http://localhost:3000/codigo-tarjeta` | 520 × 230 | 1025, 78 |
-| Código de creador: cinta de noticias | `http://localhost:3000/codigo-cinta` | 1920 × 60 | 0, 1020 |
-| Tren del hype (arriba de todo) | `http://localhost:3000/hype` | 1920 × 1080 | 0, 0 |
+| Reloj | `http://127.0.0.1:3000/overlay?align=left&pops=right` | 900 × 150 | (como lo tienes) |
+| Metas del mes | `http://127.0.0.1:3000/metas` | 306 × 200 | 8, 15 |
+| Top General | `http://127.0.0.1:3000/top-general` | 306 × 195 | 8, 405 |
+| Podio del mes (debajo de la cámara) | `http://127.0.0.1:3000/podio` | 306 × 205 | 1553, 385 |
+| Reyes del mes pasado (abajo al centro) | `http://127.0.0.1:3000/reyes` | 640 × 112 | 640, 942 |
+| Código de creador: tarjeta (en lugar del cuadro azul) | `http://127.0.0.1:3000/codigo-tarjeta` | 520 × 230 | 1025, 78 |
+| Código de creador: cinta de noticias | `http://127.0.0.1:3000/codigo-cinta` | 1920 × 60 | 0, 1020 |
+| Tren del hype (arriba de todo) | `http://127.0.0.1:3000/hype` | 1920 × 1080 | 0, 0 |
 
-**Para que se vean nítidos (sin perder calidad):**
-- En cada fuente pon el **Ancho × Alto exacto** de la tabla y deja la escala al 100%: clic derecho → **Transformar → Restablecer transformación**. No las estires ni las achiques arrastrando las esquinas: OBS reescala la imagen y el texto se pone borroso.
-- Si alguna la quieres más grande, agrégale `?escala=1.2` a la URL y sube el Ancho × Alto en la misma proporción (ej. 306 × 200 → 368 × 240). Así se dibuja de nuevo a ese tamaño y sigue nítida.
-- Los textos chicos (categorías, montos, porcentajes) tienen tamaño mínimo de 14–16 px y contorno negro duro, para que se lean aunque Twitch comprima la imagen. Los nombres largos se achican solos para verse completos.
+**Tamaño libre (desde la 2.21.1):**
+- Las medidas de la tabla son solo una sugerencia. Cada overlay se agranda o achica solo para llenar el **Ancho × Alto** que le pongas a la fuente (propiedades de la fuente), sin deformarse y siempre nítido.
+- También puedes arrastrar las esquinas en OBS al tamaño que quieras. Funciona igual; si lo agrandas mucho arrastrando, el texto puede verse un poco más suave, y ahí conviene subir el Ancho × Alto en las propiedades.
+- Si quieres un tamaño fijo como antes: `?escala=1.2` (metas, podio, top, reyes, tarjeta) o `?size=84` (reloj). Sin eso, se adaptan solos.
+- El reloj ya no salta de lugar al arrancar, pausar o cuando entra un multiplicador: "EN PAUSA" y el multiplicador flotan encima y debajo sin empujar los números.
 
 - La posición se escribe en OBS con clic derecho en la fuente → **Transformar → Editar transformación**.
 - La cámara queda como la tienes (x 1560, y 96, 306 px de ancho). Si la mueves, alinea el podio con su borde izquierdo y su ancho.
@@ -105,7 +108,7 @@ Para activarlo, en el panel completo → **Acceso remoto y usuarios**:
 ## 3. Poner el reloj en OBS
 
 1. En OBS: **Fuentes → + → Navegador**.
-2. URL: `http://localhost:3000/overlay` · Ancho `900` · Alto `400`.
+2. URL: `http://127.0.0.1:3000/overlay` · Ancho `900` · Alto `400`.
 
 Ya viene animado: los números suben "rodando" cuando entra tiempo, cada tipo de aporte tiene su color e ícono (subs rosa, bits violeta, PayPal azul, Mercado Pago celeste), los aportes grandes (10 min o más) traen confeti y sacudón, con multiplicador activo el reloj brilla y el "x2" muestra un anillo con el tiempo que le queda, los últimos 10 minutos se ponen rojos y el último minuto late, y en pausa aparece **EN PAUSA** (o **VOLVEMOS PRONTO** con el stream apagado).
 
@@ -138,11 +141,11 @@ El overlay trae sonidos para cada evento: sub, bits, PayPal, Mercado Pago, aport
 - **Sonidos propios:** pon archivos `mp3`, `wav`, `ogg` o `m4a` en la carpeta `sonidos` con estos nombres: `sub`, `bits`, `paypal`, `mercadopago`, `grande`, `multiplicador`, `final`, `fin`, `manual` (ej. `grande.mp3`). El panel marca cuáles son "propios".
 - Si usas dos copias del overlay en OBS, agrega `?sound=0` a una para que no suene doble.
 
-Ejemplo: `http://localhost:3000/overlay?theme=glass&accent=00e0a4&recent=1&total=1`
+Ejemplo: `http://127.0.0.1:3000/overlay?theme=glass&accent=00e0a4&recent=1&total=1`
 
 ## 🎛️ Menú principal y "Pausar todo"
 
-Al abrir el reloj (o en `http://localhost:3000/menu`) aparece el **Centro de control**: el estado del reloj, las conexiones, las metas del mes, los últimos aportes y una tarjeta por cada módulo con su botón **Abrir** (cada uno en su propia pestaña) y las URLs de sus overlays para copiar:
+Al abrir el reloj (o en `http://127.0.0.1:3000/menu`) aparece el **Centro de control**: el estado del reloj, las conexiones, las metas del mes, los últimos aportes y una tarjeta por cada módulo con su botón **Abrir** (cada uno en su propia pestaña) y las URLs de sus overlays para copiar:
 
 - **Reloj Subatón** (`/panel`): el reloj, multiplicadores, tiempo que suma cada cosa, sonidos del overlay, historial y **🧪 Probar** (plegable: tócalo para mostrarlo u ocultarlo; recuerda cómo lo dejaste).
 - **Podio y Metas del mes** (`/podio-panel`).
@@ -161,7 +164,7 @@ Para seguir escuchando, la PC tiene que estar prendida. Si la apagas, al volver 
 
 Cuando donan por **Mercado Pago** caen patitos **amarillos** y por **PayPal** patitos **verdes**, repartidos por toda la pantalla. Rebotan y se apilan abajo, mezclados.
 
-- En OBS: Fuente → Navegador → `http://localhost:3000/patitos`, tamaño **1920 × 1080** (pantalla completa, encima del juego).
+- En OBS: Fuente → Navegador → `http://127.0.0.1:3000/patitos`, tamaño **1920 × 1080** (pantalla completa, encima del juego).
 - Todo se configura en el panel del podio, sección 🦆:
   - **Por cada X USD caen Y patitos** (proporcional; Mercado Pago se convierte a USD). Ej.: 5 USD → 10 patitos, entonces 10 USD → 20 y 2,50 USD → 5.
   - **Duración en pantalla (min):** si pasa ese tiempo sin donaciones, los patitos se van. Con la próxima donación vuelven a caer **todos los acumulados** más los nuevos. Con 0 no se van nunca.
@@ -269,7 +272,7 @@ Cuando arranca un tren del hype en Twitch, cruza la pantalla una locomotora con 
 - **El tiempo del tren** es el mismo que muestra Twitch: el reloj se calibra solo con la hora de Twitch, aunque la hora de Windows esté corrida (si lo está, la ventana del reloj te avisa). Los espectadores ven el video con unos segundos de retraso respecto del chat, así que una diferencia de pocos segundos con el cartel de Twitch es normal.
 - **Al terminar** sale "¡Tren completado!" con el nivel, los puntos y el podio de los 3 que más aportaron.
 - **Panel:** menú → **Tren del hype** (`/hype-panel`). Botones para probar (empieza, suma puntos, sube de nivel, termina), volumen, música y efectos por separado, barra arriba o abajo, título.
-- **OBS:** fuente de navegador `http://localhost:3000/hype`, 1920 × 1080, **arriba de todo**, con **"Controlar audio a través de OBS"** marcado para que la música salga en el stream.
+- **OBS:** fuente de navegador `http://127.0.0.1:3000/hype`, 1920 × 1080, **arriba de todo**, con **"Controlar audio a través de OBS"** marcado para que la música salga en el stream.
 - **Twitch:** necesita un permiso nuevo. Si ya estabas conectado, en **Configuración → Conexiones** pulsa **Desconectar** y vuelve a **Conectar con Twitch**.
 - **Tren futurista con tu canción:** el tren es un maglev de neón que levita sobre un riel de luz, con barra holográfica, celdas de energía y ecualizador. Con tu `hype-inicio.mp3` (128 BPM) suena desde el principio: el tren entra en el golpe fuerte (2 s), la barra aparece en el siguiente (9,5 s), todo late a cada golpe, los festejos de nivel caen justo en el golpe y en el drop (32 s) sale **⚡ OVERDRIVE ⚡**. Mientras dura el tren, la canción repite la parte de 17 s a 47 s sin cortes y, al terminar, salta a los 47 s para cerrar. Se activa y se ajusta en el panel → *Canción sincronizada*. **Puedes usar cualquier canción:** en el panel → *Canción del tren* elígela de tu carpeta `sonidos` o tócala en **⬆️ Subir canción**. El reloj la mide sola en unos segundos (ritmo, golpes fuertes, drops, la parte que se repite y el final) y te muestra los tiempos. Si algo no te convence, **🔄 Volver a medir** o ajústalo a mano en *Ajustar los tiempos a mano*.
 - **Sonidos uno por uno:** en el panel puedes apagar por separado el sonido de inicio, la fanfarria de nivel, los sonidos chicos, el final y la música. Si tu `hype-inicio.mp3` es largo, deja marcado **"Mientras suena mi sonido de inicio, que no suene nada más"**: nada lo pisa y la música de fondo arranca cuando termina. Si el tren termina antes, el inicio se apaga suave y suena el final.
@@ -279,7 +282,7 @@ Cuando arranca un tren del hype en Twitch, cruza la pantalla una locomotora con 
 
 Reemplaza el cuadro azul de Fortnite por una tarjeta animada con tu estilo. Entra deslizándose, el código se escribe solo, un puntero aprieta **ACEPTAR**, sale "¡Gracias por apoyarme!" y vuelan monedas. Abajo pasa una **cinta de noticias** con el código de cada plataforma y tus mensajes.
 
-- Se configura en el menú → **Código de creador** (o `http://localhost:3000/codigo-panel`).
+- Se configura en el menú → **Código de creador** (o `http://127.0.0.1:3000/codigo-panel`).
 - **Plataformas:** agrega, edita, ordena o desactiva las que quieras (juego, dónde se usa, código y un aviso chico). La tarjeta y la cinta rotan entre las activas. Epic pide aclarar que recibes una comisión: déjalo en el aviso.
 - **Cada cuánto:** la tarjeta y la cinta tienen cada una su "cada X minutos" y "cuántos segundos queda". Nunca salen las dos juntas. Con 0 minutos solo salen con **▶ Mostrar ahora**.
 - **Cinta estilo noticiero:** a la izquierda dice **URGENTE** con una luz que titila (cámbialo por NEWS o lo que quieras en *Etiqueta*). La **velocidad** viene en 55: más bajo es más lento.
@@ -297,16 +300,16 @@ El reloj arma solo un **podio del mes** con los aportes que registra; no hay que
 - Las **pruebas** del simulador no cuentan.
 - Va del **día 1 al último día de cada mes** (hora de tu PC). Al empezar un mes nuevo el podio queda en cero solo, y los #1 del mes que terminó pasan al overlay **Reyes del mes pasado**.
 
-Panel: botón **🏆 Podio** arriba en el panel del reloj, o `http://localhost:3000/podio-panel`. Ahí ves el ranking de cada mes, los reyes, la conversión a dólares y los títulos. También puedes **agregar a mano** una transferencia que el reloj no detectó, **cambiar el nombre** de un aporte (si Mercado Pago lo trajo como "Juan" y en Twitch es "juancho99", así se suman juntos) o **quitarlo** del podio. Nada de esto cambia el tiempo del reloj. En el **ranking**, el botón ✏️ de cada fila le cambia el nombre a esa persona en todos sus aportes del mes (por ejemplo "Donación Mercado Pago" → su usuario de Twitch); si pones un nombre que ya está, se suman juntos. Los **reyes del mes pasado** se calculan solos, pero con **Editar** / **Agregar** puedes ponerlos a mano y con **Automático** vuelven al cálculo normal.
+Panel: botón **🏆 Podio** arriba en el panel del reloj, o `http://127.0.0.1:3000/podio-panel`. Ahí ves el ranking de cada mes, los reyes, la conversión a dólares y los títulos. También puedes **agregar a mano** una transferencia que el reloj no detectó, **cambiar el nombre** de un aporte (si Mercado Pago lo trajo como "Juan" y en Twitch es "juancho99", así se suman juntos) o **quitarlo** del podio. Nada de esto cambia el tiempo del reloj. En el **ranking**, el botón ✏️ de cada fila le cambia el nombre a esa persona en todos sus aportes del mes (por ejemplo "Donación Mercado Pago" → su usuario de Twitch); si pones un nombre que ya está, se suman juntos. Los **reyes del mes pasado** se calculan solos, pero con **Editar** / **Agregar** puedes ponerlos a mano y con **Automático** vuelven al cálculo normal.
 
 Overlays para OBS (Fuente → Navegador). Todos tienen **fondo transparente** y el mismo estilo:
 
 | Overlay | URL | Tamaño |
 |---|---|---|
-| Metas del mes | `http://localhost:3000/metas` | 320 × 190 |
-| Podio del mes (rota Donadores → Subs → Bits) | `http://localhost:3000/podio` | 320 × 200 |
-| Top General del mes (el #1 de cada categoría) | `http://localhost:3000/top-general` | 360 × 200 |
-| Reyes del mes pasado | `http://localhost:3000/reyes` | 380 × 140 |
+| Metas del mes | `http://127.0.0.1:3000/metas` | 320 × 190 |
+| Podio del mes (rota Donadores → Subs → Bits) | `http://127.0.0.1:3000/podio` | 320 × 200 |
+| Top General del mes (el #1 de cada categoría) | `http://127.0.0.1:3000/top-general` | 360 × 200 |
+| Reyes del mes pasado | `http://127.0.0.1:3000/reyes` | 380 × 140 |
 
 **Metas del mes:** se llenan solas. *Subs* cuenta todas las subs del mes (nuevas, resubs y regaladas), *Bits* los bits y *Donado* PayPal + Mercado Pago en USD. En el panel del podio pones la meta de cada una, el nombre que se ve, y en "Ya tenías" lo que llevabas este mes antes de usar el reloj (solo cuenta para ese mes). Cuando una meta se cumple, la barra se pone dorada con confeti.
 
@@ -342,7 +345,7 @@ No necesita abrir puertos ni túneles.
 
 1. Entra a <https://dev.twitch.tv/console/apps> → **Registrar aplicación**.
 2. Nombre: lo que quieras (ej. `Reloj subaton TuCanal`).
-3. URL de redireccionamiento OAuth: `http://localhost:3000/auth/twitch/callback`
+3. URL de redireccionamiento OAuth: `http://127.0.0.1:3000/auth/twitch/callback`
 4. Categoría: **Broadcaster Suite** · Tipo de cliente: **Confidencial**.
 5. Copia el **Client ID**, pulsa **Nuevo secreto** y copia el **Client Secret**.
 6. En el panel → Conexiones → Twitch: pégalos, **Guardar**, y luego **Conectar con Twitch** (inicia sesión con la cuenta del canal).

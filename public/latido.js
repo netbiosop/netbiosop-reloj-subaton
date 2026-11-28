@@ -42,7 +42,7 @@
   }
 
   try {
-    new EventSource('/events?overlay=1').onmessage = (ev) => {
+    new (window.EventoVivo || EventSource)('/events?overlay=1').onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       const p = m.payload || {};
       if (m.type === 'debug-revisar') responder();

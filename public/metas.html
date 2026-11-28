@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="es">
 <head>
+<script src="/vivo.js"></script>
 <script src="/latido.js"></script>
+<script src="/ajustar.js"></script>
 <meta charset="utf-8">
 <title>Metas del mes</title>
 <link rel="stylesheet" href="marca.css">
@@ -59,8 +61,8 @@
 const fmt = (cat,v) => cat==='dinero' ? '$'+(Number.isInteger(v)?v:(Math.round(v*100)/100).toFixed(2)) : Math.round(v).toLocaleString('es');
 const replay = (el,cls)=>{ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 const params = new URLSearchParams(location.search);
-const escala = parseFloat(params.get('escala'));
-if(escala>0) document.getElementById('wrap').style.transform = `scale(${escala})`;
+let escala = parseFloat(params.get('escala'));
+ajustarAlTamano(document.getElementById('wrap'), escala, (s) => { escala = s; });
 const wrap = document.getElementById('wrap'), filasEl = document.getElementById('filas');
 let filas = {}, valores = {}, firma = '', primera = true;
 
@@ -143,7 +145,7 @@ async function cargar(){
   }catch(e){ /* reloj apagado: queda lo último */ }
 }
 cargar(); setInterval(cargar, 10000); // respaldo: los cambios llegan al instante por /events
-try { new EventSource('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
+try { new EventoVivo('/events?overlay=1').onmessage = (ev) => { try { if (JSON.parse(ev.data).type === 'podio') cargar(); } catch (e) {} }; } catch (e) {}
 Iconos.auto(filasEl);
 const repetir = parseFloat(params.get('repetir'));
 if(repetir>=10) setInterval(()=>replay(wrap,'entra'), repetir*1000);

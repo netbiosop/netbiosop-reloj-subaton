@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head>
+<script src="/vivo.js"></script>
 <script src="/latido.js"></script>
 <meta charset="utf-8">
 <title>Reloj Subatón – Overlay</title>
@@ -14,7 +15,7 @@
     pops=right       los "+tiempo" salen a la DERECHA del reloj (por defecto salen arriba)
     color=ffffff     color de los números (hex sin #)
     accent=b48cff    color del multiplicador, brillos y popups
-    size=140         tamaño de los números en px
+    size=140         tamaño fijo de los números en px (sin size se ajusta solo al tamaño de la fuente en OBS)
     font=Bebas Neue  cualquier fuente de Google Fonts
     bg=000000        fondo (por defecto transparente)
 
@@ -60,7 +61,12 @@
     color: var(--color);
   }
   #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
-  .wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: calc(var(--size) * .07); }
+  .wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+  /* "EN PAUSA" arriba y el multiplicador/total/recientes abajo van flotando: así el reloj no salta de lugar
+     cuando aparecen o desaparecen (antes se movía 15–35 px al arrancar, pausar o entrar un multiplicador) */
+  .status { position: absolute; bottom: calc(100% + var(--size) * .07); left: 50%; translate: -50% 0; white-space: nowrap; }
+  .debajo { position: absolute; top: calc(100% + var(--size) * .07); left: 50%; translate: -50% 0; width: max-content; max-width: 96vw;
+    display: flex; flex-direction: column; align-items: center; gap: calc(var(--size) * .07); }
 
   /* ---------- tarjeta y números ---------- */
   .card { position: relative; display: flex; flex-direction: column; align-items: center; transition: transform .3s ease; }
@@ -183,7 +189,8 @@
 
   /* ---------- alineado a la izquierda y popups a la derecha ---------- */
   body.align-left { justify-content: flex-start; padding-left: 6px; }
-  body.align-left .wrap, body.align-left .card { align-items: flex-start; }
+  body.align-left .wrap, body.align-left .card, body.align-left .debajo { align-items: flex-start; }
+  body.align-left .status, body.align-left .debajo { left: 0; translate: none; }
   .pops-right .card .pops { bottom: auto; top: 50%; left: 100%; width: auto; height: 0; transform: none; margin-left: calc(var(--size) * .3); }
   .pops-right .pop { left: 0; bottom: auto; top: 0; align-items: flex-start; animation-name: riseR; }
   .pops-right .pop.out { animation: popOutR .35s ease forwards; }
@@ -222,12 +229,14 @@
     <div class="bar" id="bar"><i></i></div>
     <div class="pops" id="pops"></div>
   </div>
+  <div class="debajo" id="debajo">
   <div class="mult" id="mult">
     <span class="ring"><svg viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="16"/><circle class="fg" id="ringFg" cx="20" cy="20" r="16" stroke-dasharray="100.53" stroke-dashoffset="0"/></svg><b id="multVal">x2</b></span>
     <span id="multSrc"></span><span class="left" id="multLeft"></span>
   </div>
   <div class="total" id="total"></div>
   <div class="recent" id="recent"></div>
+  </div>
 </div>
 <script src="/sounds.js"></script>
 <script>
@@ -246,7 +255,26 @@
   if (hex(q.get('color'))) root.setProperty('--color', hex(q.get('color')));
   if (hex(q.get('accent'))) root.setProperty('--accent', hex(q.get('accent')));
   if (hex(q.get('bg'))) root.setProperty('--bg', hex(q.get('bg')));
+  // Tamaño: con ?size=84 queda fijo; sin size se ajusta solo al Ancho × Alto que le pongas a la fuente en OBS
   if (num('size', 0) > 0) root.setProperty('--size', num('size', 140) + 'px');
+  else {
+    const ajustarTam = () => {
+      const st = document.getElementById('status'), mu = document.getElementById('mult'), tot = document.getElementById('total');
+      const card = document.getElementById('card'), pr = q.get('pops') === 'right', tm = document.getElementById('time');
+      const antes = [st.className, mu.className, tm.innerHTML];
+      tm.textContent = '88:88:88';
+      root.setProperty('--size', '100px');
+      st.classList.add('show'); mu.classList.add('show'); // se mide con todo visible para que nunca se corte
+      const arriba = st.offsetHeight + 7, abajo = mu.offsetHeight + (tot.classList.contains('show') ? tot.offsetHeight + 7 : 0) + 7;
+      const alto = card.offsetHeight + 2 * Math.max(arriba, abajo), ancho = card.offsetWidth * (pr ? 1.45 : 1) + 12;
+      st.className = antes[0]; mu.className = antes[1]; tm.innerHTML = antes[2];
+      const t = Math.max(16, Math.floor(100 * Math.min(innerWidth / ancho, innerHeight / alto)));
+      root.setProperty('--size', t + 'px');
+    };
+    addEventListener('resize', ajustarTam);
+    addEventListener('load', ajustarTam);
+    document.fonts && document.fonts.ready.then(ajustarTam);
+  }
   const defaultFont = { neon: 'Orbitron', minimal: 'Inter' }[theme] || 'Bebas Neue';
   const font = q.get('font') || defaultFont;
   root.setProperty('--font', `'${font.replace(/'/g, '')}'`);
@@ -483,7 +511,7 @@
   }
   let es;
   function connectEvents() {
-    es = new EventSource('/events?overlay=1');
+    es = new EventoVivo('/events?overlay=1');
     es.onerror = () => {
       freeze();
       if (es.readyState === 2) setTimeout(connectEvents, 3000); // conexión cerrada del todo: abrir una nueva
